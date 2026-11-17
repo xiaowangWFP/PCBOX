@@ -1,0 +1,16 @@
+package com.phoneconsole.client.model;
+
+/**
+ * 硬件监控推送报文。
+ */
+public class TelemetryMessage {
+    public String type;
+    public double cpu;
+    public double mem;
+    /** GPU 占用百分比；-1 表示 PC 端无法采集 */
+    public double gpu = -1;
+    public String netUp;
+    public String netDown;
+    public int volume;
+    public boolean isMuted;
+}

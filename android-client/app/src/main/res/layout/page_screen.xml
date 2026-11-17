@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <LinearLayout
+        android:id="@+id/screen_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingBottom="8dp">
+
+        <Button
+            android:id="@+id/stream_btn"
+            style="@style/PrimaryButton"
+            android:text="开始监视" />
+
+        <TextView
+            android:id="@+id/btn_monitor"
+            style="@style/Chip"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_mode_tag"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="选择屏幕"
+            android:textColor="@color/accent" />
+
+        <TextView
+            style="@style/Chip"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_mode_tag"
+            android:text="1920×1080 · 60fps · H.264"
+            android:textColor="@color/accent" />
+
+        <TextView
+            android:id="@+id/stream_state"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:text="屏幕监视仅通过 USB 高速通道传输"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/screen_stage"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@android:color/black">
+
+        <TextureView
+            android:id="@+id/screen_texture"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center" />
+
+        <TextView
+            android:id="@+id/screen_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:lineSpacingExtra="6dp"
+            android:padding="20dp"
+            android:text="正在检测连接通道…"
+            android:textColor="@color/text_muted"
+            android:textSize="13sp" />
+
+        <!-- 全屏放大 / 退出全屏（TextView 避免被主题 backgroundTint 染色） -->
+        <TextView
+            android:id="@+id/btn_fullscreen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_mode_tag"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp"
+            android:text="⛶ 全屏"
+            android:textColor="@color/accent"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

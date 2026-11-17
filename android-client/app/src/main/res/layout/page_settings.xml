@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PC 局域网地址（无线模式）"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/lan_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_card"
+            android:hint="192.168.1.100:8500"
+            android:inputType="textUri"
+            android:padding="12dp"
+            android:singleLine="true"
+            android:textColor="@color/text_primary"
+            android:textColorHint="#475569"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/save_lan_btn"
+            style="@style/PrimaryButton"
+            android:layout_marginTop="12dp"
+            android:text="保存并重连" />
+
+        <TextView
+            android:id="@+id/conn_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:lineSpacingExtra="4dp"
+            android:text="尚未连接"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:lineSpacingExtra="6dp"
+            android:text="使用说明：\n· 有线：开启 USB 调试并插线，PC 服务端自动执行 adb reverse，走 127.0.0.1:8500，无需填写地址。\n· 无线：填写 PC 的局域网 IP（默认端口 8500），保存后立即重连。\n· 屏幕监视依赖 USB 高带宽，Wi-Fi 下自动禁用并提示。"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

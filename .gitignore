@@ -1,0 +1,23 @@
+# 开发文档（按要求不上传）
+开发进度文档/
+*.md
+*.markdown
+
+# 构建产物与缓存
+.gradle/
+**/build/
+**/target/
+*.class
+*.dex
+*.flat
+*.iml
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# 本地配置与密钥
+local.properties
+keystore.properties
+keystore/
+config.json
