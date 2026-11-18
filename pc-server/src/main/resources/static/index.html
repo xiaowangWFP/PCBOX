@@ -865,12 +865,16 @@
         el.addEventListener('pointerup', () => {
             el.classList.remove('pressed');
             clear();
-            sendAction(buttonId, longPressed ? 'long_press_end' : 'click');
+            const wasLongPress = longPressed;
+            longPressed = false;
+            sendAction(buttonId, wasLongPress ? 'long_press_end' : 'click');
         });
         const cancel = () => {
             el.classList.remove('pressed');
             clear();
-            if (longPressed) sendAction(buttonId, 'long_press_cancel');
+            const wasLongPress = longPressed;
+            longPressed = false;
+            if (wasLongPress) sendAction(buttonId, 'long_press_cancel');
         };
         el.addEventListener('pointercancel', cancel);
         el.addEventListener('pointerleave', cancel);

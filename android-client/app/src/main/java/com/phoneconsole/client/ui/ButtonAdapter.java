@@ -166,8 +166,11 @@ public class ButtonAdapter extends RecyclerView.Adapter<ButtonAdapter.ButtonHold
 
                 case MotionEvent.ACTION_UP:
                     view.setAlpha(1f);
+                    // 必须先取出长按状态：resetGesture() 会把 longPressed 置回 false，
+                    // 否则长按松手会误发 click，PC 端收不到 long_press_end 而一直连发。
+                    boolean wasLongPress = longPressed;
                     resetGesture();
-                    emit(longPressed ? "long_press_end" : "click");
+                    emit(wasLongPress ? "long_press_end" : "click");
                     return true;
 
                 case MotionEvent.ACTION_CANCEL:

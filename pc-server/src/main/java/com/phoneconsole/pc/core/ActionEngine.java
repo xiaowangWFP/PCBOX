@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -27,6 +28,12 @@ public class ActionEngine {
     private static final long REPEAT_INTERVAL_MS = 120L;
     /** 单次长按最长持续时长：即使 long_press_end 丢失也不会永久运行 */
     private static final long MAX_REPEAT_MS = 10_000L;
+
+    /** 只有连续量调节类命令允许 120ms 连发；一次性开关/切窗/播放控制只执行一次 */
+    private static final Set<String> REPEATABLE_MEDIA = Set.of("volume_up", "volume_down");
+    private static final Set<String> REPEATABLE_HOTKEYS = Set.of(
+            "up", "down", "left", "right", "pageup", "pagedown",
+            "home", "end", "backspace", "delete", "del");
 
     private volatile AppConfig config;
     private final MediaController media = new MediaController();
@@ -147,11 +154,17 @@ public class ActionEngine {
      * 三重防护：按连接隔离、同连接重复 start 覆盖旧任务、超过 10 秒自动停止。
      */
     private void startRepeat(Object owner, AppConfig.ButtonConfig button) {
-        if (button.action == null || button.action.toggle) {
+        if (button.action == null) {
             return;
         }
         String type = button.action.type == null ? "" : button.action.type.toLowerCase(Locale.ROOT);
         if (!"media".equals(type) && !"hotkey".equals(type)) {
+            return;
+        }
+        if (!isRepeatable(button)) {
+            // 静音、播放/暂停、Alt+Tab、Ctrl+Shift+Esc 等一次性动作：
+            // 长按只执行一次，避免 120ms 反复点按导致状态来回横跳。
+            execute(button);
             return;
         }
 
@@ -175,6 +188,31 @@ public class ActionEngine {
         if (previous != null) {
             previous.cancel(false);
         }
+    }
+
+    /**
+     * 是否允许长按连发。
+     * 仅放行：媒体音量加减、单键方向/翻页/删除类导航键。
+     * 组合键、开关型动作、播放控制、启动应用等一律只执行一次。
+     */
+    static boolean isRepeatable(AppConfig.ButtonConfig button) {
+        if (button == null || button.action == null || button.action.toggle) {
+            return false;
+        }
+        AppConfig.ActionConfig action = button.action;
+        String type = action.type == null ? "" : action.type.toLowerCase(Locale.ROOT);
+        if ("media".equals(type)) {
+            String command = action.command == null ? "" : action.command.toLowerCase(Locale.ROOT);
+            return REPEATABLE_MEDIA.contains(command);
+        }
+        if ("hotkey".equals(type)) {
+            List<String> keys = action.keys;
+            if (keys == null || keys.size() != 1 || keys.get(0) == null) {
+                return false;
+            }
+            return REPEATABLE_HOTKEYS.contains(keys.get(0).trim().toLowerCase(Locale.ROOT));
+        }
+        return false;
     }
 
     /** 停止指定连接上某个按钮的长按任务 */

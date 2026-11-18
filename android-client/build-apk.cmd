@@ -3,6 +3,7 @@ rem 一键打包签名 APK，产物：dist\phone-console-<版本>-release.apk
 setlocal
 cd /d "%~dp0"
 
+if not defined ANDROID_HOME if exist "..\sdk" set "ANDROID_HOME=%~dp0..\sdk"
 if not defined ANDROID_HOME set "ANDROID_HOME=D:\android-sdk"
 if not defined ANDROID_SDK_ROOT set "ANDROID_SDK_ROOT=%ANDROID_HOME%"
 
@@ -13,6 +14,6 @@ if errorlevel 1 (
 )
 
 if not exist "..\dist" mkdir "..\dist"
-copy /y "app\build\outputs\apk\release\phone-console-0.1.0-release.apk" "..\dist\" >nul
-echo [完成] ..\dist\phone-console-0.1.0-release.apk
+copy /y "app\build\outputs\apk\release\*.apk" "..\dist\" >nul
+echo [完成] 产物已复制到 ..\dist\
 endlocal

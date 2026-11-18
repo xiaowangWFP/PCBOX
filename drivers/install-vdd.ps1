@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$root = 'd:\手机连接电脑方案\drivers'
+$root = $PSScriptRoot
 $src = Join-Path $root 'vdd\VirtualDisplayDriver'
 $nef = Join-Path $root 'nefcon\x64\nefconc.exe'
 $dest = 'C:\VirtualDisplayDriver'
