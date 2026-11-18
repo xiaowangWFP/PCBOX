@@ -27,6 +27,7 @@ import com.phoneconsole.client.model.ButtonItem;
 import com.phoneconsole.client.model.ButtonStateMessage;
 import com.phoneconsole.client.model.LayoutMessage;
 import com.phoneconsole.client.model.ScreenDevicesMessage;
+import com.phoneconsole.client.model.ScreenStateMessage;
 import com.phoneconsole.client.model.SessionMessage;
 import com.phoneconsole.client.model.TelemetryMessage;
 import com.phoneconsole.client.net.ConnectionManager;
@@ -53,8 +54,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     private static final String DEFAULT_PAGE = "default_page";
 
-    private static final int STREAM_WIDTH = 1920;
-    private static final int STREAM_HEIGHT = 1080;
+    /** 推流格式兜底值：实际尺寸与帧率由服务端 screen_state / screen_stats 下发 */
+    private static final int DEFAULT_STREAM_WIDTH = 1280;
+    private static final int DEFAULT_STREAM_HEIGHT = 720;
+    private static final int DEFAULT_STREAM_FPS = 30;
 
     // 侧边栏 / 顶栏
     private View sidebar;
@@ -104,7 +107,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private GridLayoutManager gridLayoutManager;
     private int layoutRows = 3;
 
-    // 屏幕页（H.264 1080p60 固定）
+    // 屏幕页（H.264，格式随服务端 config.json 下发）
     private Button streamBtn;
     private TextView streamState;
     private TextureView screenTexture;
@@ -143,6 +146,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     private double actualFps;
     private int streamKbps;
+    // 当前推流编码格式，随服务端报文更新
+    private int streamWidth = DEFAULT_STREAM_WIDTH;
+    private int streamHeight = DEFAULT_STREAM_HEIGHT;
+    private int streamFps = DEFAULT_STREAM_FPS;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
@@ -380,7 +387,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                 screenSurface = new Surface(surfaceTexture);
                 applyScreenAspect();
                 if ((streamRequested || streaming) && !h264Decoder.isRunning() && screenSurface.isValid()) {
-                    h264Decoder.start(screenSurface);
+                    h264Decoder.start(screenSurface, streamWidth, streamHeight, streamFps);
                 }
             }
 
@@ -524,8 +531,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     /**
-     * 舞台内按 16:9 等比摆放 TextureView（不依赖 setTransform）：
-     * 画面区域严格 16:9，四周由舞台的黑色背景填充，任何尺寸下都不会拉伸。
+     * 舞台内按推流实际宽高比等比摆放 TextureView（不依赖 setTransform）：
+     * 比例跟随服务端编码尺寸（默认 1280x720，按采集源比例可能变化），
+     * 超宽屏等非 16:9 采集源也不会拉伸，四周由舞台的黑色背景填充。
      */
     private void applyScreenAspect() {
         if (screenTexture == null || screenStage == null) {
@@ -533,25 +541,56 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         int stageWidth = screenStage.getWidth();
         int stageHeight = screenStage.getHeight();
-        if (stageWidth <= 0 || stageHeight <= 0) {
+        if (stageWidth <= 0 || stageHeight <= 0 || streamWidth <= 0 || streamHeight <= 0) {
             return;
         }
-        float scale = Math.min(stageWidth / (float) STREAM_WIDTH, stageHeight / (float) STREAM_HEIGHT);
-        int width = Math.max(1, Math.round(STREAM_WIDTH * scale));
-        int height = Math.max(1, Math.round(STREAM_HEIGHT * scale));
+        float scale = Math.min(stageWidth / (float) streamWidth, stageHeight / (float) streamHeight);
+        int width = Math.max(1, Math.round(streamWidth * scale));
+        int height = Math.max(1, Math.round(streamHeight * scale));
         ViewGroup.LayoutParams params = screenTexture.getLayoutParams();
         if (params.width != width || params.height != height) {
             params.width = width;
             params.height = height;
             screenTexture.setLayoutParams(params);
         }
-        // 缓冲区本身是 1920x1080，缩放交给视图尺寸完成
+        // 缓冲区按编码尺寸输出，缩放交给视图尺寸完成
         screenTexture.setTransform(null);
+    }
+
+    /** 采用服务端下发的推流格式；尺寸变化时重新计算画面比例 */
+    private void applyStreamFormat(int width, int height, int fps) {
+        if (fps > 0) {
+            streamFps = fps;
+        }
+        if (width <= 0 || height <= 0 || (width == streamWidth && height == streamHeight)) {
+            return;
+        }
+        streamWidth = width;
+        streamHeight = height;
+        applyScreenAspect();
+        screenStage.post(this::applyScreenAspect);
+    }
+
+    /** 服务端热更新参数导致分辨率变化时，按新尺寸重建解码器等待下一个 IDR */
+    private void restartDecoder() {
+        if (!streaming || screenSurface == null || !screenSurface.isValid()) {
+            return;
+        }
+        firstFrame = false;
+        screenHint.setVisibility(View.VISIBLE);
+        screenHint.setText("画面参数已更新，正在等待 H.264 关键帧…");
+        h264Decoder.start(screenSurface, streamWidth, streamHeight, streamFps);
+    }
+
+    /** 当前推流格式文本，如 1280×720@30 H.264 */
+    private String streamFormat() {
+        return streamWidth + "×" + streamHeight + "@" + streamFps + " H.264";
     }
 
     private String streamSummary() {
         StringBuilder text = new StringBuilder()
-                .append("实际 ").append(String.format(Locale.ROOT, "%.1f", actualFps)).append(" fps");
+                .append(streamFormat())
+                .append(" · 实际 ").append(String.format(Locale.ROOT, "%.1f", actualFps)).append(" fps");
         if (streamKbps > 0) {
             text.append(streamKbps >= 1024
                     ? String.format(Locale.ROOT, " · %.1f MB/s", streamKbps / 1024.0)
@@ -694,6 +733,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         transport = session.transport == null ? "lan" : session.transport;
         screenAllowed = session.screenStream;
+        // 通道帧率上限先按会话报文预估，推流启动后以 screen_state 下发的实际值为准
+        if (session.screenMaxFps > 0) {
+            streamFps = session.screenMaxFps;
+        }
         modeView.setText("usb".equals(transport) ? "USB" : "Wi-Fi");
         sidebarFoot.setText(("usb".equals(transport) ? "USB 高速通道" : "Wi-Fi 局域网通道"));
         updateScreenUi();
@@ -704,7 +747,11 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     @Override
-    public void onScreenState(boolean streaming, String reason) {
+    public void onScreenState(ScreenStateMessage state) {
+        if (state == null) {
+            return;
+        }
+        String reason = state.reason;
         if ("usb_required".equals(reason)) {
             screenAllowed = false;
             this.streaming = false;
@@ -720,7 +767,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                     ? "服务端未找到 ffmpeg，请检查 PC 端 config.json 的 screen.ffmpegExecutable"
                     : "H.264 编码器启动失败，请查看 PC 服务端运行日志");
             streamState.setText("推流不可用");
-        } else if (streaming) {
+        } else if (state.streaming) {
+            applyStreamFormat(state.width, state.height, state.fps);
             this.streaming = true;
             streamRequested = false;
             actualFps = 0;
@@ -729,9 +777,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             screenHint.setVisibility(View.VISIBLE);
             screenHint.setText("正在等待 H.264 关键帧…");
             if (screenSurface != null && screenSurface.isValid()) {
-                h264Decoder.start(screenSurface);
+                h264Decoder.start(screenSurface, streamWidth, streamHeight, streamFps);
             }
-            streamState.setText("推流中：1920×1080@60 H.264");
+            streamState.setText("推流中：" + streamFormat());
         } else {
             this.streaming = false;
             streamRequested = false;
@@ -741,7 +789,14 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     @Override
-    public void onScreenStats(double actualFps, int kbps) {
+    public void onScreenStats(double actualFps, int kbps, int width, int height, int fps) {
+        // 服务端热更新参数后编码器会重启，分辨率变化时按新尺寸重建解码器
+        if (width > 0 && height > 0 && (width != streamWidth || height != streamHeight)) {
+            applyStreamFormat(width, height, fps);
+            restartDecoder();
+        } else if (fps > 0 && fps != streamFps) {
+            streamFps = fps;
+        }
         this.actualFps = actualFps;
         this.streamKbps = kbps;
         if (streaming) {
@@ -864,7 +919,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             } else if (streamRequested) {
                 screenHint.setText("正在启动 H.264 编码…");
             } else {
-                screenHint.setText("通道就绪。\n点击「开始监视」查看 1080p60 H.264 实时画面。");
+                screenHint.setText("通道就绪。\n点击「开始监视」查看 " + streamFormat() + " 实时画面。");
             }
             if (!screenAllowed) {
                 streamState.setText("推流不可用");

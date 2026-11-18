@@ -2,6 +2,7 @@ package com.phoneconsole.client.screen;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Surface;
@@ -12,7 +13,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * H.264 Annex-B 解码：MediaCodec 输出到 TextureView 的 Surface。
- * 服务端固定 1920x1080@60，每个 WebSocket 二进制帧即一个访问单元（AUD 开头）。
+ * 每个 WebSocket 二进制帧即一个访问单元（AUD 开头）；
+ * 编码尺寸与帧率由服务端 screen_state / screen_stats 下发（默认 1280x720@30），不再写死 1080p60。
  */
 public final class H264Decoder {
 
@@ -22,9 +24,10 @@ public final class H264Decoder {
         void onError(String message);
     }
 
-    private static final int WIDTH = 1920;
-    private static final int HEIGHT = 1080;
-    private static final long FRAME_INTERVAL_US = 1_000_000L / 60;
+    /** 服务端未下发格式时的兜底值，与 PC 端 config.default.json 保持一致 */
+    private static final int DEFAULT_WIDTH = 1280;
+    private static final int DEFAULT_HEIGHT = 720;
+    private static final int DEFAULT_FPS = 30;
     private static final int QUEUE_CAPACITY = 12;
 
     private final Listener listener;
@@ -39,16 +42,23 @@ public final class H264Decoder {
         this.listener = listener;
     }
 
-    /** 启动解码线程；Surface 由调用方持有生命周期 */
-    public synchronized void start(Surface surface) {
+    /**
+     * 启动解码线程；Surface 由调用方持有生命周期。
+     * 分辨率与帧率来自服务端下发值，<=0 时退回 720p30 兜底。
+     */
+    public synchronized void start(Surface surface, int width, int height, int fps) {
         stopLocked();
         if (surface == null || !surface.isValid()) {
             return;
         }
+        int resolvedWidth = width > 0 ? width : DEFAULT_WIDTH;
+        int resolvedHeight = height > 0 ? height : DEFAULT_HEIGHT;
+        int resolvedFps = fps > 0 ? Math.min(120, fps) : DEFAULT_FPS;
         queue.clear();
         running = true;
         int gen = ++generation;
-        worker = new Thread(() -> loop(gen, surface), "h264-decoder");
+        worker = new Thread(() -> loop(gen, surface, resolvedWidth, resolvedHeight, resolvedFps),
+                "h264-decoder");
         worker.start();
     }
 
@@ -93,29 +103,61 @@ public final class H264Decoder {
         }
     }
 
-    private void loop(int gen, Surface surface) {
+    /** 解码格式：尺寸来自服务端下发，低延迟附加键按系统版本选配 */
+    private static MediaFormat decodeFormat(int width, int height, int fps, boolean lowLatency) {
+        MediaFormat format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height);
+        if (lowLatency) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
+                format.setInteger(MediaFormat.KEY_OPERATING_RATE, fps);
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                format.setInteger(MediaFormat.KEY_PRIORITY, 0);
+            }
+        }
+        return format;
+    }
+
+    private void loop(int gen, Surface surface, int width, int height, int fps) {
         MediaCodec codec = null;
         boolean firstFrame = false;
+        // 输入缓冲暂时拿不到时保留当前帧下一轮重试，直接丢弃会造成码流断点花屏
+        byte[] pending = null;
         try {
-            MediaFormat format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, WIDTH, HEIGHT);
             codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
-            codec.configure(format, surface, null, 0);
+            try {
+                codec.configure(decodeFormat(width, height, fps, true), surface, null, 0);
+            } catch (Exception e) {
+                // 个别老机型不认低延迟/优先级附加键，重建解码器后按基础格式重试
+                try {
+                    codec.release();
+                } catch (Exception ignored) {
+                    // 已释放
+                }
+                codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
+                codec.configure(decodeFormat(width, height, fps, false), surface, null, 0);
+            }
             codec.start();
 
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
             long ptsUs = 0;
+            long frameIntervalUs = 1_000_000L / Math.max(1, fps);
             while (running && gen == generation) {
-                byte[] data = queue.poll(30, TimeUnit.MILLISECONDS);
-                if (data != null) {
+                if (pending == null) {
+                    pending = queue.poll(30, TimeUnit.MILLISECONDS);
+                }
+                if (pending != null) {
                     int index = codec.dequeueInputBuffer(10_000);
                     if (index >= 0) {
                         ByteBuffer buffer = codec.getInputBuffer(index);
-                        if (buffer != null && buffer.capacity() >= data.length) {
+                        if (buffer != null && buffer.capacity() >= pending.length) {
                             buffer.clear();
-                            buffer.put(data);
-                            codec.queueInputBuffer(index, 0, data.length, ptsUs, 0);
-                            ptsUs += FRAME_INTERVAL_US;
+                            buffer.put(pending);
+                            codec.queueInputBuffer(index, 0, pending.length, ptsUs, 0);
+                            ptsUs += frameIntervalUs;
+                            pending = null;
                         } else {
+                            // 缓冲不足：连同空帧一起回填，保留 pending 下一轮重试
                             codec.queueInputBuffer(index, 0, 0, ptsUs, 0);
                         }
                     }
@@ -130,7 +172,7 @@ public final class H264Decoder {
                             main.post(listener::onFirstFrame);
                         }
                     } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        // 输出尺寸固定 1080p，无需处理
+                        // 尺寸以 SPS 为准，服务端改分辨率会重新推流并下发新格式
                     } else {
                         break;
                     }

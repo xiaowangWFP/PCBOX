@@ -15,6 +15,7 @@ import com.google.gson.JsonParser;
 import com.phoneconsole.client.model.ButtonStateMessage;
 import com.phoneconsole.client.model.LayoutMessage;
 import com.phoneconsole.client.model.ScreenDevicesMessage;
+import com.phoneconsole.client.model.ScreenStateMessage;
 import com.phoneconsole.client.model.SessionMessage;
 import com.phoneconsole.client.model.TelemetryMessage;
 
@@ -49,11 +50,11 @@ public class ConnectionManager {
         /** 会话能力：通道类型与屏幕推流是否可用 */
         void onSession(SessionMessage session);
 
-        /** 屏幕推流状态回报 */
-        void onScreenState(boolean streaming, String reason);
+        /** 屏幕推流状态回报（含服务端下发的分辨率与帧率） */
+        void onScreenState(ScreenStateMessage state);
 
-        /** 屏幕推流实时统计（每秒一次） */
-        void onScreenStats(double actualFps, int kbps);
+        /** 屏幕推流实时统计（每秒一次，含当前编码分辨率） */
+        void onScreenStats(double actualFps, int kbps, int width, int height, int fps);
 
         /** 可选显示器列表 */
         void onScreenDevices(ScreenDevicesMessage devices);
@@ -142,7 +143,7 @@ public class ConnectionManager {
         ws.send(payload.toString());
     }
 
-    /** 屏幕推流控制：start=true 开启，否则停止；画质固定 1080p60 H.264 */
+    /** 屏幕推流控制：start=true 开启，否则停止；画质由服务端 config.json 决定（默认 720p30） */
     public void sendScreenControl(boolean start) {
         sendScreenControl(start, -1);
     }
@@ -297,16 +298,21 @@ public class ConnectionManager {
                     break;
                 }
                 case "screen_state": {
-                    boolean streaming = obj.has("streaming") && obj.get("streaming").getAsBoolean();
-                    String reason = obj.has("reason") && !obj.get("reason").isJsonNull()
-                            ? obj.get("reason").getAsString() : null;
-                    main.post(() -> listener.onScreenState(streaming, reason));
+                    ScreenStateMessage state = gson.fromJson(obj, ScreenStateMessage.class);
+                    if (state == null) {
+                        state = new ScreenStateMessage();
+                    }
+                    final ScreenStateMessage payload = state;
+                    main.post(() -> listener.onScreenState(payload));
                     break;
                 }
                 case "screen_stats": {
                     double actualFps = obj.has("actualFps") ? obj.get("actualFps").getAsDouble() : 0;
                     int kbps = obj.has("kbps") ? obj.get("kbps").getAsInt() : 0;
-                    main.post(() -> listener.onScreenStats(actualFps, kbps));
+                    int width = obj.has("width") ? obj.get("width").getAsInt() : 0;
+                    int height = obj.has("height") ? obj.get("height").getAsInt() : 0;
+                    int fps = obj.has("fps") ? obj.get("fps").getAsInt() : 0;
+                    main.post(() -> listener.onScreenStats(actualFps, kbps, width, height, fps));
                     break;
                 }
                 case "screen_devices": {
