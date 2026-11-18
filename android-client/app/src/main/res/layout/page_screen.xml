@@ -29,10 +29,11 @@
             android:textColor="@color/accent" />
 
         <TextView
+            android:id="@+id/stream_format"
             style="@style/Chip"
             android:layout_marginStart="8dp"
             android:background="@drawable/bg_mode_tag"
-            android:text="1920×1080 · 60fps · H.264"
+            android:text="1280×720 · 30fps · H.264"
             android:textColor="@color/accent" />
 
         <TextView

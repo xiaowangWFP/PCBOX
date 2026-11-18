@@ -113,6 +113,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private TextureView screenTexture;
     private View screenStage;
     private TextView screenHint;
+    private TextView streamFormatView;
     private Surface screenSurface;
     private H264Decoder h264Decoder;
     private boolean firstFrame;
@@ -284,6 +285,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         screenTexture = findViewById(R.id.screen_texture);
         screenStage = findViewById(R.id.screen_stage);
         screenHint = findViewById(R.id.screen_hint);
+        streamFormatView = findViewById(R.id.stream_format);
         monitorBtn = findViewById(R.id.btn_monitor);
         fullscreenBtn = findViewById(R.id.btn_fullscreen);
         topbar = findViewById(R.id.topbar);
@@ -440,6 +442,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                 showMonitorPicker();
             }
         });
+
+        applyStreamFormat(0, 0, 0);
     }
 
     /** 弹出采集屏幕选择：整块桌面 + 每块显示器 */
@@ -557,18 +561,29 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         screenTexture.setTransform(null);
     }
 
-    /** 采用服务端下发的推流格式；尺寸变化时重新计算画面比例 */
+    /** 采用服务端下发的推流格式（宽高传 0 表示只更新帧率与标签） */
     private void applyStreamFormat(int width, int height, int fps) {
         if (fps > 0) {
             streamFps = fps;
         }
-        if (width <= 0 || height <= 0 || (width == streamWidth && height == streamHeight)) {
-            return;
+        boolean resized = width > 0 && height > 0
+                && (width != streamWidth || height != streamHeight);
+        if (resized) {
+            streamWidth = width;
+            streamHeight = height;
         }
-        streamWidth = width;
-        streamHeight = height;
-        applyScreenAspect();
-        screenStage.post(this::applyScreenAspect);
+        if (streamFormatView != null) {
+            streamFormatView.setText(streamFormatChip());
+        }
+        if (resized) {
+            applyScreenAspect();
+            screenStage.post(this::applyScreenAspect);
+        }
+    }
+
+    /** 顶部格式标签文本，如 1280×720 · 30fps · H.264 */
+    private String streamFormatChip() {
+        return streamWidth + "×" + streamHeight + " · " + streamFps + "fps · H.264";
     }
 
     /** 服务端热更新参数导致分辨率变化时，按新尺寸重建解码器等待下一个 IDR */
@@ -734,9 +749,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         transport = session.transport == null ? "lan" : session.transport;
         screenAllowed = session.screenStream;
         // 通道帧率上限先按会话报文预估，推流启动后以 screen_state 下发的实际值为准
-        if (session.screenMaxFps > 0) {
-            streamFps = session.screenMaxFps;
-        }
+        applyStreamFormat(0, 0, session.screenMaxFps);
         modeView.setText("usb".equals(transport) ? "USB" : "Wi-Fi");
         sidebarFoot.setText(("usb".equals(transport) ? "USB 高速通道" : "Wi-Fi 局域网通道"));
         updateScreenUi();
@@ -794,8 +807,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (width > 0 && height > 0 && (width != streamWidth || height != streamHeight)) {
             applyStreamFormat(width, height, fps);
             restartDecoder();
-        } else if (fps > 0 && fps != streamFps) {
-            streamFps = fps;
+        } else {
+            applyStreamFormat(0, 0, fps);
         }
         this.actualFps = actualFps;
         this.streamKbps = kbps;
