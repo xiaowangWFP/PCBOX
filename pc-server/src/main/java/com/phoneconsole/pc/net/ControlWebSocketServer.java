@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collection;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -36,17 +36,23 @@ public class ControlWebSocketServer extends WebSocketServer {
     private final Gson gson = new Gson();
     private volatile AppConfig config;
     private final ActionEngine engine;
-    /** H.264 1080p60 订阅者（共享同一个 ffmpeg 编码进程） */
-    private final Set<WebSocket> h264Connections = ConcurrentHashMap.newKeySet();
+    /** USB 通道 60fps；局域网默认 30fps，减轻无线抖动与平板解码压力 */
+    private static final int USB_FPS = 60;
+    private static final int LAN_FPS = 30;
+
+    /** 每个客户端各自订阅的（显示器, 帧率），互不影响 */
+    private record Subscription(int monitor, int fps) {
+        String key() {
+            return monitor + "@" + fps;
+        }
+    }
+
+    private final Map<WebSocket, Subscription> connMonitors = new ConcurrentHashMap<>();
+    /** 同一（屏 + 帧率）的多个客户端共享一个 ffmpeg 进程 */
+    private final Map<String, H264ScreenStreamer> streamers = new ConcurrentHashMap<>();
     private final ScreenTargets targets = new ScreenTargets();
-    /** 当前采集的显示器序号：-1 = 整块桌面；可在客户端切换 */
+    /** 新客户端的默认采集目标：-1 = 整块桌面 */
     private volatile int selectedMonitor;
-    private final H264ScreenStreamer h264 = new H264ScreenStreamer(
-            () -> {
-                AppConfig snapshot = config;
-                return snapshot.screen == null ? "ffmpeg" : snapshot.screen.ffmpegExecutable;
-            },
-            () -> selectedMonitor);
 
     /** 当前手机端展示的页面，用于新连接接入时同步 */
     private volatile String currentPageId;
@@ -62,7 +68,7 @@ public class ControlWebSocketServer extends WebSocketServer {
         engine.setStateSink(this::broadcast);
     }
 
-    /** 配置热重载：替换快照，并把 screen.monitor 同步到当前采集目标 */
+    /** 配置热重载：替换快照，并更新后续新客户端使用的默认采集目标 */
     public void setConfig(AppConfig config) {
         if (config == null) {
             return;
@@ -71,7 +77,7 @@ public class ControlWebSocketServer extends WebSocketServer {
         int fromConfig = config.screen == null ? -1 : config.screen.monitor;
         if (fromConfig != selectedMonitor) {
             selectedMonitor = fromConfig;
-            h264.restartEncoder();
+            // 只影响之后发起的订阅，已在观看的客户端保持自己选的那块屏
             broadcastScreenDevices();
         }
     }
@@ -117,7 +123,7 @@ public class ControlWebSocketServer extends WebSocketServer {
         session.transport = usb ? "usb" : "lan";
         // 屏幕推流不再限定通道：H.264 码率低，USB / 局域网均可使用
         session.screenStream = true;
-        session.screenMaxFps = H264ScreenStreamer.FPS;
+        session.screenMaxFps = usb ? USB_FPS : LAN_FPS;
         conn.send(gson.toJson(session));
 
         String pageId = currentPageId != null ? currentPageId : config.defaultPageId;
@@ -223,29 +229,30 @@ public class ControlWebSocketServer extends WebSocketServer {
             return;
         }
         int monitor = intOf(json, "monitor", selectedMonitor);
-        if (monitor != selectedMonitor) {
-            selectedMonitor = monitor;
-            h264.restartEncoder();
-            sendScreenDevices(conn);
-            LogBuffer.get().info("SCREEN", "切换采集显示器 -> " + monitor);
+        if (monitor >= 0 && targets.get(monitor) == null) {
+            // 显示器数量变了（拔掉外接屏、虚拟屏未激活等）：序号已不存在，直接退回整块桌面
+            LogBuffer.get().warn("SCREEN", "显示器 " + monitor + " 不存在，改用整块桌面");
+            monitor = -1;
         }
-
+        // 采集目标按连接独立，不再改动全局状态，避免一台设备切屏把其他设备的画面一起切走
         stopStreamer(conn);
-        startH264(conn);
+        startH264(conn, monitor);
     }
 
-    /** 下发可选显示器列表；id 与 ddagrab 的 output_idx 一致 */
+    /** 下发可选显示器列表；id 就是 AWT/Win32 的屏序号，采集时按该屏物理坐标裁剪 */
     private void sendScreenDevices(WebSocket conn) {
         ScreenDevicesMessage message = new ScreenDevicesMessage();
-        message.current = selectedMonitor;
+        Subscription subscription = connMonitors.get(conn);
+        message.current = subscription == null ? selectedMonitor : subscription.monitor();
         for (ScreenTargets.Target target : targets.list()) {
             ScreenDevicesMessage.Device device = new ScreenDevicesMessage.Device();
             device.id = target.id();
             device.name = target.name();
-            device.width = target.bounds().width;
-            device.height = target.bounds().height;
-            device.x = target.bounds().x;
-            device.y = target.bounds().y;
+            // 用物理像素上报，和实际采集分辨率一致（AWT 给的是 DPI 缩放后的逻辑值）
+            device.width = target.physical().width;
+            device.height = target.physical().height;
+            device.x = target.physical().x;
+            device.y = target.physical().y;
             device.primary = target.primary();
             message.devices.add(device);
         }
@@ -258,8 +265,20 @@ public class ControlWebSocketServer extends WebSocketServer {
         }
     }
 
-    /** H.264 固定 1920x1080@60，多个订阅者共享同一编码进程 */
-    private void startH264(WebSocket conn) {
+    /** 同一块屏 + 同一帧率的客户端共享一个编码器；不同屏/不同帧率互不影响 */
+    private H264ScreenStreamer streamerFor(int monitor, int fps) {
+        String key = monitor + "@" + fps;
+        return streamers.computeIfAbsent(key, ignored -> new H264ScreenStreamer(
+                () -> {
+                    AppConfig snapshot = config;
+                    return snapshot.screen == null ? "ffmpeg" : snapshot.screen.ffmpegExecutable;
+                },
+                () -> monitor, targets, fps));
+    }
+
+    private void startH264(WebSocket conn, int monitor) {
+        int fps = isUsbChannel(conn) ? USB_FPS : LAN_FPS;
+        final H264ScreenStreamer streamer = streamerFor(monitor, fps);
         H264ScreenStreamer.Sink sink = new H264ScreenStreamer.Sink() {
             @Override
             public boolean onAccessUnit(byte[] data, boolean keyframe) {
@@ -276,26 +295,28 @@ public class ControlWebSocketServer extends WebSocketServer {
 
             @Override
             public void onStats(H264ScreenStreamer.Stats stats) {
-                sendScreenStats(conn, H264ScreenStreamer.FPS, H264ScreenStreamer.WIDTH,
-                        H264ScreenStreamer.HEIGHT, stats.actualFps(), stats.kbps());
+                sendScreenStats(conn, streamer.fps(), streamer.width(),
+                        streamer.height(), stats.actualFps(), stats.kbps());
             }
 
             @Override
             public void onClosed(String reason) {
-                h264Connections.remove(conn);
+                connMonitors.remove(conn);
                 sendScreenState(conn, false, 0, 0, 0, reason);
             }
         };
 
-        if (!h264.subscribe(conn, sink)) {
+        connMonitors.put(conn, new Subscription(monitor, fps));
+        if (!streamer.subscribe(conn, sink)) {
+            connMonitors.remove(conn);
             sendScreenState(conn, false, 0, 0, 0, "encoder_unavailable");
             LogBuffer.get().error("SCREEN", "H.264 编码器不可用，检查 config.json 的 screen.ffmpegExecutable");
             return;
         }
-        h264Connections.add(conn);
-        sendScreenState(conn, true, H264ScreenStreamer.FPS, H264ScreenStreamer.WIDTH,
-                H264ScreenStreamer.HEIGHT, null);
-        LogBuffer.get().info("SCREEN", "开始推流：H.264 1920x1080@60（" + conn.getRemoteSocketAddress() + "）");
+        sendScreenState(conn, true, streamer.fps(), streamer.width(), streamer.height(), null);
+        LogBuffer.get().info("SCREEN", "开始推流：" + streamer.width() + "x" + streamer.height()
+                + "@" + fps + "，采集=" + (monitor < 0 ? "整块桌面" : "显示器 " + monitor)
+                + "（" + conn.getRemoteSocketAddress() + "）");
     }
 
     private void sendScreenStats(WebSocket conn, int fps, int width, int height,
@@ -317,8 +338,18 @@ public class ControlWebSocketServer extends WebSocketServer {
     }
 
     private void stopStreamer(WebSocket conn) {
-        if (h264Connections.remove(conn)) {
-            h264.unsubscribe(conn);
+        Subscription subscription = connMonitors.remove(conn);
+        if (subscription == null) {
+            return;
+        }
+        H264ScreenStreamer streamer = streamers.get(subscription.key());
+        if (streamer == null) {
+            return;
+        }
+        streamer.unsubscribe(conn);
+        if (streamer.subscriberCount() == 0) {
+            // 最后一个人走了才回收编码器，其他人还在看就继续复用
+            streamers.remove(subscription.key(), streamer);
         }
     }
 
@@ -360,8 +391,11 @@ public class ControlWebSocketServer extends WebSocketServer {
     }
 
     private void shutdownScreen() {
-        h264.stop();
-        h264Connections.clear();
+        for (H264ScreenStreamer streamer : streamers.values()) {
+            streamer.stop();
+        }
+        streamers.clear();
+        connMonitors.clear();
     }
 
     private LayoutMessage buildLayout(String pageId) {

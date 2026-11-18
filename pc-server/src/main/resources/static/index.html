@@ -503,7 +503,7 @@
                         <select class="monitor-select" id="monitorSelect" title="选择监视的屏幕">
                             <option value="-1">整块桌面（所有显示器）</option>
                         </select>
-                        <span class="spec-tag">1920×1080 · 60fps · H.264</span>
+                        <span class="spec-tag" id="specTag">1920×1080 · 60fps · H.264</span>
                         <span id="streamState">屏幕监视仅通过 USB 高速通道传输</span>
                     </div>
                     <div class="screen-stage" id="screenStage">
@@ -606,6 +606,9 @@
         wsPort: params.get('wsPort') || localStorage.getItem('wsPort') || '8500',
         actualFps: 0,
         kbps: 0,
+        videoWidth: 1920,
+        videoHeight: 1080,
+        videoFps: 60,
         monitor: -1,
         monitors: [],
         history: { cpu: [], mem: [], gpu: [] },
@@ -1069,9 +1072,9 @@
             $('streamState').textContent = '推流不可用';
         } else if (state.streaming) {
             hint.innerHTML = '正在等待 H.264 关键帧…';
-            $('streamState').textContent = '推流中：1920×1080@60 H.264';
+            $('streamState').textContent = '推流中：' + streamSummary();
         } else {
-            hint.innerHTML = '通道就绪。<br>点击「开始监视」查看 1080p60 H.264 实时画面。';
+            hint.innerHTML = '通道就绪。<br>点击「开始监视」查看实时画面。';
             $('streamState').textContent = '推流已停止';
         }
     }
@@ -1095,7 +1098,11 @@
                 resetDecoder();
                 state.actualFps = 0;
                 state.kbps = 0;
-                $('streamState').textContent = '推流中：1920×1080@60 H.264';
+                if (msg.width > 0) state.videoWidth = msg.width;
+                if (msg.height > 0) state.videoHeight = msg.height;
+                if (msg.fps > 0) state.videoFps = msg.fps;
+                updateSpecTag();
+                $('streamState').textContent = '推流中：' + streamSummary();
             } else {
                 resetDecoder();
             }
@@ -1106,6 +1113,9 @@
     function onScreenStats(msg) {
         state.actualFps = msg.actualFps || 0;
         state.kbps = msg.kbps || 0;
+        if (msg.width > 0) state.videoWidth = msg.width;
+        if (msg.height > 0) state.videoHeight = msg.height;
+        updateSpecTag();
         if (state.streaming && h264State.firstFrame) {
             $('streamState').textContent = streamSummary();
         }
@@ -1130,8 +1140,15 @@
         select.value = String(state.monitor);
     }
 
+    function updateSpecTag() {
+        const tag = $('specTag');
+        if (tag) {
+            tag.textContent = state.videoWidth + '×' + state.videoHeight + ' · ' + state.videoFps + 'fps · H.264';
+        }
+    }
+
     function streamSummary() {
-        let text = '1920×1080 · 60fps · H.264';
+        let text = state.videoWidth + '×' + state.videoHeight + ' · ' + state.videoFps + 'fps · H.264';
         if (state.actualFps > 0) {
             text += ' · 实际 ' + state.actualFps.toFixed(1) + ' fps';
         }
@@ -1186,6 +1203,7 @@
     });
 
     checkH264Support();
+    updateSpecTag();
 
     /* ---------- 系统管理 ---------- */
     const adminState = {

@@ -5,6 +5,7 @@ import org.java_websocket.WebSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.Rectangle;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,9 +21,10 @@ import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 /**
- * PC 桌面 H.264 推流：固定输出 1920x1080@60，采集源可选整块桌面（镜像）或单块显示器（扩展屏），
- * ffmpeg ddagrab / gdigrab 采集 + libx264 编码，输出 Annex-B 裸流，
- * 按访问单元（AUD 分隔）通过 WebSocket 二进制帧下发。
+ * PC 桌面 H.264 推流：60fps，输出尺寸按采集源宽高比等比缩放到 1920x1080 的像素预算内（不加黑边），
+ * 采集源可选整块桌面或单块显示器；单块屏统一从 GDI 合成桌面按物理坐标裁剪，
+ * 避免 ddagrab 的 output_idx 与界面屏序号不一致导致抓错屏。
+ * libx264 编码后输出 Annex-B 裸流，按访问单元（AUD 分隔）通过 WebSocket 二进制帧下发。
  * <p>
  * 多个订阅者共享同一个编码进程；每个订阅者从下一个 IDR 关键帧开始发送，
  * 发送队列积压时丢弃当前帧并等待下一个关键帧重新同步。
@@ -32,9 +34,10 @@ public final class H264ScreenStreamer {
 
     private static final Logger log = LoggerFactory.getLogger(H264ScreenStreamer.class);
 
-    public static final int WIDTH = 1920;
-    public static final int HEIGHT = 1080;
-    public static final int FPS = 60;
+    public static final int DEFAULT_FPS = 60;
+    /** 输出画面的像素预算：16:9 时正好 1920x1080，其它比例等比缩放，不加黑边 */
+    private static final int MAX_WIDTH = 1920;
+    private static final int MAX_HEIGHT = 1080;
 
     /** 每秒统计：实际编码帧率与码率 */
     public record Stats(double actualFps, int kbps) {
@@ -62,6 +65,9 @@ public final class H264ScreenStreamer {
     private final Supplier<String> ffmpegExecutable;
     /** 采集目标：-1 = 整块桌面，>=0 = 显示器序号 */
     private final IntSupplier monitor;
+    private final ScreenTargets targets;
+    /** 编码帧率：USB 走 60，局域网默认降到 30，减轻无线链路与平板解码压力 */
+    private final int fps;
     private final Map<WebSocket, Subscriber> subscribers = new ConcurrentHashMap<>();
     private final Object lock = new Object();
 
@@ -70,18 +76,45 @@ public final class H264ScreenStreamer {
     private int sessionCounter;
     private volatile Process process;
     private Thread pumpThread;
+    /** 采集通道降级：0 = ddagrab 单屏，1 = gdigrab 按屏裁剪，2 = gdigrab 整块桌面 */
+    private volatile int captureMode;
+    /** 最近一次请求的显示器序号，切换后清除降级状态 */
+    private volatile int lastRequestedMonitor = Integer.MIN_VALUE;
 
     private long statsStart = System.nanoTime();
     private int statsFrames;
     private long statsBytes;
+    /** 当前编码输出尺寸，按采集源的宽高比等比缩放，避免左右/上下黑边 */
+    private volatile int outputWidth = MAX_WIDTH;
+    private volatile int outputHeight = MAX_HEIGHT;
 
-    public H264ScreenStreamer(Supplier<String> ffmpegExecutable, IntSupplier monitor) {
+    public H264ScreenStreamer(Supplier<String> ffmpegExecutable, IntSupplier monitor, ScreenTargets targets, int fps) {
         this.ffmpegExecutable = ffmpegExecutable;
         this.monitor = monitor;
+        this.targets = targets;
+        this.fps = fps <= 0 ? DEFAULT_FPS : fps;
     }
 
     public boolean isRunning() {
         return running;
+    }
+
+    /** 当前编码宽度（已按采集源比例换算，可能小于 1920） */
+    public int width() {
+        return outputWidth;
+    }
+
+    /** 当前编码高度 */
+    public int height() {
+        return outputHeight;
+    }
+
+    public int fps() {
+        return fps;
+    }
+
+    public int subscriberCount() {
+        return subscribers.size();
     }
 
     /** 订阅；首个订阅者会拉起编码进程。返回是否成功开始 */
@@ -156,21 +189,27 @@ public final class H264ScreenStreamer {
         return value == null ? "" : value.trim();
     }
 
-    private List<String> command() {
-        int target = monitorIndex();
+    private List<String> command(int target, int mode, int width, int height) {
         List<String> cmd = new ArrayList<>();
         cmd.add(executable());
         cmd.addAll(List.of("-hide_banner", "-loglevel", "error"));
-        if (target >= 0) {
-            // 扩展屏：只抓指定显示器，ddagrab 输出 D3D11 硬件帧，软件编码前需下载回内存
-            cmd.addAll(List.of("-f", "lavfi", "-i",
-                    "ddagrab=output_idx=" + target + ":framerate=" + FPS + ":draw_mouse=1"));
-            cmd.addAll(List.of("-vf", "hwdownload,format=bgra," + outputFilter()));
+        Rectangle area = target >= 0 ? physicalBounds(target) : null;
+        if (target >= 0 && mode == 0 && area != null) {
+            // 单块屏：从 GDI 合成桌面里按物理坐标裁剪。
+            // 不用 ddagrab：它的 output_idx 只按 DXGI 输出顺序编号，和 AWT 的屏序号对不上，
+            // 多屏/虚拟屏时会把「显示器 2」抓成主屏。
+            cmd.addAll(List.of("-f", "gdigrab", "-framerate", String.valueOf(fps),
+                    "-offset_x", String.valueOf(area.x),
+                    "-offset_y", String.valueOf(area.y),
+                    "-video_size", area.width + "x" + area.height,
+                    "-i", "desktop"));
+            cmd.add("-vf");
+            cmd.add(outputFilter(width, height));
         } else {
             // 镜像：抓整块虚拟桌面（所有显示器）
-            cmd.addAll(List.of("-f", "gdigrab", "-framerate", String.valueOf(FPS), "-i", "desktop"));
+            cmd.addAll(List.of("-f", "gdigrab", "-framerate", String.valueOf(fps), "-i", "desktop"));
             cmd.add("-vf");
-            cmd.add(outputFilter());
+            cmd.add(outputFilter(width, height));
         }
         cmd.addAll(List.of(
                 "-c:v", "libx264",
@@ -178,18 +217,49 @@ public final class H264ScreenStreamer {
                 "-tune", "zerolatency",
                 "-profile:v", "baseline",
                 "-level", "4.2",
+                // 限制峰值码率，避免关键帧在无线链路上把带宽打满造成卡顿
+                "-maxrate", "6000k",
+                "-bufsize", "12000k",
                 "-pix_fmt", "yuv420p",
                 "-x264-params", "aud=1:repeat_headers=1:bframes=0",
-                "-g", String.valueOf(FPS * 2),
+                "-g", String.valueOf(fps * 2),
                 "-f", "h264",
                 "pipe:1"));
         return cmd;
     }
 
-    /** 等比缩放并用黑边补齐到 1920x1080，保证客户端始终按 16:9 解码 */
-    private static String outputFilter() {
-        return "scale=" + WIDTH + ":" + HEIGHT + ":force_original_aspect_ratio=decrease,"
-                + "pad=" + WIDTH + ":" + HEIGHT + ":(ow-iw)/2:(oh-ih)/2:black,setsar=1";
+    /** 按采集源宽高比直接缩放到目标尺寸，不补黑边，客户端才能铺满屏幕 */
+    private static String outputFilter(int width, int height) {
+        return "scale=" + width + ":" + height + ":flags=bicubic,setsar=1";
+    }
+
+    /** 按采集源比例算出输出尺寸：限制在 1920x1080 的像素预算内，宽高取偶数（x264 要求） */
+    private int[] outputSize(int target) {
+        Rectangle source = target >= 0 ? physicalBounds(target) : desktopBounds();
+        if (source == null || source.width <= 1 || source.height <= 1) {
+            return new int[]{MAX_WIDTH, MAX_HEIGHT};
+        }
+        double scale = Math.min(1.0,
+                Math.min((double) MAX_WIDTH / source.width, (double) MAX_HEIGHT / source.height));
+        int width = Math.max(2, ((int) Math.round(source.width * scale)) & ~1);
+        int height = Math.max(2, ((int) Math.round(source.height * scale)) & ~1);
+        return new int[]{width, height};
+    }
+
+    /** 整块桌面 = 所有显示器物理区域的并集 */
+    private Rectangle desktopBounds() {
+        if (targets == null) {
+            return null;
+        }
+        Rectangle union = null;
+        for (ScreenTargets.Target target : targets.list()) {
+            Rectangle area = target.physical();
+            if (area == null || area.width <= 0 || area.height <= 0) {
+                continue;
+            }
+            union = union == null ? new Rectangle(area) : union.union(area);
+        }
+        return union;
     }
 
     private int monitorIndex() {
@@ -201,16 +271,37 @@ public final class H264ScreenStreamer {
         }
     }
 
+    /** 显示器物理像素区域；枚举失败时返回 null，调用方退回整块桌面 */
+    private Rectangle physicalBounds(int target) {
+        ScreenTargets.Target screen = targets == null ? null : targets.get(target);
+        return screen == null ? null : screen.physical();
+    }
+
+    private String describe(int target, int mode) {
+        if (target < 0 || mode >= 1 || physicalBounds(target) == null) {
+            return "整块桌面（gdigrab）";
+        }
+        return "显示器 " + target + "（gdigrab 裁剪）";
+    }
+
     private void pumpLoop(int session) {
         int rapidFailures = 0;
         while (isActive(session)) {
             Process current = null;
             long startedAt = System.currentTimeMillis();
             try {
-                List<String> command = command();
                 int target = monitorIndex();
+                if (target != lastRequestedMonitor) {
+                    lastRequestedMonitor = target;
+                    captureMode = 0;
+                }
+                int mode = captureMode;
+                int[] size = outputSize(target);
+                outputWidth = size[0];
+                outputHeight = size[1];
+                List<String> command = command(target, mode, size[0], size[1]);
                 log.info("启动 H.264 屏幕编码：{}x{}@{}，采集={}，ffmpeg={}",
-                        WIDTH, HEIGHT, FPS, target < 0 ? "整块桌面" : "显示器 " + target, command.get(0));
+                        size[0], size[1], fps, describe(target, mode), command.get(0));
                 Process started = new ProcessBuilder(command)
                         .redirectErrorStream(false)
                         .start();
@@ -225,13 +316,23 @@ public final class H264ScreenStreamer {
                 logThread.setDaemon(true);
                 logThread.start();
 
-                LogBuffer.get().info("SCREEN", "H.264 编码器已启动（1920x1080@60）");
+                LogBuffer.get().info("SCREEN", "H.264 编码器已启动（" + size[0] + "x" + size[1] + "@" + fps + "）");
                 readLoop(started.getInputStream(), session);
                 int exitCode = started.waitFor();
                 if (!isActive(session)) {
                     break;
                 }
                 long lived = System.currentTimeMillis() - startedAt;
+                // 单屏裁剪失败（坐标越界等）时退回整块桌面，避免整个推流不可用
+                if (lived < 2000 && target >= 0 && mode < 1) {
+                    captureMode = 1;
+                    rapidFailures = 0;
+                    log.warn("显示器 {} 裁剪采集失败，改用整块桌面", target);
+                    LogBuffer.get().warn("SCREEN", "显示器 " + target + " 裁剪采集失败，改用整块桌面");
+                    markAllUnsynced();
+                    Thread.sleep(1000);
+                    continue;
+                }
                 rapidFailures = lived < 2000 ? rapidFailures + 1 : 0;
                 log.warn("H.264 编码器退出（code={}），1 秒后重启", exitCode);
                 LogBuffer.get().warn("SCREEN", "H.264 编码器退出（code=" + exitCode + "），1 秒后重启");
@@ -358,6 +459,8 @@ public final class H264ScreenStreamer {
             while ((line = reader.readLine()) != null) {
                 if (!line.isBlank()) {
                     log.warn("H.264 编码器：{}", line);
+                    // 同步到运行日志，网页控制台才能看到真实失败原因
+                    LogBuffer.get().warn("SCREEN", "ffmpeg：" + line);
                 }
             }
         } catch (IOException ignored) {
