@@ -165,6 +165,18 @@ public class ConnectionManager {
         ws.send(payload.toString());
     }
 
+    /** 请求服务端下发指定面板的布局（用于控制页切换面板） */
+    public void requestLayout(String pageId) {
+        WebSocket ws = socket;
+        if (ws == null || pageId == null || pageId.isEmpty()) {
+            return;
+        }
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "layout_request");
+        payload.addProperty("pageId", pageId);
+        ws.send(payload.toString());
+    }
+
     /** 请求 PC 下发可选显示器列表 */
     public void requestScreenDevices() {
         WebSocket ws = socket;

@@ -26,11 +26,18 @@ public class GpuMonitor {
     private static final int PDH_FMT_DOUBLE = 0x00000200;
     private static final int PDH_MORE_DATA = (int) 0x800007D2L;
     private static final String COUNTER_PATH = "\\GPU Engine(*)\\Utilization Percentage";
+    /** 每个进程的专用显存占用（字节），逐进程求和即为已用显存 */
+    private static final String MEMORY_COUNTER_PATH = "\\GPU Process Memory(*)\\Dedicated Usage";
 
     private Pointer query;
     private Pointer counter;
     private boolean primed;
     private boolean warned;
+
+    private Pointer memQuery;
+    private Pointer memCounter;
+    private boolean memPrimed;
+    private boolean memWarned;
 
     public GpuMonitor() {
         if (!Platform.isWindows()) {
@@ -59,6 +66,33 @@ public class GpuMonitor {
         } catch (Throwable t) {
             log.warn("GPU 采集初始化失败：{}", t.getMessage());
             close();
+        }
+        initMemoryCounter();
+    }
+
+    /** 显存计数器独立初始化：GPU 占用不可用时显存仍可能可读 */
+    private void initMemoryCounter() {
+        try {
+            PointerByReference queryRef = new PointerByReference();
+            int status = Pdh.INSTANCE.PdhOpenQueryW(null, null, queryRef);
+            if (status != 0) {
+                return;
+            }
+            memQuery = queryRef.getValue();
+            PointerByReference counterRef = new PointerByReference();
+            status = Pdh.INSTANCE.PdhAddEnglishCounterW(memQuery, new WString(MEMORY_COUNTER_PATH), null, counterRef);
+            if (status != 0) {
+                log.info("显存计数器不可用（0x{}），显存将显示为 —", Integer.toHexString(status));
+                closeMemory();
+                return;
+            }
+            memCounter = counterRef.getValue();
+            Pdh.INSTANCE.PdhCollectQueryData(memQuery);
+            memPrimed = true;
+            log.info("显存采集已启用（PDH GPU Adapter Memory）");
+        } catch (Throwable t) {
+            log.warn("显存采集初始化失败：{}", t.getMessage());
+            closeMemory();
         }
     }
 
@@ -110,8 +144,56 @@ public class GpuMonitor {
         }
     }
 
+    /** @return 已用显存 MB；不可用时返回 -1 */
+    public synchronized double vramUsedMb() {
+        if (!memPrimed) {
+            return -1;
+        }
+        try {
+            int status = Pdh.INSTANCE.PdhCollectQueryData(memQuery);
+            if (status != 0) {
+                return -1;
+            }
+            IntByReference sizeRef = new IntByReference();
+            IntByReference countRef = new IntByReference();
+            Pdh.INSTANCE.PdhGetFormattedCounterArrayW(memCounter, PDH_FMT_DOUBLE, sizeRef, countRef, null);
+            if (sizeRef.getValue() <= 0) {
+                return -1;
+            }
+            Memory buffer = new Memory(sizeRef.getValue());
+            status = Pdh.INSTANCE.PdhGetFormattedCounterArrayW(memCounter, PDH_FMT_DOUBLE, sizeRef, countRef, buffer);
+            if (status != 0 && status != PDH_MORE_DATA) {
+                return -1;
+            }
+            int count = countRef.getValue();
+            if (count <= 0) {
+                return 0;
+            }
+            Item first = new Item(buffer);
+            Item[] items = (Item[]) first.toArray(count);
+            double total = 0;
+            for (Item item : items) {
+                if (item.FmtValue.CStatus != 0) {
+                    continue;
+                }
+                double bytes = item.FmtValue.doubleValue;
+                if (Double.isFinite(bytes) && bytes > 0) {
+                    total += bytes;
+                }
+            }
+            return Math.round(total / 1048576.0 * 10.0) / 10.0;
+        } catch (Throwable t) {
+            if (!memWarned) {
+                memWarned = true;
+                log.warn("显存采样失败：{}", t.getMessage());
+            }
+            return -1;
+        }
+    }
+
     public synchronized void close() {
         primed = false;
+        closeMemory();
         if (query != null) {
             try {
                 Pdh.INSTANCE.PdhCloseQuery(query);
@@ -120,6 +202,19 @@ public class GpuMonitor {
             }
             query = null;
             counter = null;
+        }
+    }
+
+    private void closeMemory() {
+        memPrimed = false;
+        if (memQuery != null) {
+            try {
+                Pdh.INSTANCE.PdhCloseQuery(memQuery);
+            } catch (Throwable ignored) {
+                // 关闭阶段失败可忽略
+            }
+            memQuery = null;
+            memCounter = null;
         }
     }
 

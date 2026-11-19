@@ -1,27 +1,30 @@
 package com.phoneconsole.client;
 
+import android.content.res.Configuration;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.widget.Button;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
-import androidx.appcompat.app.AlertDialog;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
-import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
+import androidx.core.content.ContextCompat;
 
 import com.phoneconsole.client.model.ButtonItem;
 import com.phoneconsole.client.model.ButtonStateMessage;
@@ -32,18 +35,22 @@ import com.phoneconsole.client.model.SessionMessage;
 import com.phoneconsole.client.model.TelemetryMessage;
 import com.phoneconsole.client.net.ConnectionManager;
 import com.phoneconsole.client.screen.H264Decoder;
-import com.phoneconsole.client.ui.ButtonAdapter;
-import com.phoneconsole.client.ui.HistoryGraphView;
+import com.phoneconsole.client.ui.ControlWorkspaceController;
+import com.phoneconsole.client.ui.RingProgressView;
+import com.phoneconsole.client.ui.TactileDeckAdapter;
+import com.phoneconsole.client.ui.UiMotionHelper;
+import com.phoneconsole.client.ui.WindowInsetsHelper;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * 主界面：左侧分组导航（可收起）+ 固定顶栏（音量/内存/GPU/CPU）+ 四个页面。
- * 页面：性能监视、屏幕监视、功能控制、连接设置。
+ * 主界面（Tactile Obsidian 新版）：
+ * 竖屏底部导航 / 横屏左侧图标轨，四个页面：性能监视、功能控制、屏幕监视、连接设置。
+ * 页面全部由新版布局驱动，控制页交给 {@link ControlWorkspaceController} 统一调度。
  */
 public class MainActivity extends AppCompatActivity implements ConnectionManager.Listener {
 
@@ -52,127 +59,135 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private static final String PAGE_SCREEN = "screen";
     private static final String PAGE_SETTINGS = "settings";
 
-    private static final String DEFAULT_PAGE = "default_page";
-
     /** 推流格式兜底值：实际尺寸与帧率由服务端 screen_state / screen_stats 下发 */
     private static final int DEFAULT_STREAM_WIDTH = 1280;
     private static final int DEFAULT_STREAM_HEIGHT = 720;
     private static final int DEFAULT_STREAM_FPS = 30;
 
-    // 侧边栏 / 顶栏
-    private View sidebar;
-    private TextView navPerformance;
+    /** 服务端默认页 / 媒体页（用于把新 UI 的快捷指令映射到既有按键） */
+    private static final String DEFAULT_PAGE_ID = "default_page";
+    private static final String MEDIA_PAGE_ID = "media_page";
+    private static final String DEFAULT_PORT = "8500";
+
+    // 布局骨架：竖屏底栏与横屏图标轨互斥，另一侧为 null
+    private View topBar;
+    private View pageContainer;
+    private View bottomNavBar;
+    private View sideNavRail;
+    private View navPerf;
+    private View navControl;
     private View navScreen;
-    private TextView navControl;
-    private TextView navSettings;
-    private TextView screenBadge;
-    private TextView pageTitleView;
-    private TextView clockView;
-    private TextView dotView;
-    private TextView modeView;
-    private TextView sidebarFoot;
+    private View navSettings;
+    private TextView tvPageTitle;
+    private TextView tvConnStatus;
+    private View statusDot;
+    private View bottomNavIndicator;
+    private View railNavIndicator;
+    private TextView tvTopFps;
+    private TextView tvTopCpu;
+    private TextView tvTopGpu;
+    private TextView tvTopMem;
+    private TextView tvTopVram;
+    private double lastCpu = -1;
+    private double lastMem = -1;
+    private double lastGpu = -1;
+    private double lastVram = -1;
 
-    // 顶栏指标
-    private TextView volText;
-    private TextView memText;
-    private TextView gpuText;
-    private TextView cpuText;
-    private ProgressBar volBar;
-    private ProgressBar memBar;
-    private ProgressBar gpuBar;
-    private ProgressBar cpuBar;
-
-    // 页面容器
+    // 页面
     private View pagePerformance;
     private View pageControl;
     private View pageScreen;
     private View pageSettings;
 
     // 性能页
-    private TextView cpuBig;
-    private TextView memBig;
-    private TextView gpuBig;
-    private TextView volBig;
-    private TextView muteState;
-    private TextView netInfo;
-    private ProgressBar volBigBar;
-    private HistoryGraphView cpuGraph;
-    private HistoryGraphView memGraph;
-    private HistoryGraphView gpuGraph;
+    private TextView tvCpuValue;
+    private TextView tvMemValue;
+    private TextView tvGpuValue;
+    private TextView tvVramValue;
+    private TextView tvFpsValue;
+    private TextView tvVolValue;
+    private TextView tvVolSub;
+    private TextView tvNetUp;
+    private TextView tvNetDown;
+    private RingProgressView ringCpu;
+    private RingProgressView ringMem;
+    private RingProgressView ringGpu;
+    private RingProgressView ringVram;
+    private RingProgressView ringFps;
+    private RingProgressView ringVol;
+    private ProgressBar barCpu;
+    private ProgressBar barMem;
+    private ProgressBar barGpu;
+    private ProgressBar barVram;
+    private ProgressBar barFps;
+    private ProgressBar barVol;
 
     // 控制页
-    private TextView layoutTitle;
-    private RecyclerView grid;
-    private ButtonAdapter adapter;
-    private GridLayoutManager gridLayoutManager;
-    private int layoutRows = 3;
+    private ControlWorkspaceController controlController;
+    private final List<TactileDeckAdapter.DeckKeyItem> deckItems = new ArrayList<>();
+    /** 服务端下发的面板清单，旋转重建布局后需要原样恢复 */
+    private List<ControlWorkspaceController.DeckPageMeta> deckPages = new ArrayList<>();
+    private final Map<String, String> buttonStates = new HashMap<>();
+    private String deckPageTitle = "";
 
-    // 屏幕页（H.264，格式随服务端 config.json 下发）
-    private Button streamBtn;
-    private TextView streamState;
-    private TextureView screenTexture;
+    // 屏幕页
+    private TextView btnToggleStream;
+    private TextView tvScreenMeta;
+    private TextView tvScreenHint;
+    private TextView btnScreenFullscreen;
+    private Spinner spinnerMonitors;
+    private SurfaceView surfaceScreen;
     private View screenStage;
-    private TextView screenHint;
-    private TextView streamFormatView;
     private Surface screenSurface;
     private H264Decoder h264Decoder;
     private boolean firstFrame;
+    private boolean suppressMonitorCallback;
 
     // 采集显示器选择
-    private TextView monitorBtn;
     private final List<ScreenDevicesMessage.Device> monitors = new ArrayList<>();
     private int selectedMonitor = -1;
-    private boolean monitorDialogPending;
-
-    // 全屏放大
-    private TextView fullscreenBtn;
-    private View topbar;
-    private View screenToolbar;
-    private boolean fullscreen;
-    private int sidebarVisibilityBeforeFullscreen = View.VISIBLE;
 
     // 设置页
-    private EditText lanInput;
-    private TextView connInfo;
+    private EditText etServerHost;
+    private EditText etServerPort;
+    private TextView tvSessionDetail;
 
     private ConnectionManager connection;
     private String currentPage = PAGE_PERFORMANCE;
-    private String currentPageId = DEFAULT_PAGE;
+    private String currentPageId = DEFAULT_PAGE_ID;
 
     private boolean connected;
     private boolean screenAllowed;
     private boolean streaming;
     private boolean streamRequested;
+    private boolean fullscreen;
     private String transport = "lan";
 
     private double actualFps;
     private int streamKbps;
-    // 当前推流编码格式，随服务端报文更新
     private int streamWidth = DEFAULT_STREAM_WIDTH;
     private int streamHeight = DEFAULT_STREAM_HEIGHT;
     private int streamFps = DEFAULT_STREAM_FPS;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+    private int lastVolumeSent = -1;
+    private long lastVolumeInputAt;
+    private long lastUnsupportedToastAt;
+    private String lastUnsupportedFeature = "";
 
-    private final Runnable clockTask = new Runnable() {
-        @Override
-        public void run() {
-            clockView.setText(timeFormat.format(new Date()));
-            handler.postDelayed(this, 1000);
-        }
-    };
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        hideSystemBars();
         setContentView(R.layout.activity_main);
 
         bindViews();
-        applyCutoutInset();
+        WindowInsetsHelper.attach(this, findViewById(R.id.rootContainer),
+                topBar, pageContainer, bottomNavBar, sideNavRail);
+
         setupNavigation();
+        setupPerformancePage();
         setupControlPage();
         setupScreenPage();
         setupSettingsPage();
@@ -180,14 +195,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         connection = new ConnectionManager(getApplicationContext(), this);
         connection.start();
 
-        // 支持 adb 联调直接打开指定页面：am start -n ... --es page screen
         String initialPage = getIntent() == null ? null : getIntent().getStringExtra("page");
-        if (PAGE_PERFORMANCE.equals(initialPage) || PAGE_SCREEN.equals(initialPage)
-                || PAGE_CONTROL.equals(initialPage) || PAGE_SETTINGS.equals(initialPage)) {
-            selectPage(initialPage);
-        } else {
-            selectPage(PAGE_PERFORMANCE);
-        }
+        selectPage(pageOrDefault(initialPage));
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -200,21 +209,75 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                 getOnBackPressedDispatcher().onBackPressed();
             }
         });
-
-        handler.post(clockTask);
     }
 
     @Override
     protected void onNewIntent(android.content.Intent intent) {
         super.onNewIntent(intent);
-        if (intent == null) {
+        if (intent != null) {
+            selectPage(pageOrDefault(intent.getStringExtra("page")));
+        }
+    }
+
+    /**
+     * 清单里声明了 configChanges，系统不会重建 Activity，
+     * 横竖屏切换需要手动重新加载对应资源目录下的布局（layout / layout-land）。
+     */
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        if (h264Decoder != null) {
+            h264Decoder.stop();
+        }
+
+        setContentView(R.layout.activity_main);
+        bindViews();
+        WindowInsetsHelper.attach(this, findViewById(R.id.rootContainer),
+                topBar, pageContainer, bottomNavBar, sideNavRail);
+
+        setupNavigation();
+        setupPerformancePage();
+        setupControlPage();
+        setupScreenPage();
+        setupSettingsPage();
+
+        fullscreen = false;
+        selectPage(currentPage);
+
+        if (controlController != null) {
+            if (!deckItems.isEmpty()) {
+                controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), 3, 1);
+            }
+            List<ControlWorkspaceController.DeckPageMeta> pages = deckPages;
+            if (pages == null || pages.isEmpty()) {
+                pages = new ArrayList<>();
+                pages.add(new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle));
+            }
+            controlController.updateDeckPages(pages, currentPageId);
+        }
+
+        applyStreamFormat(0, 0, 0);
+        renderConnStatus();
+        updateScreenUi();
+        renderSessionDetail();
+    }
+
+    /** 顶栏连接状态（旋转后重建布局时需要重新套用，避免停留在默认的「未连接」） */
+    private void renderConnStatus() {
+        if (statusDot != null) {
+            statusDot.setBackgroundResource(connected
+                    ? R.drawable.bg_status_dot_on : R.drawable.bg_status_dot_off);
+        }
+        if (tvConnStatus == null) {
             return;
         }
-        String page = intent.getStringExtra("page");
-        if (PAGE_PERFORMANCE.equals(page) || PAGE_CONTROL.equals(page)
-                || PAGE_SCREEN.equals(page) || PAGE_SETTINGS.equals(page)) {
-            selectPage(page);
-        }
+        String text = connected
+                ? ("usb".equals(transport) ? "USB 通道" : "Wi-Fi 通道")
+                : "未连接";
+        tvConnStatus.setText(text);
+        tvConnStatus.setTextColor(ContextCompat.getColor(this,
+                connected ? R.color.status_ok : R.color.text_muted));
     }
 
     @Override
@@ -223,10 +286,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         stopStream();
         if (h264Decoder != null) {
             h264Decoder.stop();
-        }
-        if (screenSurface != null) {
-            screenSurface.release();
-            screenSurface = null;
         }
         if (connection != null) {
             connection.stop();
@@ -237,130 +296,173 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     // ---------------- 初始化 ----------------
 
     private void bindViews() {
-        sidebar = findViewById(R.id.nav_sidebar);
-        navPerformance = findViewById(R.id.nav_performance);
-        navScreen = findViewById(R.id.nav_screen);
-        navControl = findViewById(R.id.nav_control);
-        navSettings = findViewById(R.id.nav_settings);
-        screenBadge = findViewById(R.id.nav_screen_badge);
-        pageTitleView = findViewById(R.id.page_title);
-        clockView = findViewById(R.id.status_clock);
-        dotView = findViewById(R.id.status_dot);
-        modeView = findViewById(R.id.status_mode);
-        sidebarFoot = findViewById(R.id.sidebar_foot);
+        topBar = findViewById(R.id.topBar);
+        pageContainer = findViewById(R.id.pageContainer);
+        bottomNavBar = findViewById(R.id.bottomNavBar);
+        sideNavRail = findViewById(R.id.sideNavRail);
+        navPerf = findViewById(R.id.navPerf);
+        navControl = findViewById(R.id.navControl);
+        navScreen = findViewById(R.id.navScreen);
+        navSettings = findViewById(R.id.navSettings);
+        tvPageTitle = findViewById(R.id.tvPageTitle);
+        tvConnStatus = findViewById(R.id.tvConnStatus);
+        statusDot = findViewById(R.id.statusDot);
+        bottomNavIndicator = findViewById(R.id.bottomNavIndicator);
+        railNavIndicator = findViewById(R.id.railNavIndicator);
+        tvTopFps = findViewById(R.id.tvTopFps);
+        tvTopCpu = findViewById(R.id.tvTopCpu);
+        tvTopGpu = findViewById(R.id.tvTopGpu);
+        tvTopMem = findViewById(R.id.tvTopMem);
+        tvTopVram = findViewById(R.id.tvTopVram);
+        renderTopMetrics();
 
-        volText = findViewById(R.id.vol_text);
-        memText = findViewById(R.id.mem_text);
-        gpuText = findViewById(R.id.gpu_text);
-        cpuText = findViewById(R.id.cpu_text);
-        volBar = findViewById(R.id.vol_bar);
-        memBar = findViewById(R.id.mem_bar);
-        gpuBar = findViewById(R.id.gpu_bar);
-        cpuBar = findViewById(R.id.cpu_bar);
+        pagePerformance = findViewById(R.id.pagePerformance);
+        pageControl = findViewById(R.id.pageControl);
+        pageScreen = findViewById(R.id.pageScreen);
+        pageSettings = findViewById(R.id.pageSettings);
 
-        pagePerformance = findViewById(R.id.page_performance);
-        pageControl = findViewById(R.id.page_control);
-        pageScreen = findViewById(R.id.page_screen);
-        pageSettings = findViewById(R.id.page_settings);
+        tvCpuValue = findViewById(R.id.tvCpuValue);
+        tvMemValue = findViewById(R.id.tvMemValue);
+        tvGpuValue = findViewById(R.id.tvGpuValue);
+        tvVramValue = findViewById(R.id.tvVramValue);
+        tvFpsValue = findViewById(R.id.tvFpsValue);
+        tvVolValue = findViewById(R.id.tvVolValue);
+        tvVolSub = findViewById(R.id.tvVolSub);
+        tvNetUp = findViewById(R.id.tvNetUp);
+        tvNetDown = findViewById(R.id.tvNetDown);
 
-        cpuBig = findViewById(R.id.cpu_big);
-        memBig = findViewById(R.id.mem_big);
-        gpuBig = findViewById(R.id.gpu_big);
-        volBig = findViewById(R.id.vol_big);
-        muteState = findViewById(R.id.mute_state);
-        netInfo = findViewById(R.id.net_info);
-        volBigBar = findViewById(R.id.vol_big_bar);
-        cpuGraph = findViewById(R.id.cpu_graph);
-        memGraph = findViewById(R.id.mem_graph);
-        gpuGraph = findViewById(R.id.gpu_graph);
-        cpuGraph.setLineColor(0xFF22D3EE);
-        memGraph.setLineColor(0xFF34D399);
-        gpuGraph.setLineColor(0xFFFBBF24);
+        ringCpu = findViewById(R.id.ringCpu);
+        ringMem = findViewById(R.id.ringMem);
+        ringGpu = findViewById(R.id.ringGpu);
+        ringVram = findViewById(R.id.ringVram);
+        ringFps = findViewById(R.id.ringFps);
+        ringVol = findViewById(R.id.ringVol);
+        barCpu = findViewById(R.id.barCpu);
+        barMem = findViewById(R.id.barMem);
+        barGpu = findViewById(R.id.barGpu);
+        barVram = findViewById(R.id.barVram);
+        barFps = findViewById(R.id.barFps);
+        barVol = findViewById(R.id.barVol);
 
-        layoutTitle = findViewById(R.id.layout_title);
-        grid = findViewById(R.id.grid);
+        btnToggleStream = findViewById(R.id.btnToggleStream);
+        tvScreenMeta = findViewById(R.id.tvScreenMeta);
+        tvScreenHint = findViewById(R.id.tvScreenHint);
+        btnScreenFullscreen = findViewById(R.id.btnScreenFullscreen);
+        spinnerMonitors = findViewById(R.id.spinnerMonitors);
+        surfaceScreen = findViewById(R.id.surfaceScreen);
+        screenStage = findViewById(R.id.screenStage);
 
-        streamBtn = findViewById(R.id.stream_btn);
-        streamState = findViewById(R.id.stream_state);
-        screenTexture = findViewById(R.id.screen_texture);
-        screenStage = findViewById(R.id.screen_stage);
-        screenHint = findViewById(R.id.screen_hint);
-        streamFormatView = findViewById(R.id.stream_format);
-        monitorBtn = findViewById(R.id.btn_monitor);
-        fullscreenBtn = findViewById(R.id.btn_fullscreen);
-        topbar = findViewById(R.id.topbar);
-        screenToolbar = findViewById(R.id.screen_toolbar);
-
-        lanInput = findViewById(R.id.lan_input);
-        connInfo = findViewById(R.id.conn_info);
-    }
-
-    /**
-     * 内容已允许画进挖孔区域（shortEdges），横屏时挖孔在左边缘中部，
-     * 给侧边栏补一个内边距，避免导航文字被摄像头开孔压住。
-     */
-    private void applyCutoutInset() {
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(sidebar, (view, insets) -> {
-            androidx.core.graphics.Insets cutout =
-                    insets.getInsets(WindowInsetsCompat.Type.displayCutout());
-            view.setPadding(cutout.left, 0, 0, 0);
-            return insets;
-        });
-        androidx.core.view.ViewCompat.requestApplyInsets(sidebar);
+        etServerHost = findViewById(R.id.etServerHost);
+        etServerPort = findViewById(R.id.etServerPort);
+        tvSessionDetail = findViewById(R.id.tvSessionDetail);
     }
 
     private void setupNavigation() {
-        navPerformance.setOnClickListener(v -> selectPage(PAGE_PERFORMANCE));
-        navScreen.setOnClickListener(v -> selectPage(PAGE_SCREEN));
+        navPerf.setOnClickListener(v -> selectPage(PAGE_PERFORMANCE));
         navControl.setOnClickListener(v -> selectPage(PAGE_CONTROL));
+        navScreen.setOnClickListener(v -> selectPage(PAGE_SCREEN));
         navSettings.setOnClickListener(v -> selectPage(PAGE_SETTINGS));
-        modeView.setOnClickListener(v -> selectPage(PAGE_SETTINGS));
-
-        findViewById(R.id.btn_menu).setOnClickListener(v -> {
-            sidebar.setVisibility(sidebar.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
-        });
-
-        bindGroup(R.id.group_monitor_header, R.id.group_monitor_items, R.id.group_monitor_chevron);
-        bindGroup(R.id.group_control_header, R.id.group_control_items, R.id.group_control_chevron);
-        bindGroup(R.id.group_system_header, R.id.group_system_items, R.id.group_system_chevron);
     }
 
-    /** 分组标题点击展开 / 收起 */
-    private void bindGroup(int headerId, int itemsId, int chevronId) {
-        View header = findViewById(headerId);
-        View items = findViewById(itemsId);
-        TextView chevron = findViewById(chevronId);
-        header.setOnClickListener(v -> {
-            boolean show = items.getVisibility() != View.VISIBLE;
-            items.setVisibility(show ? View.VISIBLE : View.GONE);
-            chevron.setText(show ? "▼" : "▶");
-        });
+    private void setupPerformancePage() {
+        // 环形指示器的进度弧颜色，与底部细进度条保持一致
+        setRingColor(ringCpu, R.color.accent_blue);
+        setRingColor(ringMem, R.color.status_ok);
+        setRingColor(ringGpu, R.color.status_warn);
+        setRingColor(ringVram, R.color.accent_bright);
+        setRingColor(ringFps, R.color.perf_cyan);
+        setRingColor(ringVol, R.color.status_purple);
+
+        findViewById(R.id.btnPerfVolDown).setOnClickListener(v -> sendMedia("media_vol_down"));
+        findViewById(R.id.btnPerfVolUp).setOnClickListener(v -> sendMedia("media_vol_up"));
+        findViewById(R.id.btnPerfMute).setOnClickListener(v -> sendMedia("media_mute"));
+        updateFpsCard();
     }
 
     private void setupControlPage() {
-        gridLayoutManager = new GridLayoutManager(this, 3);
-        grid.setLayoutManager(gridLayoutManager);
-        grid.setHasFixedSize(true);
-        adapter = new ButtonAdapter(this::onButtonAction);
-        grid.setAdapter(adapter);
-        grid.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom)
-                -> applyGridMetrics());
-    }
+        controlController = new ControlWorkspaceController(pageControl,
+                new ControlWorkspaceController.ControlActionDispatcher() {
+                    @Override
+                    public void onSwitchDeckPage(String pageId) {
+                        connection.requestLayout(pageId);
+                    }
 
-    /** 按服务端下发的行数把网格分成等高行，少量按钮不会被拉满整屏 */
-    private void applyGridMetrics() {
-        if (adapter == null || grid == null) {
-            return;
-        }
-        int available = grid.getHeight() - grid.getPaddingTop() - grid.getPaddingBottom();
-        if (available <= 0) {
-            return;
-        }
-        float density = getResources().getDisplayMetrics().density;
-        int minHeight = Math.round(56 * density);
-        // item_button 上下各 5dp 外边距，行高要预留出来，否则最后一行会被裁掉
-        int margin = Math.round(10 * density);
-        adapter.setRowHeight(Math.max(minHeight, available / Math.max(1, layoutRows) - margin));
+                    @Override
+                    public void onDeckKeyClick(String buttonId) {
+                        connection.sendAction(currentPageId, buttonId, "click");
+                    }
+
+                    @Override
+                    public void onDeckKeyRepeat(String buttonId) {
+                        // 服务端长按靠 long_press_start/end 维持，这里用连续 click 达成同样的连发效果
+                        connection.sendAction(currentPageId, buttonId, "click");
+                    }
+
+                    @Override
+                    public void onDeckKeyDelete(String buttonId, String label) {
+                        notifyUnsupported("删除自定义按键");
+                    }
+
+                    @Override
+                    public void onAddCustomKey(ControlWorkspaceController.CustomKeyDraft draft) {
+                        notifyUnsupported("新增自定义按键");
+                    }
+
+                    @Override
+                    public void onSetVolume(int volumePercent) {
+                        applyVolumeByDelta(volumePercent);
+                    }
+
+                    @Override
+                    public void onToggleSpeakerMute() {
+                        sendMedia("media_mute");
+                    }
+
+                    @Override
+                    public void onToggleMicMute() {
+                        notifyUnsupported("麦克风静音");
+                    }
+
+                    @Override
+                    public void onQuickMediaCommand(String command) {
+                        if ("prev".equals(command)) {
+                            sendMedia("media_prev");
+                        } else if ("next".equals(command)) {
+                            sendMedia("media_next");
+                        } else {
+                            sendMedia("media_play");
+                        }
+                    }
+
+                    @Override
+                    public void onQuickHotkey(String combo) {
+                        if ("alt+tab".equals(combo)) {
+                            connection.sendAction(DEFAULT_PAGE_ID, "btn_alt_tab", "click");
+                        } else {
+                            notifyUnsupported("快捷键 " + combo);
+                        }
+                    }
+
+                    @Override
+                    public void onSendRemoteText(String text, boolean pressEnter) {
+                        notifyUnsupported("远程文本输入");
+                    }
+
+                    @Override
+                    public void onTouchpadMove(int dx, int dy) {
+                        notifyUnsupported("触控板鼠标移动");
+                    }
+
+                    @Override
+                    public void onTouchpadClick(String mouseButton) {
+                        notifyUnsupported("触控板点击");
+                    }
+
+                    @Override
+                    public void onTouchpadScroll(int deltaY) {
+                        notifyUnsupported("触控板滚动");
+                    }
+                });
     }
 
     private void setupScreenPage() {
@@ -368,56 +470,67 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             @Override
             public void onFirstFrame() {
                 firstFrame = true;
-                screenHint.setVisibility(View.GONE);
                 streaming = true;
                 streamRequested = false;
                 updateScreenUi();
-                streamState.setText(streamSummary());
             }
 
             @Override
             public void onError(String message) {
-                screenHint.setVisibility(View.VISIBLE);
-                screenHint.setText(message);
-                streamState.setText("H.264 解码失败");
+                tvScreenHint.setVisibility(View.VISIBLE);
+                tvScreenHint.setText(message);
+                tvScreenMeta.setText("H.264 解码失败");
             }
         });
 
-        screenTexture.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+        surfaceScreen.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
-            public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-                screenSurface = new Surface(surfaceTexture);
+            public void surfaceCreated(SurfaceHolder holder) {
+                screenSurface = holder.getSurface();
                 applyScreenAspect();
-                if ((streamRequested || streaming) && !h264Decoder.isRunning() && screenSurface.isValid()) {
+                if ((streamRequested || streaming) && !h264Decoder.isRunning()
+                        && screenSurface != null && screenSurface.isValid()) {
                     h264Decoder.start(screenSurface, streamWidth, streamHeight, streamFps);
                 }
             }
 
             @Override
-            public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+                screenSurface = holder.getSurface();
                 applyScreenAspect();
             }
 
             @Override
-            public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
+            public void surfaceDestroyed(SurfaceHolder holder) {
                 if (h264Decoder != null) {
                     h264Decoder.stop();
                 }
-                if (screenSurface != null) {
-                    screenSurface.release();
-                    screenSurface = null;
-                }
-                return true;
-            }
-
-            @Override
-            public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
+                screenSurface = null;
             }
         });
+
         screenStage.addOnLayoutChangeListener((v, left, top, right, bottom,
                                                oldLeft, oldTop, oldRight, oldBottom) -> applyScreenAspect());
 
-        streamBtn.setOnClickListener(v -> {
+        spinnerMonitors.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (view instanceof TextView) {
+                    ((TextView) view).setTextColor(ContextCompat.getColor(
+                            MainActivity.this, R.color.text_primary));
+                }
+                if (suppressMonitorCallback) {
+                    return;
+                }
+                selectMonitor(position <= 0 ? -1 : monitors.get(position - 1).id);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        btnToggleStream.setOnClickListener(v -> {
             if (streaming || streamRequested) {
                 stopStream();
             } else {
@@ -425,7 +538,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             }
         });
 
-        fullscreenBtn.setOnClickListener(v -> {
+        btnScreenFullscreen.setOnClickListener(v -> {
             if (fullscreen) {
                 exitFullscreen();
             } else {
@@ -433,197 +546,59 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             }
         });
 
-        monitorBtn.setOnClickListener(v -> {
-            if (monitors.isEmpty()) {
-                monitorDialogPending = true;
-                connection.requestScreenDevices();
-                monitorBtn.setText("获取屏幕中…");
-            } else {
-                showMonitorPicker();
-            }
-        });
-
+        rebuildMonitorSpinner();
         applyStreamFormat(0, 0, 0);
     }
 
-    /** 弹出采集屏幕选择：整块桌面 + 每块显示器 */
-    private void showMonitorPicker() {
-        List<String> labels = new ArrayList<>();
-        List<Integer> ids = new ArrayList<>();
-        labels.add("整块桌面（所有显示器）");
-        ids.add(-1);
-        for (ScreenDevicesMessage.Device device : monitors) {
-            labels.add(device.name + " · " + device.width + "×" + device.height);
-            ids.add(device.id);
-        }
-        int checked = 0;
-        for (int i = 0; i < ids.size(); i++) {
-            if (ids.get(i) == selectedMonitor) {
-                checked = i;
-                break;
-            }
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("选择监视屏幕")
-                .setSingleChoiceItems(labels.toArray(new String[0]), checked,
-                        (dialog, which) -> {
-                            dialog.dismiss();
-                            selectMonitor(ids.get(which));
-                        })
-                .setNegativeButton("取消", null)
-                .show();
-    }
-
-    private void selectMonitor(int id) {
-        selectedMonitor = id;
-        updateMonitorLabel();
-        if (streaming || streamRequested) {
-            stopStream();
-            startStream();
-        }
-    }
-
-    private void updateMonitorLabel() {
-        if (monitorBtn == null) {
-            return;
-        }
-        if (selectedMonitor < 0) {
-            monitorBtn.setText("选择屏幕");
-            return;
-        }
-        for (ScreenDevicesMessage.Device device : monitors) {
-            if (device.id == selectedMonitor) {
-                monitorBtn.setText("屏幕：" + device.name);
+    private void setupSettingsPage() {
+        findViewById(R.id.btnReconnect).setOnClickListener(v -> {
+            String host = etServerHost.getText().toString().trim();
+            String port = etServerPort.getText().toString().trim();
+            if (host.isEmpty()) {
+                Toast.makeText(this, "请填写服务端地址", Toast.LENGTH_SHORT).show();
                 return;
             }
-        }
-        monitorBtn.setText("屏幕 " + (selectedMonitor + 1));
-    }
-
-    /** 进入全屏：隐藏侧边栏、顶栏与工具条，画面独占屏幕 */
-    private void enterFullscreen() {
-        if (fullscreen) {
-            return;
-        }
-        fullscreen = true;
-        sidebarVisibilityBeforeFullscreen = sidebar.getVisibility();
-        sidebar.setVisibility(View.GONE);
-        topbar.setVisibility(View.GONE);
-        screenToolbar.setVisibility(View.GONE);
-        pageScreen.setPadding(0, 0, 0, 0);
-        fullscreenBtn.setText("⤢ 退出全屏");
-        hideSystemBars();
-        applyScreenAspect();
-        screenStage.post(this::applyScreenAspect);
-    }
-
-    /** 退出全屏：恢复导航与工具条 */
-    private void exitFullscreen() {
-        if (!fullscreen) {
-            return;
-        }
-        fullscreen = false;
-        sidebar.setVisibility(sidebarVisibilityBeforeFullscreen);
-        topbar.setVisibility(View.VISIBLE);
-        screenToolbar.setVisibility(View.VISIBLE);
-        int padding = Math.round(10 * getResources().getDisplayMetrics().density);
-        pageScreen.setPadding(padding, padding, padding, padding);
-        fullscreenBtn.setText("⛶ 全屏");
-        hideSystemBars();
-        applyScreenAspect();
-        screenStage.post(this::applyScreenAspect);
-    }
-
-    /**
-     * 舞台内按推流实际宽高比等比摆放 TextureView（不依赖 setTransform）：
-     * 比例跟随服务端编码尺寸（默认 1280x720，按采集源比例可能变化），
-     * 超宽屏等非 16:9 采集源也不会拉伸，四周由舞台的黑色背景填充。
-     */
-    private void applyScreenAspect() {
-        if (screenTexture == null || screenStage == null) {
-            return;
-        }
-        int stageWidth = screenStage.getWidth();
-        int stageHeight = screenStage.getHeight();
-        if (stageWidth <= 0 || stageHeight <= 0 || streamWidth <= 0 || streamHeight <= 0) {
-            return;
-        }
-        float scale = Math.min(stageWidth / (float) streamWidth, stageHeight / (float) streamHeight);
-        int width = Math.max(1, Math.round(streamWidth * scale));
-        int height = Math.max(1, Math.round(streamHeight * scale));
-        ViewGroup.LayoutParams params = screenTexture.getLayoutParams();
-        if (params.width != width || params.height != height) {
-            params.width = width;
-            params.height = height;
-            screenTexture.setLayoutParams(params);
-        }
-        // 缓冲区按编码尺寸输出，缩放交给视图尺寸完成
-        screenTexture.setTransform(null);
-    }
-
-    /** 采用服务端下发的推流格式（宽高传 0 表示只更新帧率与标签） */
-    private void applyStreamFormat(int width, int height, int fps) {
-        if (fps > 0) {
-            streamFps = fps;
-        }
-        boolean resized = width > 0 && height > 0
-                && (width != streamWidth || height != streamHeight);
-        if (resized) {
-            streamWidth = width;
-            streamHeight = height;
-        }
-        if (streamFormatView != null) {
-            streamFormatView.setText(streamFormatChip());
-        }
-        if (resized) {
-            applyScreenAspect();
-            screenStage.post(this::applyScreenAspect);
-        }
-    }
-
-    /** 顶部格式标签文本，如 1280×720 · 30fps · H.264 */
-    private String streamFormatChip() {
-        return streamWidth + "×" + streamHeight + " · " + streamFps + "fps · H.264";
-    }
-
-    /** 服务端热更新参数导致分辨率变化时，按新尺寸重建解码器等待下一个 IDR */
-    private void restartDecoder() {
-        if (!streaming || screenSurface == null || !screenSurface.isValid()) {
-            return;
-        }
-        firstFrame = false;
-        screenHint.setVisibility(View.VISIBLE);
-        screenHint.setText("画面参数已更新，正在等待 H.264 关键帧…");
-        h264Decoder.start(screenSurface, streamWidth, streamHeight, streamFps);
-    }
-
-    /** 当前推流格式文本，如 1280×720@30 H.264 */
-    private String streamFormat() {
-        return streamWidth + "×" + streamHeight + "@" + streamFps + " H.264";
-    }
-
-    private String streamSummary() {
-        StringBuilder text = new StringBuilder()
-                .append(streamFormat())
-                .append(" · 实际 ").append(String.format(Locale.ROOT, "%.1f", actualFps)).append(" fps");
-        if (streamKbps > 0) {
-            text.append(streamKbps >= 1024
-                    ? String.format(Locale.ROOT, " · %.1f MB/s", streamKbps / 1024.0)
-                    : " · " + streamKbps + " KB/s");
-        }
-        return text.toString();
-    }
-
-    private void setupSettingsPage() {
-        findViewById(R.id.save_lan_btn).setOnClickListener(v -> {
-            String value = normalizeEndpoint(lanInput.getText().toString().trim());
-            connection.setLanEndpoint(value);
+            connection.setLanEndpoint(normalizeEndpoint(
+                    host + (port.isEmpty() ? "" : ":" + port)));
             connection.reconnect();
-            connInfo.setText("已保存并重新连接…");
+            tvSessionDetail.setText("已保存并重新连接…");
         });
     }
 
     // ---------------- 页面切换 ----------------
+
+    private String pageOrDefault(String page) {
+        if (PAGE_CONTROL.equals(page) || PAGE_SCREEN.equals(page) || PAGE_SETTINGS.equals(page)) {
+            return page;
+        }
+        return PAGE_PERFORMANCE;
+    }
+
+    private View pageViewOf(String page) {
+        if (PAGE_CONTROL.equals(page)) {
+            return pageControl;
+        }
+        if (PAGE_SCREEN.equals(page)) {
+            return pageScreen;
+        }
+        if (PAGE_SETTINGS.equals(page)) {
+            return pageSettings;
+        }
+        return pagePerformance;
+    }
+
+    private int pageIndex(String page) {
+        if (PAGE_CONTROL.equals(page)) {
+            return 1;
+        }
+        if (PAGE_SCREEN.equals(page)) {
+            return 2;
+        }
+        if (PAGE_SETTINGS.equals(page)) {
+            return 3;
+        }
+        return 0;
+    }
 
     private void selectPage(String page) {
         if (PAGE_SCREEN.equals(currentPage) && !PAGE_SCREEN.equals(page)) {
@@ -632,36 +607,85 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             }
             stopStream();
         }
+
+        View previous = pageViewOf(currentPage);
+        View next = pageViewOf(page);
+        boolean forward = pageIndex(page) > pageIndex(currentPage);
         currentPage = page;
 
-        pagePerformance.setVisibility(PAGE_PERFORMANCE.equals(page) ? View.VISIBLE : View.GONE);
-        pageControl.setVisibility(PAGE_CONTROL.equals(page) ? View.VISIBLE : View.GONE);
-        pageScreen.setVisibility(PAGE_SCREEN.equals(page) ? View.VISIBLE : View.GONE);
-        pageSettings.setVisibility(PAGE_SETTINGS.equals(page) ? View.VISIBLE : View.GONE);
-
-        navPerformance.setSelected(PAGE_PERFORMANCE.equals(page));
-        navScreen.setSelected(PAGE_SCREEN.equals(page));
-        navControl.setSelected(PAGE_CONTROL.equals(page));
-        navSettings.setSelected(PAGE_SETTINGS.equals(page));
-
-        if (PAGE_CONTROL.equals(page)) {
-            pageTitleView.setText("功能控制");
-        } else if (PAGE_SCREEN.equals(page)) {
-            pageTitleView.setText("屏幕监视");
-        } else if (PAGE_SETTINGS.equals(page)) {
-            pageTitleView.setText("连接设置");
-        } else {
-            pageTitleView.setText("性能监视");
+        UiMotionHelper.switchPageWithMotion(previous, next, forward);
+        for (String each : new String[]{PAGE_PERFORMANCE, PAGE_CONTROL, PAGE_SCREEN, PAGE_SETTINGS}) {
+            View view = pageViewOf(each);
+            if (view != null && view != next) {
+                view.setVisibility(View.GONE);
+            }
         }
+        if (next != null) {
+            next.setVisibility(View.VISIBLE);
+        }
+
+        tvPageTitle.setText(pageTitleOf(page));
+        UiMotionHelper.animateTitleSwap(tvPageTitle);
+        applyNavSelection(page);
 
         if (PAGE_SETTINGS.equals(page)) {
-            lanInput.setText(connection.getLanEndpoint());
-            lanInput.setSelection(lanInput.getText().length());
-            renderConnInfo();
+            fillEndpointFields();
+            renderSessionDetail();
         }
         if (PAGE_SCREEN.equals(page)) {
+            // 进入屏幕页只刷新状态，推流必须由用户点「开始监视」手动开启
             updateScreenUi();
-            startStreamIfPossible();
+        }
+        if (PAGE_CONTROL.equals(page) && controlController != null) {
+            controlController.resyncIndicators();
+        }
+    }
+
+    private String pageTitleOf(String page) {
+        if (PAGE_CONTROL.equals(page)) {
+            return getString(R.string.nav_ctrl_full);
+        }
+        if (PAGE_SCREEN.equals(page)) {
+            return getString(R.string.nav_screen_full);
+        }
+        if (PAGE_SETTINGS.equals(page)) {
+            return getString(R.string.nav_settings_full);
+        }
+        return getString(R.string.nav_perf_full);
+    }
+
+    private void applyNavSelection(String page) {
+        View[] items = new View[]{navPerf, navControl, navScreen, navSettings};
+        int[] icons = new int[]{R.id.ivNavPerf, R.id.ivNavControl, R.id.ivNavScreen, R.id.ivNavSettings};
+        int[] labels = new int[]{R.id.tvNavPerf, R.id.tvNavControl, R.id.tvNavScreen, R.id.tvNavSettings};
+        String[] pages = new String[]{PAGE_PERFORMANCE, PAGE_CONTROL, PAGE_SCREEN, PAGE_SETTINGS};
+
+        int accent = ContextCompat.getColor(this, R.color.accent_bright);
+        int muted = ContextCompat.getColor(this, R.color.text_muted);
+
+        for (int i = 0; i < items.length; i++) {
+            if (items[i] == null) {
+                continue;
+            }
+            boolean selected = pages[i].equals(page);
+            items[i].setSelected(selected);
+
+            View icon = items[i].findViewById(icons[i]);
+            if (icon instanceof ImageView) {
+                ((ImageView) icon).setColorFilter(selected ? accent : muted);
+            }
+            View label = items[i].findViewById(labels[i]);
+            if (label instanceof TextView) {
+                ((TextView) label).setTextColor(selected ? accent : muted);
+            }
+        }
+
+        View active = items[Math.max(0, Math.min(items.length - 1, pageIndex(page)))];
+        if (bottomNavIndicator != null && active != null) {
+            UiMotionHelper.animateHorizontalIndicator(bottomNavIndicator, active, 0, true);
+        }
+        if (railNavIndicator != null && active != null) {
+            UiMotionHelper.animateVerticalIndicator(railNavIndicator, active, true);
         }
     }
 
@@ -675,15 +699,46 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (layout.pageId != null) {
             currentPageId = layout.pageId;
         }
-        layoutTitle.setText(layout.pageTitle == null ? "" : layout.pageTitle);
+        deckPageTitle = layout.pageTitle == null ? "" : layout.pageTitle;
+
+        buttonStates.clear();
+        deckItems.clear();
+        for (ButtonItem item : layout.buttons) {
+            if (item == null || item.id == null) {
+                continue;
+            }
+            deckItems.add(toDeckItem(item));
+        }
 
         int cols = layout.grid != null && layout.grid.cols > 0 ? layout.grid.cols : 3;
-        if (gridLayoutManager.getSpanCount() != cols) {
-            gridLayoutManager.setSpanCount(cols);
+        controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), cols, 1);
+
+        List<ControlWorkspaceController.DeckPageMeta> pages = new ArrayList<>();
+        if (layout.pages != null) {
+            for (LayoutMessage.PageRef ref : layout.pages) {
+                if (ref != null && ref.id != null) {
+                    pages.add(new ControlWorkspaceController.DeckPageMeta(
+                            ref.id, ref.title == null ? ref.id : ref.title));
+                }
+            }
         }
-        layoutRows = layout.grid != null && layout.grid.rows > 0 ? layout.grid.rows : 3;
-        adapter.submit(layout.buttons);
-        applyGridMetrics();
+        if (pages.isEmpty()) {
+            pages.add(new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle));
+        }
+        deckPages = pages;
+        controlController.updateDeckPages(deckPages, currentPageId);
+    }
+
+    private TactileDeckAdapter.DeckKeyItem toDeckItem(ButtonItem item) {
+        String hint = item.icon == null ? "" : item.icon;
+        boolean active = "active".equalsIgnoreCase(item.state) || "on".equalsIgnoreCase(item.state);
+        return new TactileDeckAdapter.DeckKeyItem(
+                item.id,
+                item.label == null ? item.id : item.label,
+                hint,
+                item.bgColor,
+                active,
+                false);
     }
 
     @Override
@@ -691,25 +746,35 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (telemetry == null) {
             return;
         }
-        setMetric(cpuBar, cpuText, telemetry.cpu);
-        setMetric(memBar, memText, telemetry.mem);
-        setMetric(gpuBar, gpuText, telemetry.gpu);
+        setMetric(tvCpuValue, telemetry.cpu);
+        setMetric(tvMemValue, telemetry.mem);
+        setMetric(tvGpuValue, telemetry.gpu);
+
+        lastCpu = telemetry.cpu;
+        lastMem = telemetry.mem;
+        lastGpu = telemetry.gpu;
+        lastVram = telemetry.vram;
+        renderTopMetrics();
 
         boolean muted = telemetry.isMuted;
-        volBar.setProgress(muted ? 0 : telemetry.volume);
-        volText.setText(muted ? "静音" : telemetry.volume + "%");
+        int volume = muted ? 0 : telemetry.volume;
+        tvVolValue.setText(muted ? "静音" : volume + "%");
+        tvVolSub.setText(muted ? "已静音" : "正常");
+        tvNetUp.setText("↑ " + safe(telemetry.netUp));
+        tvNetDown.setText("↓ " + safe(telemetry.netDown));
 
-        cpuBig.setText(formatPercent(telemetry.cpu));
-        memBig.setText(formatPercent(telemetry.mem));
-        gpuBig.setText(formatPercent(telemetry.gpu));
-        volBig.setText(muted ? "0%" : telemetry.volume + "%");
-        volBigBar.setProgress(muted ? 0 : telemetry.volume);
-        muteState.setText(muted ? "已静音" : "正常");
-        netInfo.setText("↑ " + safe(telemetry.netUp) + " · ↓ " + safe(telemetry.netDown));
+        applyGauge(barCpu, ringCpu, telemetry.cpu);
+        applyGauge(barMem, ringMem, telemetry.mem);
+        applyGauge(barGpu, ringGpu, telemetry.gpu);
+        applyGauge(barVol, ringVol, muted ? 0 : volume);
+        updateVramCard(telemetry.vram, telemetry.vramTotal);
 
-        cpuGraph.addPoint((float) telemetry.cpu);
-        memGraph.addPoint((float) telemetry.mem);
-        gpuGraph.addPoint((float) telemetry.gpu);
+        if (controlController != null) {
+            controlController.updateAudioTelemetry(volume, muted, false);
+        }
+        if (System.currentTimeMillis() - lastVolumeInputAt > 1500) {
+            lastVolumeSent = volume;
+        }
     }
 
     @Override
@@ -717,15 +782,30 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (state == null || state.buttonId == null) {
             return;
         }
-        adapter.updateButton(state.buttonId, state.state, state.label, state.icon, state.bgColor);
+        buttonStates.put(state.buttonId, state.state == null ? "" : state.state);
+        for (int i = 0; i < deckItems.size(); i++) {
+            TactileDeckAdapter.DeckKeyItem item = deckItems.get(i);
+            if (!item.id.equals(state.buttonId)) {
+                continue;
+            }
+            String label = state.label == null ? item.label : state.label;
+            String bgColor = state.bgColor == null ? item.bgColorHex : state.bgColor;
+            String hint = state.icon == null ? item.hint : state.icon;
+            boolean active = "active".equalsIgnoreCase(state.state) || "on".equalsIgnoreCase(state.state);
+            deckItems.set(i, new TactileDeckAdapter.DeckKeyItem(
+                    item.id, label, hint, bgColor, active, false));
+            break;
+        }
+        if (controlController != null) {
+            int cols = 3;
+            controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), cols, 1);
+        }
     }
 
     @Override
     public void onConnectionChanged(boolean connected, String mode, String endpoint) {
         this.connected = connected;
-        dotView.setTextColor(connected ? 0xFF22C55E : 0xFFEF4444);
-        modeView.setText(mode == null ? "-" : mode);
-        modeView.setTextColor(connected ? 0xFF7DD3FC : 0xFF64748B);
+        renderConnStatus();
 
         if (!connected) {
             transport = "lan";
@@ -733,12 +813,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             streaming = false;
             streamRequested = false;
             stopDecoder();
-            sidebarFoot.setText("连接断开，稍后自动重试");
-        } else {
-            sidebarFoot.setText(("usb".equals(transport) ? "USB 高速通道" : "Wi-Fi 局域网通道") + "\n" + endpoint);
         }
         updateScreenUi();
-        renderConnInfo();
+        renderSessionDetail();
     }
 
     @Override
@@ -748,15 +825,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         transport = session.transport == null ? "lan" : session.transport;
         screenAllowed = session.screenStream;
-        // 通道帧率上限先按会话报文预估，推流启动后以 screen_state 下发的实际值为准
         applyStreamFormat(0, 0, session.screenMaxFps);
-        modeView.setText("usb".equals(transport) ? "USB" : "Wi-Fi");
-        sidebarFoot.setText(("usb".equals(transport) ? "USB 高速通道" : "Wi-Fi 局域网通道"));
+        renderConnStatus();
         updateScreenUi();
-        renderConnInfo();
-        if (PAGE_SCREEN.equals(currentPage)) {
-            startStreamIfPossible();
-        }
+        renderSessionDetail();
     }
 
     @Override
@@ -767,34 +839,34 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         String reason = state.reason;
         if ("usb_required".equals(reason)) {
             screenAllowed = false;
-            this.streaming = false;
+            streaming = false;
             streamRequested = false;
             stopDecoder();
-            streamState.setText("服务端拒绝：屏幕监视需要 USB 连接");
+            tvScreenMeta.setText("需 USB 连接");
+            tvScreenHint.setText("服务端拒绝：屏幕监视需要 USB 连接");
         } else if ("encoder_unavailable".equals(reason) || "encoder_error".equals(reason)) {
-            this.streaming = false;
+            streaming = false;
             streamRequested = false;
             stopDecoder();
-            screenHint.setVisibility(View.VISIBLE);
-            screenHint.setText("encoder_unavailable".equals(reason)
+            tvScreenHint.setVisibility(View.VISIBLE);
+            tvScreenHint.setText("encoder_unavailable".equals(reason)
                     ? "服务端未找到 ffmpeg，请检查 PC 端 config.json 的 screen.ffmpegExecutable"
                     : "H.264 编码器启动失败，请查看 PC 服务端运行日志");
-            streamState.setText("推流不可用");
+            tvScreenMeta.setText("推流不可用");
         } else if (state.streaming) {
             applyStreamFormat(state.width, state.height, state.fps);
-            this.streaming = true;
+            streaming = true;
             streamRequested = false;
             actualFps = 0;
             streamKbps = 0;
             firstFrame = false;
-            screenHint.setVisibility(View.VISIBLE);
-            screenHint.setText("正在等待 H.264 关键帧…");
+            tvScreenHint.setVisibility(View.VISIBLE);
+            tvScreenHint.setText("正在等待 H.264 关键帧…");
             if (screenSurface != null && screenSurface.isValid()) {
                 h264Decoder.start(screenSurface, streamWidth, streamHeight, streamFps);
             }
-            streamState.setText("推流中：" + streamFormat());
         } else {
-            this.streaming = false;
+            streaming = false;
             streamRequested = false;
             stopDecoder();
         }
@@ -803,7 +875,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     @Override
     public void onScreenStats(double actualFps, int kbps, int width, int height, int fps) {
-        // 服务端热更新参数后编码器会重启，分辨率变化时按新尺寸重建解码器
         if (width > 0 && height > 0 && (width != streamWidth || height != streamHeight)) {
             applyStreamFormat(width, height, fps);
             restartDecoder();
@@ -812,8 +883,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         this.actualFps = actualFps;
         this.streamKbps = kbps;
+        renderTopMetrics();
+        updateFpsCard();
         if (streaming) {
-            streamState.setText(streamSummary());
+            tvScreenMeta.setText(streamSummary());
         }
     }
 
@@ -825,11 +898,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         monitors.clear();
         monitors.addAll(devices.devices);
         selectedMonitor = devices.current;
-        updateMonitorLabel();
-        if (monitorDialogPending) {
-            monitorDialogPending = false;
-            showMonitorPicker();
-        }
+        rebuildMonitorSpinner();
     }
 
     @Override
@@ -844,6 +913,115 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     // ---------------- 屏幕监视 ----------------
 
+    private void rebuildMonitorSpinner() {
+        if (spinnerMonitors == null) {
+            return;
+        }
+        List<String> labels = new ArrayList<>();
+        labels.add("整块桌面");
+        int checked = 0;
+        for (int i = 0; i < monitors.size(); i++) {
+            ScreenDevicesMessage.Device device = monitors.get(i);
+            labels.add((device.name == null ? "显示器 " + (i + 1) : device.name)
+                    + " · " + device.width + "×" + device.height);
+            if (device.id == selectedMonitor) {
+                checked = i + 1;
+            }
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        suppressMonitorCallback = true;
+        spinnerMonitors.setAdapter(adapter);
+        spinnerMonitors.setSelection(checked);
+        suppressMonitorCallback = false;
+
+        // 深色背景下的选中项文字颜色由代码统一指定，避免默认黑字看不清
+        spinnerMonitors.post(() -> {
+            View selected = spinnerMonitors.getSelectedView();
+            if (selected instanceof TextView) {
+                ((TextView) selected).setTextColor(
+                        ContextCompat.getColor(this, R.color.text_primary));
+            }
+        });
+    }
+
+    private void selectMonitor(int id) {
+        if (id == selectedMonitor) {
+            return;
+        }
+        selectedMonitor = id;
+        if (streaming || streamRequested) {
+            stopStream();
+            startStream();
+        }
+    }
+
+    private void applyScreenAspect() {
+        if (surfaceScreen == null || screenStage == null) {
+            return;
+        }
+        int stageWidth = screenStage.getWidth();
+        int stageHeight = screenStage.getHeight();
+        if (stageWidth <= 0 || stageHeight <= 0 || streamWidth <= 0 || streamHeight <= 0) {
+            return;
+        }
+        float scale = Math.min(stageWidth / (float) streamWidth, stageHeight / (float) streamHeight);
+        int width = Math.max(1, Math.round(streamWidth * scale));
+        int height = Math.max(1, Math.round(streamHeight * scale));
+        ViewGroup.LayoutParams params = surfaceScreen.getLayoutParams();
+        if (params.width != width || params.height != height) {
+            params.width = width;
+            params.height = height;
+            surfaceScreen.setLayoutParams(params);
+        }
+    }
+
+    private void applyStreamFormat(int width, int height, int fps) {
+        if (fps > 0) {
+            streamFps = fps;
+        }
+        boolean resized = width > 0 && height > 0
+                && (width != streamWidth || height != streamHeight);
+        if (resized) {
+            streamWidth = width;
+            streamHeight = height;
+        }
+        if (resized) {
+            applyScreenAspect();
+            if (screenStage != null) {
+                screenStage.post(this::applyScreenAspect);
+            }
+        }
+    }
+
+    private void restartDecoder() {
+        if (!streaming || screenSurface == null || !screenSurface.isValid()) {
+            return;
+        }
+        firstFrame = false;
+        tvScreenHint.setVisibility(View.VISIBLE);
+        tvScreenHint.setText("画面参数已更新，正在等待 H.264 关键帧…");
+        h264Decoder.start(screenSurface, streamWidth, streamHeight, streamFps);
+    }
+
+    private String streamFormat() {
+        return streamWidth + "×" + streamHeight + "@" + streamFps + " H.264";
+    }
+
+    private String streamSummary() {
+        StringBuilder text = new StringBuilder(streamFormat());
+        if (actualFps > 0) {
+            text.append(" · ").append(String.format(Locale.ROOT, "%.1f", actualFps)).append(" fps");
+        }
+        if (streamKbps > 0) {
+            text.append(streamKbps >= 1024
+                    ? String.format(Locale.ROOT, " · %.1f MB/s", streamKbps / 1024.0)
+                    : " · " + streamKbps + " KB/s");
+        }
+        return text.toString();
+    }
+
     private void startStreamIfPossible() {
         if (!connected || !screenAllowed || streaming || streamRequested) {
             updateScreenUi();
@@ -853,10 +1031,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         actualFps = 0;
         streamKbps = 0;
         firstFrame = false;
-        screenHint.setVisibility(View.VISIBLE);
-        screenHint.setText("正在启动 H.264 编码…");
+        tvScreenHint.setVisibility(View.VISIBLE);
+        tvScreenHint.setText("正在启动 H.264 编码…");
         connection.sendScreenControl(true, selectedMonitor);
-        streamState.setText("正在启动 H.264 编码…");
         updateScreenUi();
     }
 
@@ -880,125 +1057,286 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         updateScreenUi();
     }
 
-    /** 停止解码；TextureView 保持可见以维持 Surface 生命周期 */
     private void stopDecoder() {
         if (h264Decoder != null) {
             h264Decoder.stop();
         }
         firstFrame = false;
+        if (surfaceScreen != null) {
+            surfaceScreen.setVisibility(View.GONE);
+        }
     }
 
     private void updateScreenUi() {
-        if (screenBadge == null) {
+        if (btnToggleStream == null) {
             return;
         }
-        if (!connected) {
-            screenBadge.setText("未连接");
-            screenBadge.setTextColor(0xFF94A3B8);
-        } else if (screenAllowed) {
-            screenBadge.setText("可用");
-            screenBadge.setTextColor(0xFF86EFAC);
-        } else {
-            screenBadge.setText("不可用");
-            screenBadge.setTextColor(0xFFFCA5A5);
-        }
-
         boolean usable = connected && screenAllowed;
-        streamBtn.setEnabled(usable);
-        streamBtn.setText((streaming || streamRequested) ? "停止监视" : "开始监视");
+        btnToggleStream.setEnabled(usable);
+        btnToggleStream.setAlpha(usable ? 1f : 0.5f);
+        btnToggleStream.setText((streaming || streamRequested) ? "停止监视" : "开始监视");
+        btnScreenFullscreen.setVisibility(streaming ? View.VISIBLE : View.GONE);
+        renderTopMetrics();
+        updateFpsCard();
 
-        boolean canFullscreen = streaming;
-        fullscreenBtn.setVisibility(canFullscreen ? View.VISIBLE : View.GONE);
-        fullscreenBtn.setText(fullscreen ? "⤢ 退出全屏" : "⛶ 全屏");
-        if (!canFullscreen && fullscreen) {
-            exitFullscreen();
-        }
-
-        if (!PAGE_SCREEN.equals(currentPage)) {
+        if (streaming) {
+            surfaceScreen.setVisibility(View.VISIBLE);
+            tvScreenHint.setVisibility(firstFrame ? View.GONE : View.VISIBLE);
+            if (!firstFrame) {
+                tvScreenHint.setText("正在等待 H.264 关键帧…");
+            }
+            tvScreenMeta.setText(streamSummary());
             return;
         }
-        if (streaming) {
-            screenHint.setVisibility(firstFrame ? View.GONE : View.VISIBLE);
-            if (!firstFrame) {
-                screenHint.setText("正在等待 H.264 关键帧…");
-            }
-            streamState.setText(streamSummary());
+
+        surfaceScreen.setVisibility(View.GONE);
+        tvScreenHint.setVisibility(View.VISIBLE);
+        if (!connected) {
+            tvScreenHint.setText("尚未连接 PC 服务端。\n请在「连接设置」中确认地址与端口。");
+            tvScreenMeta.setText("待机中");
+        } else if (!screenAllowed) {
+            tvScreenHint.setText("服务端未开放屏幕推流。\n请确认服务端版本与连接状态。");
+            tvScreenMeta.setText("推流不可用");
+        } else if (streamRequested) {
+            tvScreenHint.setText("正在启动 H.264 编码…");
+            tvScreenMeta.setText("启动中");
         } else {
-            screenHint.setVisibility(View.VISIBLE);
-            if (!connected) {
-                screenHint.setText("尚未连接 PC 服务端。\n请在「连接设置」中确认地址与端口。");
-            } else if (!screenAllowed) {
-                screenHint.setText("服务端未开放屏幕推流。\n请确认服务端版本与连接状态。");
-            } else if (streamRequested) {
-                screenHint.setText("正在启动 H.264 编码…");
-            } else {
-                screenHint.setText("通道就绪。\n点击「开始监视」查看 " + streamFormat() + " 实时画面。");
-            }
-            if (!screenAllowed) {
-                streamState.setText("推流不可用");
-            } else if (!streamRequested) {
-                streamState.setText("推流已停止");
-            }
+            tvScreenHint.setText("通道就绪。\n点击「开始监视」查看 " + streamFormat() + " 实时画面。");
+            tvScreenMeta.setText("待机中");
         }
     }
 
-    // ---------------- 其它 ----------------
+    // ---------------- 全屏 ----------------
 
-    private void setMetric(ProgressBar bar, TextView text, double value) {
-        boolean valid = value >= 0;
-        text.setText(valid ? Math.round(value) + "%" : "—");
-        bar.setProgress(valid ? (int) Math.round(Math.min(100, value)) : 0);
+    private void enterFullscreen() {
+        if (fullscreen) {
+            return;
+        }
+        fullscreen = true;
+        if (topBar != null) {
+            topBar.setVisibility(View.GONE);
+        }
+        if (bottomNavBar != null) {
+            bottomNavBar.setVisibility(View.GONE);
+        }
+        if (sideNavRail != null) {
+            sideNavRail.setVisibility(View.GONE);
+        }
+        View toolbar = screenToolbar();
+        if (toolbar != null) {
+            toolbar.setVisibility(View.GONE);
+        }
+        btnScreenFullscreen.setText("退出全屏");
+        applyScreenAspect();
+        if (screenStage != null) {
+            screenStage.post(this::applyScreenAspect);
+        }
     }
 
-    private String formatPercent(double value) {
-        return value >= 0 ? Math.round(value) + "%" : "—";
+    private void exitFullscreen() {
+        if (!fullscreen) {
+            return;
+        }
+        fullscreen = false;
+        if (topBar != null) {
+            topBar.setVisibility(View.VISIBLE);
+        }
+        if (bottomNavBar != null) {
+            bottomNavBar.setVisibility(View.VISIBLE);
+        }
+        if (sideNavRail != null) {
+            sideNavRail.setVisibility(View.VISIBLE);
+        }
+        View toolbar = screenToolbar();
+        if (toolbar != null) {
+            toolbar.setVisibility(View.VISIBLE);
+        }
+        btnScreenFullscreen.setText("全屏");
+        applyScreenAspect();
+        if (screenStage != null) {
+            screenStage.post(this::applyScreenAspect);
+        }
     }
 
-    private String safe(String value) {
-        return value == null ? "0 B/s" : value;
+    /** 屏幕页顶部工具条（开始/屏幕选择/格式标签），全屏时整体隐藏 */
+    private View screenToolbar() {
+        if (pageScreen instanceof ViewGroup && ((ViewGroup) pageScreen).getChildCount() > 0) {
+            return ((ViewGroup) pageScreen).getChildAt(0);
+        }
+        return null;
     }
 
-    private void renderConnInfo() {
-        if (connInfo == null) {
+    // ---------------- 设置页 ----------------
+
+    private void fillEndpointFields() {
+        if (connection == null) {
+            return;
+        }
+        String endpoint = connection.getLanEndpoint();
+        String host = "127.0.0.1";
+        String port = DEFAULT_PORT;
+        if (endpoint != null && !endpoint.isEmpty()) {
+            String body = endpoint.replaceFirst("^wss?://", "");
+            int index = body.lastIndexOf(':');
+            if (index > 0) {
+                host = body.substring(0, index);
+                port = body.substring(index + 1);
+            } else {
+                host = body;
+            }
+        }
+        etServerHost.setText(host);
+        etServerPort.setText(port);
+    }
+
+    private void renderSessionDetail() {
+        if (tvSessionDetail == null) {
             return;
         }
         String lan = connection == null ? "" : connection.getLanEndpoint();
-        connInfo.setText("USB 地址：ws://127.0.0.1:8500\n"
-                + "局域网地址：" + (lan.isEmpty() ? "未设置" : lan) + "\n"
+        tvSessionDetail.setText("USB 地址：ws://127.0.0.1:8500\n"
+                + "局域网地址：" + (lan == null || lan.isEmpty() ? "未设置" : lan) + "\n"
                 + "状态：" + (connected ? "已连接" : "未连接") + "\n"
                 + "通道：" + ("usb".equals(transport) ? "USB（adb reverse）" : "Wi-Fi 局域网") + "\n"
                 + "屏幕监视：" + (screenAllowed ? "可用" : "不可用"));
     }
 
-    /** 补全 ws:// 前缀与默认端口，空串表示清除局域网地址 */
     private String normalizeEndpoint(String raw) {
-        if (raw.isEmpty()) {
+        if (raw == null || raw.trim().isEmpty()) {
             return "";
         }
-        String url = raw;
+        String url = raw.trim();
         if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
             url = "ws://" + url;
         }
         String hostPart = url.substring(url.indexOf("://") + 3);
+        if (hostPart.isEmpty()) {
+            return "";
+        }
         if (hostPart.indexOf(':') < 0) {
-            url = url + ":8500";
+            url = url + ":" + DEFAULT_PORT;
         }
         return url;
     }
 
-    private void onButtonAction(ButtonItem item, String event) {
-        if (item == null || item.id == null) {
-            return;
-        }
-        connection.sendAction(currentPageId, item.id, event);
+    // ---------------- 动作映射 ----------------
+
+    /** 新版 UI 的媒体/音量快捷按钮映射到服务端既有的媒体面板按键 */
+    private void sendMedia(String buttonId) {
+        connection.sendAction(MEDIA_PAGE_ID, buttonId, "click");
     }
 
-    private void hideSystemBars() {
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        WindowInsetsControllerCompat controller =
-                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        controller.hide(WindowInsetsCompat.Type.systemBars());
-        controller.setSystemBarsBehavior(
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+    /** 音量滑块按差值换算成若干次 volume_up / volume_down */
+    private void applyVolumeByDelta(int percent) {
+        lastVolumeInputAt = System.currentTimeMillis();
+        if (lastVolumeSent < 0) {
+            lastVolumeSent = percent;
+            return;
+        }
+        int diff = percent - lastVolumeSent;
+        if (Math.abs(diff) < 2) {
+            return;
+        }
+        int steps = Math.min(10, Math.max(1, Math.abs(diff) / 4));
+        String buttonId = diff > 0 ? "media_vol_up" : "media_vol_down";
+        for (int i = 0; i < steps; i++) {
+            connection.sendAction(MEDIA_PAGE_ID, buttonId, "click");
+        }
+        lastVolumeSent = percent;
+    }
+
+    /** 服务端当前协议尚未提供的能力：明确提示而不是静默失败 */
+    private void notifyUnsupported(String feature) {
+        long now = System.currentTimeMillis();
+        if (feature.equals(lastUnsupportedFeature) && now - lastUnsupportedToastAt < 2500) {
+            return;
+        }
+        lastUnsupportedFeature = feature;
+        lastUnsupportedToastAt = now;
+        Toast.makeText(this, "PC 服务端暂不支持：" + feature, Toast.LENGTH_SHORT).show();
+    }
+
+    // ---------------- 其它 ----------------
+
+    private void setMetric(TextView text, double value) {
+        if (text == null) {
+            return;
+        }
+        text.setText(percentText(value));
+    }
+
+    private void setRingColor(RingProgressView ring, int colorRes) {
+        if (ring != null) {
+            ring.setRingColor(ContextCompat.getColor(this, colorRes));
+        }
+    }
+
+    /** 环形指示与底部细进度条共用同一百分比；数值非法（-1）时归零 */
+    private void applyGauge(ProgressBar bar, RingProgressView ring, double value) {
+        boolean valid = value >= 0;
+        int percent = valid ? (int) Math.round(Math.min(100, value)) : 0;
+        if (bar != null) {
+            bar.setProgress(percent);
+        }
+        if (ring != null) {
+            ring.setProgress(percent);
+        }
+    }
+
+    /** 显存卡片：值显示已用 GB，环形/进度条按已用占总量的比例 */
+    private void updateVramCard(double usedMb, double totalMb) {
+        if (tvVramValue != null) {
+            tvVramValue.setText(usedMb >= 0
+                    ? String.format(Locale.ROOT, "%.1fG", usedMb / 1024.0)
+                    : "—");
+        }
+        double percent = (usedMb >= 0 && totalMb > 0) ? usedMb / totalMb * 100.0 : -1;
+        applyGauge(barVram, ringVram, percent);
+    }
+
+    /** 帧率卡片：数值来自推流统计，环形按 60fps 满量程换算 */
+    private void updateFpsCard() {
+        boolean active = streaming;
+        if (tvFpsValue != null) {
+            tvFpsValue.setText(active
+                    ? String.format(Locale.ROOT, "%.1f", actualFps)
+                    : "--");
+        }
+        applyGauge(barFps, ringFps, active ? Math.min(100.0, actualFps / 60.0 * 100.0) : -1);
+    }
+
+    /**
+     * 顶栏五项常驻指标：每项固定在等宽区域内，且数值补齐到固定宽度，
+     * 位数变化（如 9% -> 100%）不会推动相邻项。
+     */
+    private void renderTopMetrics() {
+        if (tvTopCpu == null) {
+            return;
+        }
+        tvTopFps.setText("FPS " + (streaming
+                ? String.format(Locale.ROOT, "%4.1f", actualFps)
+                : "  -- "));
+        tvTopCpu.setText("CPU " + metricPercent(lastCpu));
+        tvTopGpu.setText("GPU " + metricPercent(lastGpu));
+        tvTopMem.setText("内存 " + metricPercent(lastMem));
+        tvTopVram.setText("显存 " + metricVram(lastVram));
+    }
+
+    private String metricPercent(double value) {
+        return value >= 0 ? String.format(Locale.ROOT, "%3d%%", Math.round(value)) : "  --";
+    }
+
+    private String metricVram(double megabytes) {
+        return megabytes >= 0
+                ? String.format(Locale.ROOT, "%5.1fG", megabytes / 1024.0)
+                : "   --";
+    }
+
+    private String percentText(double value) {
+        return value >= 0 ? Math.round(value) + "%" : "—";
+    }
+
+    private String safe(String value) {
+        return value == null ? "0 B/s" : value;
     }
 }
