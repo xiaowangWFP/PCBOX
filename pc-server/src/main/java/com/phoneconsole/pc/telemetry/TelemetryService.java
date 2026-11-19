@@ -75,6 +75,7 @@ public class TelemetryService {
         message.cpu = cpuUsage();
         message.mem = memoryUsage();
         message.gpu = gpu.usage();
+        message.vram = gpu.vramUsedMb();
         double[] speed = networkSpeed();
         message.netUp = formatSpeed(speed[0]);
         message.netDown = formatSpeed(speed[1]);

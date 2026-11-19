@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -36,9 +37,9 @@ public class ControlWebSocketServer extends WebSocketServer {
     private final Gson gson = new Gson();
     private volatile AppConfig config;
     private final ActionEngine engine;
-    /** USB 通道 60fps；局域网默认 30fps，减轻无线抖动与平板解码压力 */
-    private static final int USB_FPS = 60;
-    private static final int LAN_FPS = 30;
+    /** 通道帧率上限来自 config.json（screen.usbFps / screen.lanFps），改动后对后续订阅生效 */
+    private static final int USB_FPS_FALLBACK = 30;
+    private static final int LAN_FPS_FALLBACK = 24;
 
     /** 每个客户端各自订阅的（显示器, 帧率），互不影响 */
     private record Subscription(int monitor, int fps) {
@@ -73,13 +74,52 @@ public class ControlWebSocketServer extends WebSocketServer {
         if (config == null) {
             return;
         }
+        AppConfig.Screen previousScreen = this.config == null ? null : this.config.screen;
         this.config = config;
+        if (screenChanged(previousScreen, config.screen)) {
+            // 分辨率/缩放/预设/码率变更：重启编码进程让新参数立即生效
+            for (H264ScreenStreamer streamer : streamers.values()) {
+                streamer.restartEncoder();
+            }
+            LogBuffer.get().info("SCREEN", "推流参数已变更，正在重启编码器应用新参数");
+        }
         int fromConfig = config.screen == null ? -1 : config.screen.monitor;
         if (fromConfig != selectedMonitor) {
             selectedMonitor = fromConfig;
             // 只影响之后发起的订阅，已在观看的客户端保持自己选的那块屏
             broadcastScreenDevices();
         }
+    }
+
+    /** 只比较影响单个编码进程的参数；帧率在订阅时确定，重新开始推流后生效 */
+    private static boolean screenChanged(AppConfig.Screen before, AppConfig.Screen after) {
+        if (before == null || after == null) {
+            return before != after;
+        }
+        return before.maxWidth != after.maxWidth
+                || before.maxHeight != after.maxHeight
+                || before.maxBitrateKbps != after.maxBitrateKbps
+                || before.x264Threads != after.x264Threads
+                || !Objects.equals(before.scaleFlags, after.scaleFlags)
+                || !Objects.equals(before.x264Preset, after.x264Preset)
+                || !Objects.equals(before.ffmpegExecutable, after.ffmpegExecutable);
+    }
+
+    private AppConfig.Screen screenConfig() {
+        AppConfig snapshot = config;
+        return snapshot == null ? null : snapshot.screen;
+    }
+
+    private int usbFps() {
+        AppConfig.Screen screen = screenConfig();
+        int value = screen == null ? 0 : screen.usbFps;
+        return value <= 0 ? USB_FPS_FALLBACK : Math.min(120, value);
+    }
+
+    private int lanFps() {
+        AppConfig.Screen screen = screenConfig();
+        int value = screen == null ? 0 : screen.lanFps;
+        return value <= 0 ? LAN_FPS_FALLBACK : Math.min(120, value);
     }
 
     private void broadcastScreenDevices() {
@@ -123,7 +163,7 @@ public class ControlWebSocketServer extends WebSocketServer {
         session.transport = usb ? "usb" : "lan";
         // 屏幕推流不再限定通道：H.264 码率低，USB / 局域网均可使用
         session.screenStream = true;
-        session.screenMaxFps = usb ? USB_FPS : LAN_FPS;
+        session.screenMaxFps = usb ? usbFps() : lanFps();
         conn.send(gson.toJson(session));
 
         String pageId = currentPageId != null ? currentPageId : config.defaultPageId;
@@ -152,6 +192,12 @@ public class ControlWebSocketServer extends WebSocketServer {
                 }
             }
             case "screen_control" -> handleScreenControl(conn, json);
+            case "layout_request" -> {
+                String pageId = json.has("pageId") ? json.get("pageId").getAsString() : null;
+                if (pageId != null && !pageId.isBlank()) {
+                    broadcastLayout(pageId);
+                }
+            }
             default -> log.debug("忽略消息类型：{}", type);
         }
     }
@@ -269,15 +315,11 @@ public class ControlWebSocketServer extends WebSocketServer {
     private H264ScreenStreamer streamerFor(int monitor, int fps) {
         String key = monitor + "@" + fps;
         return streamers.computeIfAbsent(key, ignored -> new H264ScreenStreamer(
-                () -> {
-                    AppConfig snapshot = config;
-                    return snapshot.screen == null ? "ffmpeg" : snapshot.screen.ffmpegExecutable;
-                },
-                () -> monitor, targets, fps));
+                this::screenConfig, () -> monitor, targets, fps));
     }
 
     private void startH264(WebSocket conn, int monitor) {
-        int fps = isUsbChannel(conn) ? USB_FPS : LAN_FPS;
+        int fps = isUsbChannel(conn) ? usbFps() : lanFps();
         final H264ScreenStreamer streamer = streamerFor(monitor, fps);
         H264ScreenStreamer.Sink sink = new H264ScreenStreamer.Sink() {
             @Override
@@ -419,6 +461,12 @@ public class ControlWebSocketServer extends WebSocketServer {
             item.bgColor = button.bgColor;
             item.state = button.state;
             message.buttons.add(item);
+        }
+        for (AppConfig.PageConfig each : config.pages) {
+            LayoutMessage.Page ref = new LayoutMessage.Page();
+            ref.id = each.id;
+            ref.title = each.title;
+            message.pages.add(ref);
         }
         return message;
     }
