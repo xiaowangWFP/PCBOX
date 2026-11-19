@@ -1,9 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 平板 / 大屏：加宽侧边栏与顶栏，避免内容过密 -->
-    <dimen name="sidebar_width">232dp</dimen>
-    <dimen name="topbar_height">72dp</dimen>
-    <dimen name="nav_text_size">15sp</dimen>
-    <dimen name="metric_text_size">13sp</dimen>
-    <dimen name="page_title_size">18sp</dimen>
+    <!-- 平板大屏尺寸规范 -->
+    <dimen name="topbar_height">56dp</dimen>
+    <dimen name="rail_width">72dp</dimen>
+
+    <dimen name="page_padding_h">24dp</dimen>
+    <dimen name="page_padding_v">18dp</dimen>
+    <dimen name="section_gap">16dp</dimen>
+    <dimen name="card_padding">18dp</dimen>
+    <dimen name="card_radius">18dp</dimen>
+    <dimen name="control_radius">10dp</dimen>
+
+    <dimen name="keycap_radius">16dp</dimen>
+    <dimen name="keycap_min_height">108dp</dimen>
+    <dimen name="keycap_padding">14dp</dimen>
+    <dimen name="keycap_icon_box">34dp</dimen>
+    <dimen name="grid_gap">12dp</dimen>
+
+    <dimen name="touchpad_height">200dp</dimen>
+    <dimen name="kpi_value_text">30sp</dimen>
+    <dimen name="graph_height">72dp</dimen>
+    <dimen name="page_title_text">18sp</dimen>
+
+    <integer name="deck_default_columns">4</integer>
 </resources>

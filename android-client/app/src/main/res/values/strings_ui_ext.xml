@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 增量新增 UI 字符串（独立文件，避免覆盖原 strings.xml 中的已有键名） -->
+    <string name="nav_perf_short">性能</string>
+    <string name="nav_ctrl_short">控制</string>
+    <string name="nav_screen_short">屏幕</string>
+    <string name="nav_settings_short">连接</string>
+
+    <string name="nav_perf_full">性能监视</string>
+    <string name="nav_ctrl_full">功能控制</string>
+    <string name="nav_screen_full">屏幕监视</string>
+    <string name="nav_settings_full">连接设置</string>
+
+    <string name="ctrl_manage_keys">管理按键</string>
+    <string name="ctrl_finish_manage">完成编辑</string>
+    <string name="ctrl_add_key">新增按键</string>
+    <string name="ctrl_speaker">声音</string>
+    <string name="ctrl_speaker_muted">已静音</string>
+    <string name="ctrl_mic">麦克风</string>
+    <string name="ctrl_mic_muted">已闭麦</string>
+    <string name="ctrl_prev">上一首</string>
+    <string name="ctrl_play">播放</string>
+    <string name="ctrl_next">下一首</string>
+    <string name="ctrl_screenshot">截图</string>
+    <string name="ctrl_desktop">桌面</string>
+    <string name="ctrl_lock">锁屏</string>
+    <string name="ctrl_deck_title">按键甲板</string>
+    <string name="ctrl_deck_hint">点击即时执行 · 长按音量连发</string>
+
+    <string name="companion_tab_input">快捷输入</string>
+    <string name="companion_tab_touchpad">触控板</string>
+    <string name="companion_tab_history">历史</string>
+    <string name="companion_input_label">远程输入文本或命令到 PC</string>
+    <string name="companion_input_hint">输入文本、网址或终端命令…</string>
+    <string name="companion_send_only">仅发送</string>
+    <string name="companion_send_enter">发送并回车</string>
+    <string name="companion_hotkeys_title">常用组合键</string>
+
+    <string name="touchpad_title">触控移动区域</string>
+    <string name="touchpad_guide">拖动移动光标 · 轻点左键</string>
+    <string name="mouse_left">左键</string>
+    <string name="mouse_middle">中键</string>
+    <string name="mouse_right">右键</string>
+    <string name="scroll_up">上滚</string>
+    <string name="scroll_down">下滚</string>
+    <string name="sensitivity_label">灵敏度</string>
+
+    <string name="history_title">最近执行记录</string>
+    <string name="history_clear">清空</string>
+    <string name="history_empty">点击按键、快捷键或发送文本后，这里会自动记录并支持一键重放。</string>
+    <string name="history_replay">重放</string>
+
+    <string name="dialog_add_key_title">新增自定义按键</string>
+    <string name="dialog_key_name">按键名称</string>
+    <string name="dialog_key_name_hint">例如：打开计算器、保存全部</string>
+    <string name="dialog_key_type">动作类型</string>
+    <string name="dialog_key_target">快捷键 / 程序 / 网址</string>
+    <string name="dialog_key_target_hint">例如：ctrl+shift+t</string>
+    <string name="dialog_key_color">键帽色系</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="dialog_save">保存到当前面板</string>
+</resources>

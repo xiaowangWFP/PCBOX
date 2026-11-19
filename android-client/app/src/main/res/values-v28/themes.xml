@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- API 28+ 启用挖孔屏/刘海屏短边延伸，再由 WindowInsetsHelper 精确避让安全区 -->
+    <style name="Theme.PhoneConsole" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent_blue</item>
+        <item name="colorPrimaryVariant">@color/accent_blue</item>
+        <item name="colorSecondary">@color/accent_bright</item>
+        <item name="android:colorBackground">@color/bg_obsidian</item>
+        <item name="android:windowBackground">@color/bg_obsidian</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+    </style>
+</resources>

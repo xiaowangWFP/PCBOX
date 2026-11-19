@@ -1,392 +1,247 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_root"
-    android:orientation="horizontal">
+    android:background="@color/bg_obsidian"
+    android:orientation="vertical">
 
-    <!-- ================= 侧边栏 ================= -->
+    <!-- 竖屏顶栏 (52dp + 状态栏/挖孔安全区由 WindowInsetsHelper 动态注入) -->
     <LinearLayout
-        android:id="@+id/nav_sidebar"
-        android:layout_width="@dimen/sidebar_width"
-        android:layout_height="match_parent"
-        android:background="@color/bg_status"
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface_panel"
         android:orientation="vertical">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:padding="12dp">
-
-            <TextView
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:background="@drawable/bg_mode_tag"
-                android:gravity="center"
-                android:text="PC"
-                android:textColor="@color/accent"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="桌面控制台"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/page_title_size"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="8dp">
-
-                <!-- 分组：监控 -->
-                <LinearLayout
-                    android:id="@+id/group_monitor_header"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="8dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="监控"
-                        android:textColor="@color/text_muted"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/group_monitor_chevron"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="▼"
-                        android:textColor="@color/text_muted"
-                        android:textSize="10sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/group_monitor_items"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/nav_performance"
-                        style="@style/NavItem"
-                        android:text="📈  性能监视" />
-
-                    <LinearLayout
-                        android:id="@+id/nav_screen"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:layout_marginBottom="2dp"
-                        android:background="@drawable/bg_nav_item"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:padding="10dp">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="🖥  屏幕监视"
-                            android:textColor="@color/text_primary"
-                            android:textSize="@dimen/nav_text_size" />
-
-                        <TextView
-                            android:id="@+id/nav_screen_badge"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:background="@drawable/bg_mode_tag"
-                            android:paddingStart="6dp"
-                            android:paddingTop="1dp"
-                            android:paddingEnd="6dp"
-                            android:paddingBottom="1dp"
-                            android:text="检测中"
-                            android:textColor="@color/text_muted"
-                            android:textSize="9sp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- 分组：控制 -->
-                <LinearLayout
-                    android:id="@+id/group_control_header"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="8dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="控制"
-                        android:textColor="@color/text_muted"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/group_control_chevron"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="▼"
-                        android:textColor="@color/text_muted"
-                        android:textSize="10sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/group_control_items"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/nav_control"
-                        style="@style/NavItem"
-                        android:text="🎛  功能控制" />
-                </LinearLayout>
-
-                <!-- 分组：系统 -->
-                <LinearLayout
-                    android:id="@+id/group_system_header"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="8dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="系统"
-                        android:textColor="@color/text_muted"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/group_system_chevron"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="▼"
-                        android:textColor="@color/text_muted"
-                        android:textSize="10sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/group_system_items"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/nav_settings"
-                        style="@style/NavItem"
-                        android:text="⚙  连接设置" />
-                </LinearLayout>
-            </LinearLayout>
-        </ScrollView>
-
-        <TextView
-            android:id="@+id/sidebar_foot"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="10dp"
-            android:text="未连接"
-            android:textColor="@color/text_muted"
-            android:textSize="10sp" />
-    </LinearLayout>
-
-    <!-- ================= 主区域 ================= -->
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical">
-
-        <!-- 固定顶栏：音量 / 内存 / GPU / CPU -->
-        <LinearLayout
-            android:id="@+id/topbar"
             android:layout_width="match_parent"
             android:layout_height="@dimen/topbar_height"
-            android:background="@color/bg_status"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="10dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
 
             <TextView
-                android:id="@+id/btn_menu"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:background="@drawable/bg_mode_tag"
-                android:gravity="center"
-                android:text="☰"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp" />
-
-            <TextView
-                android:id="@+id/page_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_marginEnd="12dp"
-                android:text="性能监视"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/page_title_size"
-                android:textStyle="bold" />
-
-            <LinearLayout
+                android:id="@+id/tvPageTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/nav_perf_full"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/page_title_text"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/connStatusWrap"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <LinearLayout
-                    style="@style/TopMetric"
-                    android:layout_marginEnd="8dp">
+                <View
+                    android:id="@+id/statusDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_status_dot_off" />
 
-                    <LinearLayout style="@style/TopMetricHead">
-                        <TextView style="@style/TopMetricLabel" android:text="音量" />
-                        <TextView
-                            android:id="@+id/vol_text"
-                            style="@style/TopMetricValue"
-                            android:text="--" />
-                    </LinearLayout>
-
-                    <ProgressBar
-                        android:id="@+id/vol_bar"
-                        style="@style/TopMetricBar"
-                        android:progressTint="#A78BFA" />
-                </LinearLayout>
-
-                <LinearLayout
-                    style="@style/TopMetric"
-                    android:layout_marginEnd="8dp">
-
-                    <LinearLayout style="@style/TopMetricHead">
-                        <TextView style="@style/TopMetricLabel" android:text="内存" />
-                        <TextView
-                            android:id="@+id/mem_text"
-                            style="@style/TopMetricValue"
-                            android:text="--" />
-                    </LinearLayout>
-
-                    <ProgressBar
-                        android:id="@+id/mem_bar"
-                        style="@style/TopMetricBar"
-                        android:progressTint="#34D399" />
-                </LinearLayout>
-
-                <LinearLayout
-                    style="@style/TopMetric"
-                    android:layout_marginEnd="8dp">
-
-                    <LinearLayout style="@style/TopMetricHead">
-                        <TextView style="@style/TopMetricLabel" android:text="GPU" />
-                        <TextView
-                            android:id="@+id/gpu_text"
-                            style="@style/TopMetricValue"
-                            android:text="--" />
-                    </LinearLayout>
-
-                    <ProgressBar
-                        android:id="@+id/gpu_bar"
-                        style="@style/TopMetricBar"
-                        android:progressTint="#FBBF24" />
-                </LinearLayout>
-
-                <LinearLayout style="@style/TopMetric">
-
-                    <LinearLayout style="@style/TopMetricHead">
-                        <TextView style="@style/TopMetricLabel" android:text="CPU" />
-                        <TextView
-                            android:id="@+id/cpu_text"
-                            style="@style/TopMetricValue"
-                            android:text="--" />
-                    </LinearLayout>
-
-                    <ProgressBar
-                        android:id="@+id/cpu_bar"
-                        style="@style/TopMetricBar"
-                        android:progressTint="@color/accent" />
-                </LinearLayout>
+                <TextView
+                    android:id="@+id/tvConnStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="未连接"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
             </LinearLayout>
-
-            <TextView
-                android:id="@+id/status_dot"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="●"
-                android:textColor="@color/offline"
-                android:textSize="11sp" />
-
-            <TextView
-                android:id="@+id/status_mode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="5dp"
-                android:background="@drawable/bg_mode_tag"
-                android:paddingStart="8dp"
-                android:paddingTop="2dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="2dp"
-                android:text="-"
-                android:textColor="@color/text_muted"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/status_clock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:fontFamily="monospace"
-                android:text="--:--:--"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 页面容器 -->
-        <FrameLayout
+        <View
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <include
-                android:id="@+id/page_performance"
-                layout="@layout/page_performance" />
-
-            <include
-                android:id="@+id/page_control"
-                layout="@layout/page_control"
-                android:visibility="gone" />
-
-            <include
-                android:id="@+id/page_screen"
-                layout="@layout/page_screen"
-                android:visibility="gone" />
-
-            <include
-                android:id="@+id/page_settings"
-                layout="@layout/page_settings"
-                android:visibility="gone" />
-        </FrameLayout>
+            android:layout_height="1dp"
+            android:background="@color/divider_line" />
     </LinearLayout>
+
+    <!-- 页面内容宿主 -->
+    <FrameLayout
+        android:id="@+id/pageContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <include
+            android:id="@+id/pagePerformance"
+            layout="@layout/page_performance"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <include
+            android:id="@+id/pageControl"
+            layout="@layout/page_control"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+        <include
+            android:id="@+id/pageScreen"
+            layout="@layout/page_screen"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+        <include
+            android:id="@+id/pageSettings"
+            layout="@layout/page_settings"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- 竖屏底部导航栏 (60dp + 底部手势条安全区由 WindowInsetsHelper 注入) -->
+    <FrameLayout
+        android:id="@+id/bottomNavBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface_nav_bar">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_gravity="top"
+            android:background="@color/divider_line" />
+
+        <View
+            android:id="@+id/bottomNavIndicator"
+            android:layout_width="48dp"
+            android:layout_height="2.5dp"
+            android:layout_gravity="top|start"
+            android:background="@color/accent_bright" />
+
+        <LinearLayout
+            android:id="@+id/bottomNavRow"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/bottom_nav_height"
+            android:orientation="horizontal"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp">
+
+            <LinearLayout
+                android:id="@+id/navPerf"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_nav_item"
+                android:clickable="true"
+                android:contentDescription="@string/nav_perf_full"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/ivNavPerf"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_nav_performance" />
+
+                <TextView
+                    android:id="@+id/tvNavPerf"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/nav_perf_short"
+                    android:textColor="@color/accent_bright"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/navControl"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_nav_item"
+                android:clickable="true"
+                android:contentDescription="@string/nav_ctrl_full"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/ivNavControl"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_nav_control" />
+
+                <TextView
+                    android:id="@+id/tvNavControl"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/nav_ctrl_short"
+                    android:textColor="@color/text_muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/navScreen"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_nav_item"
+                android:clickable="true"
+                android:contentDescription="@string/nav_screen_full"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/ivNavScreen"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_nav_screen" />
+
+                <TextView
+                    android:id="@+id/tvNavScreen"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/nav_screen_short"
+                    android:textColor="@color/text_muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/navSettings"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_nav_item"
+                android:clickable="true"
+                android:contentDescription="@string/nav_settings_full"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/ivNavSettings"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_nav_settings" />
+
+                <TextView
+                    android:id="@+id/tvNavSettings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/nav_settings_short"
+                    android:textColor="@color/text_muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>

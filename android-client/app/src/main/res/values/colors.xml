@@ -1,11 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_root">#020617</color>
-    <color name="bg_status">#0F172A</color>
-    <color name="bg_button">#1E293B</color>
-    <color name="text_primary">#E2E8F0</color>
-    <color name="text_muted">#94A3B8</color>
-    <color name="accent">#38BDF8</color>
-    <color name="online">#22C55E</color>
-    <color name="offline">#EF4444</color>
+    <!-- Tactile Obsidian 深色黑曜石色板 -->
+    <color name="bg_obsidian">#0B0D11</color>
+    <color name="surface_panel">#12151C</color>
+    <color name="surface_elevated">#181C25</color>
+    <color name="surface_hover">#1E2330</color>
+    <color name="surface_nav_bar">#EB12151C</color>
+
+    <!-- 触控键帽材质 -->
+    <color name="keycap_bg">#171B24</color>
+    <color name="keycap_pressed">#202634</color>
+    <color name="keycap_border">#14FFFFFF</color>
+    <color name="divider_line">#12FFFFFF</color>
+    <color name="divider_strong">#21FFFFFF</color>
+
+    <!-- 文字层级 -->
+    <color name="text_primary">#F3F5F8</color>
+    <color name="text_secondary">#9AA3B2</color>
+    <color name="text_muted">#6E7788</color>
+    <color name="text_on_accent">#FFFFFF</color>
+
+    <!-- 强调色与状态色 -->
+    <color name="accent_blue">#3B82F6</color>
+    <color name="accent_bright">#60A5FA</color>
+    <color name="accent_soft">#243B82F6</color>
+    <color name="accent_border">#5C60A5FA</color>
+
+    <color name="status_ok">#22C55E</color>
+    <color name="status_warn">#F59E0B</color>
+    <color name="status_bad">#EF4444</color>
+    <color name="status_bad_soft">#29EF4444</color>
+    <color name="status_bad_border">#73EF4444</color>
+    <color name="status_bad_text">#FCA5A5</color>
+    <color name="status_purple">#A78BFA</color>
+
+    <!-- 触控板网格与光晕 -->
+    <color name="touchpad_dot">#1AFFFFFF</color>
+    <color name="touchpad_glow">#523B82F6</color>
+
+    <!-- 自定义键帽色系 -->
+    <color name="swatch_slate">#1E293B</color>
+    <color name="swatch_obsidian">#0F172A</color>
+    <color name="swatch_teal">#134E4A</color>
+    <color name="swatch_cobalt">#1E3A8A</color>
+    <color name="swatch_crimson">#7F1D1D</color>
 </resources>

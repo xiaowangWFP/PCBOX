@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:paddingStart="@dimen/page_padding_h"
+    android:paddingTop="@dimen/page_padding_v"
+    android:paddingEnd="@dimen/page_padding_h"
+    android:paddingBottom="@dimen/page_padding_v">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="硬件实时遥测"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="近 60 秒采样 · 每秒同步"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- 横屏 4 列单行紧凑 KPI 卡片 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                style="@style/ConsoleCard"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CPU 占用"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tvCpuValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="monospace"
+                    android:text="--%"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/kpi_value_text"
+                    android:textStyle="bold" />
+
+                <com.phoneconsole.client.ui.HistoryGraphView
+                    android:id="@+id/graphCpu"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/graph_height"
+                    android:layout_marginTop="6dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                style="@style/ConsoleCard"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="内存占用"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tvMemValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="monospace"
+                    android:text="--%"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/kpi_value_text"
+                    android:textStyle="bold" />
+
+                <com.phoneconsole.client.ui.HistoryGraphView
+                    android:id="@+id/graphMem"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/graph_height"
+                    android:layout_marginTop="6dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                style="@style/ConsoleCard"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GPU 占用"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tvGpuValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="monospace"
+                    android:text="—"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/kpi_value_text"
+                    android:textStyle="bold" />
+
+                <com.phoneconsole.client.ui.HistoryGraphView
+                    android:id="@+id/graphGpu"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/graph_height"
+                    android:layout_marginTop="6dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                style="@style/ConsoleCard"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="系统音量"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tvVolValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="monospace"
+                    android:text="--%"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/kpi_value_text"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvVolSub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="输出正常"
+                    android:textColor="@color/text_muted"
+                    android:textSize="10.5sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnPerfVolDown"
+                        style="@style/ConsoleGhostButton"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:minHeight="32dp"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:text="−"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/btnPerfMute"
+                        style="@style/ConsoleGhostButton"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1.2"
+                        android:minHeight="32dp"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:text="静音"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/btnPerfVolUp"
+                        style="@style/ConsoleGhostButton"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_weight="1"
+                        android:minHeight="32dp"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:text="+"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 网络实时吞吐条 -->
+        <LinearLayout
+            style="@style/ConsoleCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="网络实时吞吐"
+                android:textColor="@color/text_secondary"
+                android:textSize="12.5sp" />
+
+            <TextView
+                android:id="@+id/tvNetUp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="14dp"
+                android:fontFamily="monospace"
+                android:text="上行 --"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvNetDown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="下行 --"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

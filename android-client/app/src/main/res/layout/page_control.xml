@@ -1,38 +1,598 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/controlScrollRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="10dp">
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:paddingStart="@dimen/page_padding_h"
+    android:paddingTop="@dimen/page_padding_v"
+    android:paddingEnd="@dimen/page_padding_h"
+    android:paddingBottom="@dimen/page_padding_v">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingBottom="8dp">
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/layout_title"
-            android:layout_width="wrap_content"
+        <!-- 标题与场景甲板切换栏 -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="--"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/tvDeckTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="通用控制"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDeckMeta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="9 个按键 · 4 套场景面板"
+                android:textColor="@color/text_muted"
+                android:textSize="12sp" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:scrollbars="none">
+
+                <FrameLayout
+                    android:id="@+id/deckTabWrap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_segmented"
+                    android:padding="4dp">
+
+                    <View
+                        android:id="@+id/deckTabThumb"
+                        android:layout_width="72dp"
+                        android:layout_height="34dp"
+                        android:background="@drawable/bg_segmented_thumb" />
+
+                    <LinearLayout
+                        android:id="@+id/deckTabContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </FrameLayout>
+            </HorizontalScrollView>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnToggleEditDeck"
+                    style="@style/ConsoleGhostButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_manage_keys" />
+
+                <TextView
+                    android:id="@+id/btnAddCustomKey"
+                    style="@style/ConsolePrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_add_key" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 音频与快捷系统控制坞 -->
+        <LinearLayout
+            android:id="@+id/audioDockCard"
+            style="@style/ConsoleCard"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:text="单击触发 · 长按连续触发"
-            android:textColor="@color/text_muted"
-            android:textSize="11sp" />
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnSpeakerMute"
+                    style="@style/ConsoleGhostButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:drawablePadding="4dp"
+                    android:minHeight="38dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="@string/ctrl_speaker"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/seekVolume"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="64"
+                    android:progressDrawable="@drawable/seekbar_volume"
+                    android:splitTrack="false"
+                    android:thumb="@drawable/seekbar_thumb" />
+
+                <TextView
+                    android:id="@+id/tvVolumeValue"
+                    android:layout_width="38dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:fontFamily="monospace"
+                    android:gravity="end"
+                    android:text="64%"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnMicMute"
+                    style="@style/ConsoleGhostButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minHeight="38dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="@string/ctrl_mic"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="10dp"
+                android:background="@color/divider_line" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnMediaPrev"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_prev" />
+
+                <TextView
+                    android:id="@+id/btnMediaPlay"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_play" />
+
+                <TextView
+                    android:id="@+id/btnMediaNext"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_next" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnQuickShot"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_screenshot" />
+
+                <TextView
+                    android:id="@+id/btnQuickDesktop"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_desktop" />
+
+                <TextView
+                    android:id="@+id/btnQuickLock"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_lock" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 按键甲板区 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/ctrl_deck_title"
+                android:textColor="@color/text_secondary"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/ctrl_deck_hint"
+                android:textColor="@color/text_muted"
+                android:textSize="11.5sp" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvDeckButtons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:nestedScrollingEnabled="false"
+            android:overScrollMode="never" />
+
+        <!-- 远程实用工具舱（快捷输入 / 触控板 / 历史） -->
+        <LinearLayout
+            android:id="@+id/companionCard"
+            style="@style/ConsoleCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:id="@+id/companionTabWrap"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_segmented"
+                android:padding="4dp">
+
+                <View
+                    android:id="@+id/companionTabThumb"
+                    android:layout_width="96dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/bg_segmented_thumb" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/companionTabInput"
+                        style="@style/ConsoleSegmentedTab"
+                        android:layout_width="0dp"
+                        android:layout_height="34dp"
+                        android:layout_weight="1"
+                        android:text="@string/companion_tab_input"
+                        android:textColor="@color/text_on_accent" />
+
+                    <TextView
+                        android:id="@+id/companionTabTouchpad"
+                        style="@style/ConsoleSegmentedTab"
+                        android:layout_width="0dp"
+                        android:layout_height="34dp"
+                        android:layout_weight="1"
+                        android:text="@string/companion_tab_touchpad" />
+
+                    <TextView
+                        android:id="@+id/companionTabHistory"
+                        style="@style/ConsoleSegmentedTab"
+                        android:layout_width="0dp"
+                        android:layout_height="34dp"
+                        android:layout_weight="1"
+                        android:text="@string/companion_tab_history" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- 子面板 1：快捷输入与常用组合键 -->
+            <LinearLayout
+                android:id="@+id/paneQuickInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/companion_input_label"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <EditText
+                    android:id="@+id/etRemoteText"
+                    style="@style/ConsoleInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:hint="@string/companion_input_hint"
+                    android:imeOptions="actionSend"
+                    android:inputType="text"
+                    android:maxLines="1" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnSendTextOnly"
+                        style="@style/ConsoleGhostButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/companion_send_only" />
+
+                    <TextView
+                        android:id="@+id/btnSendTextEnter"
+                        style="@style/ConsolePrimaryButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.35"
+                        android:text="@string/companion_send_enter" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="10dp"
+                    android:background="@color/divider_line" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/companion_hotkeys_title"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnHotkeyCopy"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="复制 · Ctrl+C"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView
+                        android:id="@+id/btnHotkeyPaste"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:text="粘贴 · Ctrl+V"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnHotkeyUndo"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="撤销 · Ctrl+Z"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView
+                        android:id="@+id/btnHotkeySelectAll"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:text="全选 · Ctrl+A"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnHotkeyAltTab"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="切窗口 · Alt+Tab"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView
+                        android:id="@+id/btnHotkeyClose"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:text="关窗口 · Alt+F4"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 子面板 2：无线触控板 -->
+            <LinearLayout
+                android:id="@+id/paneTouchpad"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <com.phoneconsole.client.ui.TouchpadView
+                    android:id="@+id/touchpadView"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/touchpad_height" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnMouseLeft"
+                        style="@style/ConsoleGhostButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1.2"
+                        android:text="@string/mouse_left" />
+
+                    <TextView
+                        android:id="@+id/btnMouseMiddle"
+                        style="@style/ConsoleGhostButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="0.85"
+                        android:text="@string/mouse_middle" />
+
+                    <TextView
+                        android:id="@+id/btnMouseRight"
+                        style="@style/ConsoleGhostButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.2"
+                        android:text="@string/mouse_right" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnScrollUp"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:text="@string/scroll_up" />
+
+                    <TextView
+                        android:id="@+id/btnScrollDown"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:text="@string/scroll_down" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:text="@string/sensitivity_label"
+                        android:textColor="@color/text_muted"
+                        android:textSize="12sp" />
+
+                    <Spinner
+                        android:id="@+id/spinnerTouchpadSens"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_input"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 子面板 3：操作历史 -->
+            <LinearLayout
+                android:id="@+id/paneHistory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/history_title"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/btnClearHistory"
+                        style="@style/ConsoleMiniButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:minHeight="32dp"
+                        android:text="@string/history_clear" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/historyContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/grid"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false" />
-</LinearLayout>
+</androidx.core.widget.NestedScrollView>
