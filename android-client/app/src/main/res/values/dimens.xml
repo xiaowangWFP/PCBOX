@@ -30,6 +30,7 @@
     <dimen name="perf_card_height">120dp</dimen>
     <dimen name="perf_ring_size">30dp</dimen>
     <dimen name="perf_bar_height">3dp</dimen>
+    <dimen name="perf_value_text">24sp</dimen>
 
     <!-- 网格列数配置（按方向与屏幕宽度自动切换） -->
     <integer name="deck_default_columns">3</integer>

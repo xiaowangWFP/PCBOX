@@ -79,7 +79,7 @@
                             android:fontFamily="monospace"
                             android:text="--%"
                             android:textColor="@color/text_primary"
-                            android:textSize="@dimen/kpi_value_text"
+                            android:textSize="@dimen/perf_value_text"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -104,7 +104,7 @@
                     android:maxHeight="@dimen/perf_bar_height"
                     android:minHeight="0dp"
                     android:progress="0"
-                    android:progressBackgroundTint="@color/divider_line"
+                    android:progressBackgroundTint="@color/divider_strong"
                     android:progressTint="@color/accent_blue" />
             </LinearLayout>
 
@@ -142,7 +142,7 @@
                             android:fontFamily="monospace"
                             android:text="--%"
                             android:textColor="@color/text_primary"
-                            android:textSize="@dimen/kpi_value_text"
+                            android:textSize="@dimen/perf_value_text"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -167,7 +167,7 @@
                     android:maxHeight="@dimen/perf_bar_height"
                     android:minHeight="0dp"
                     android:progress="0"
-                    android:progressBackgroundTint="@color/divider_line"
+                    android:progressBackgroundTint="@color/divider_strong"
                     android:progressTint="@color/status_ok" />
             </LinearLayout>
         </LinearLayout>
@@ -214,7 +214,7 @@
                             android:fontFamily="monospace"
                             android:text="—"
                             android:textColor="@color/text_primary"
-                            android:textSize="@dimen/kpi_value_text"
+                            android:textSize="@dimen/perf_value_text"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -239,7 +239,7 @@
                     android:maxHeight="@dimen/perf_bar_height"
                     android:minHeight="0dp"
                     android:progress="0"
-                    android:progressBackgroundTint="@color/divider_line"
+                    android:progressBackgroundTint="@color/divider_strong"
                     android:progressTint="@color/status_warn" />
             </LinearLayout>
 
@@ -277,7 +277,7 @@
                             android:fontFamily="monospace"
                             android:text="--"
                             android:textColor="@color/text_primary"
-                            android:textSize="@dimen/kpi_value_text"
+                            android:textSize="@dimen/perf_value_text"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -302,7 +302,7 @@
                     android:maxHeight="@dimen/perf_bar_height"
                     android:minHeight="0dp"
                     android:progress="0"
-                    android:progressBackgroundTint="@color/divider_line"
+                    android:progressBackgroundTint="@color/divider_strong"
                     android:progressTint="@color/accent_bright" />
             </LinearLayout>
         </LinearLayout>
@@ -349,7 +349,7 @@
                             android:fontFamily="monospace"
                             android:text="--"
                             android:textColor="@color/text_primary"
-                            android:textSize="@dimen/kpi_value_text"
+                            android:textSize="@dimen/perf_value_text"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -374,7 +374,7 @@
                     android:maxHeight="@dimen/perf_bar_height"
                     android:minHeight="0dp"
                     android:progress="0"
-                    android:progressBackgroundTint="@color/divider_line"
+                    android:progressBackgroundTint="@color/divider_strong"
                     android:progressTint="@color/perf_cyan" />
             </LinearLayout>
 
@@ -418,7 +418,7 @@
                                 android:fontFamily="monospace"
                                 android:text="--%"
                                 android:textColor="@color/text_primary"
-                                android:textSize="@dimen/kpi_value_text"
+                                android:textSize="@dimen/perf_value_text"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -498,7 +498,7 @@
                     android:maxHeight="@dimen/perf_bar_height"
                     android:minHeight="0dp"
                     android:progress="0"
-                    android:progressBackgroundTint="@color/divider_line"
+                    android:progressBackgroundTint="@color/divider_strong"
                     android:progressTint="@color/status_purple" />
             </LinearLayout>
         </LinearLayout>
