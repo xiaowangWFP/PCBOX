@@ -16,6 +16,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,7 +36,7 @@ import com.phoneconsole.client.model.TelemetryMessage;
 import com.phoneconsole.client.net.ConnectionManager;
 import com.phoneconsole.client.screen.H264Decoder;
 import com.phoneconsole.client.ui.ControlWorkspaceController;
-import com.phoneconsole.client.ui.HistoryGraphView;
+import com.phoneconsole.client.ui.RingProgressView;
 import com.phoneconsole.client.ui.TactileDeckAdapter;
 import com.phoneconsole.client.ui.UiMotionHelper;
 import com.phoneconsole.client.ui.WindowInsetsHelper;
@@ -102,17 +103,30 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private TextView tvCpuValue;
     private TextView tvMemValue;
     private TextView tvGpuValue;
+    private TextView tvVramValue;
+    private TextView tvFpsValue;
     private TextView tvVolValue;
     private TextView tvVolSub;
     private TextView tvNetUp;
     private TextView tvNetDown;
-    private HistoryGraphView graphCpu;
-    private HistoryGraphView graphMem;
-    private HistoryGraphView graphGpu;
+    private RingProgressView ringCpu;
+    private RingProgressView ringMem;
+    private RingProgressView ringGpu;
+    private RingProgressView ringVram;
+    private RingProgressView ringFps;
+    private RingProgressView ringVol;
+    private ProgressBar barCpu;
+    private ProgressBar barMem;
+    private ProgressBar barGpu;
+    private ProgressBar barVram;
+    private ProgressBar barFps;
+    private ProgressBar barVol;
 
     // 控制页
     private ControlWorkspaceController controlController;
     private final List<TactileDeckAdapter.DeckKeyItem> deckItems = new ArrayList<>();
+    /** 服务端下发的面板清单，旋转重建布局后需要原样恢复 */
+    private List<ControlWorkspaceController.DeckPageMeta> deckPages = new ArrayList<>();
     private final Map<String, String> buttonStates = new HashMap<>();
     private String deckPageTitle = "";
 
@@ -231,12 +245,16 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         fullscreen = false;
         selectPage(currentPage);
 
-        if (controlController != null && !deckItems.isEmpty()) {
-            controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), 3, 1);
-            controlController.updateDeckPages(
-                    java.util.Collections.singletonList(
-                            new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle)),
-                    currentPageId);
+        if (controlController != null) {
+            if (!deckItems.isEmpty()) {
+                controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), 3, 1);
+            }
+            List<ControlWorkspaceController.DeckPageMeta> pages = deckPages;
+            if (pages == null || pages.isEmpty()) {
+                pages = new ArrayList<>();
+                pages.add(new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle));
+            }
+            controlController.updateDeckPages(pages, currentPageId);
         }
 
         applyStreamFormat(0, 0, 0);
@@ -306,13 +324,25 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         tvCpuValue = findViewById(R.id.tvCpuValue);
         tvMemValue = findViewById(R.id.tvMemValue);
         tvGpuValue = findViewById(R.id.tvGpuValue);
+        tvVramValue = findViewById(R.id.tvVramValue);
+        tvFpsValue = findViewById(R.id.tvFpsValue);
         tvVolValue = findViewById(R.id.tvVolValue);
         tvVolSub = findViewById(R.id.tvVolSub);
         tvNetUp = findViewById(R.id.tvNetUp);
         tvNetDown = findViewById(R.id.tvNetDown);
-        graphCpu = findViewById(R.id.graphCpu);
-        graphMem = findViewById(R.id.graphMem);
-        graphGpu = findViewById(R.id.graphGpu);
+
+        ringCpu = findViewById(R.id.ringCpu);
+        ringMem = findViewById(R.id.ringMem);
+        ringGpu = findViewById(R.id.ringGpu);
+        ringVram = findViewById(R.id.ringVram);
+        ringFps = findViewById(R.id.ringFps);
+        ringVol = findViewById(R.id.ringVol);
+        barCpu = findViewById(R.id.barCpu);
+        barMem = findViewById(R.id.barMem);
+        barGpu = findViewById(R.id.barGpu);
+        barVram = findViewById(R.id.barVram);
+        barFps = findViewById(R.id.barFps);
+        barVol = findViewById(R.id.barVol);
 
         btnToggleStream = findViewById(R.id.btnToggleStream);
         tvScreenMeta = findViewById(R.id.tvScreenMeta);
@@ -335,12 +365,18 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     private void setupPerformancePage() {
-        graphCpu.setLineColor(0xFF22D3EE);
-        graphMem.setLineColor(0xFF34D399);
-        graphGpu.setLineColor(0xFFFBBF24);
+        // 环形指示器的进度弧颜色，与底部细进度条保持一致
+        setRingColor(ringCpu, R.color.accent_blue);
+        setRingColor(ringMem, R.color.status_ok);
+        setRingColor(ringGpu, R.color.status_warn);
+        setRingColor(ringVram, R.color.accent_bright);
+        setRingColor(ringFps, R.color.perf_cyan);
+        setRingColor(ringVol, R.color.status_purple);
+
         findViewById(R.id.btnPerfVolDown).setOnClickListener(v -> sendMedia("media_vol_down"));
         findViewById(R.id.btnPerfVolUp).setOnClickListener(v -> sendMedia("media_vol_up"));
         findViewById(R.id.btnPerfMute).setOnClickListener(v -> sendMedia("media_mute"));
+        updateFpsCard();
     }
 
     private void setupControlPage() {
@@ -689,7 +725,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (pages.isEmpty()) {
             pages.add(new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle));
         }
-        controlController.updateDeckPages(pages, currentPageId);
+        deckPages = pages;
+        controlController.updateDeckPages(deckPages, currentPageId);
     }
 
     private TactileDeckAdapter.DeckKeyItem toDeckItem(ButtonItem item) {
@@ -726,9 +763,11 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         tvNetUp.setText("↑ " + safe(telemetry.netUp));
         tvNetDown.setText("↓ " + safe(telemetry.netDown));
 
-        graphCpu.addPoint((float) telemetry.cpu);
-        graphMem.addPoint((float) telemetry.mem);
-        graphGpu.addPoint((float) telemetry.gpu);
+        applyGauge(barCpu, ringCpu, telemetry.cpu);
+        applyGauge(barMem, ringMem, telemetry.mem);
+        applyGauge(barGpu, ringGpu, telemetry.gpu);
+        applyGauge(barVol, ringVol, muted ? 0 : volume);
+        updateVramCard(telemetry.vram, telemetry.vramTotal);
 
         if (controlController != null) {
             controlController.updateAudioTelemetry(volume, muted, false);
@@ -845,6 +884,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         this.actualFps = actualFps;
         this.streamKbps = kbps;
         renderTopMetrics();
+        updateFpsCard();
         if (streaming) {
             tvScreenMeta.setText(streamSummary());
         }
@@ -1037,6 +1077,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         btnToggleStream.setText((streaming || streamRequested) ? "停止监视" : "开始监视");
         btnScreenFullscreen.setVisibility(streaming ? View.VISIBLE : View.GONE);
         renderTopMetrics();
+        updateFpsCard();
 
         if (streaming) {
             surfaceScreen.setVisibility(View.VISIBLE);
@@ -1222,6 +1263,46 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             return;
         }
         text.setText(percentText(value));
+    }
+
+    private void setRingColor(RingProgressView ring, int colorRes) {
+        if (ring != null) {
+            ring.setRingColor(ContextCompat.getColor(this, colorRes));
+        }
+    }
+
+    /** 环形指示与底部细进度条共用同一百分比；数值非法（-1）时归零 */
+    private void applyGauge(ProgressBar bar, RingProgressView ring, double value) {
+        boolean valid = value >= 0;
+        int percent = valid ? (int) Math.round(Math.min(100, value)) : 0;
+        if (bar != null) {
+            bar.setProgress(percent);
+        }
+        if (ring != null) {
+            ring.setProgress(percent);
+        }
+    }
+
+    /** 显存卡片：值显示已用 GB，环形/进度条按已用占总量的比例 */
+    private void updateVramCard(double usedMb, double totalMb) {
+        if (tvVramValue != null) {
+            tvVramValue.setText(usedMb >= 0
+                    ? String.format(Locale.ROOT, "%.1fG", usedMb / 1024.0)
+                    : "—");
+        }
+        double percent = (usedMb >= 0 && totalMb > 0) ? usedMb / totalMb * 100.0 : -1;
+        applyGauge(barVram, ringVram, percent);
+    }
+
+    /** 帧率卡片：数值来自推流统计，环形按 60fps 满量程换算 */
+    private void updateFpsCard() {
+        boolean active = streaming;
+        if (tvFpsValue != null) {
+            tvFpsValue.setText(active
+                    ? String.format(Locale.ROOT, "%.1f", actualFps)
+                    : "--");
+        }
+        applyGauge(barFps, ringFps, active ? Math.min(100.0, actualFps / 60.0 * 100.0) : -1);
     }
 
     /**

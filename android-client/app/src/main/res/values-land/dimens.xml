@@ -24,5 +24,9 @@
     <dimen name="page_title_text">15sp</dimen>
     <dimen name="screen_meta_max_width">320dp</dimen>
 
+    <dimen name="perf_card_height">84dp</dimen>
+    <dimen name="perf_ring_size">26dp</dimen>
+    <dimen name="perf_bar_height">2.5dp</dimen>
+
     <integer name="deck_default_columns">3</integer>
 </resources>

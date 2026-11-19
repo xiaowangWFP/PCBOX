@@ -44,4 +44,7 @@
     <color name="swatch_teal">#134E4A</color>
     <color name="swatch_cobalt">#1E3A8A</color>
     <color name="swatch_crimson">#7F1D1D</color>
+
+    <!-- 性能卡片：FPS 专用青色 -->
+    <color name="perf_cyan">#22D3EE</color>
 </resources>

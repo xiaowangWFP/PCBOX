@@ -70,9 +70,9 @@
 
             <TextView
                 android:id="@+id/tvTopFps"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginEnd="10dp"
                 android:fontFamily="monospace"
                 android:maxLines="1"
                 android:text="FPS  --"
@@ -81,9 +81,9 @@
 
             <TextView
                 android:id="@+id/tvTopCpu"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginEnd="10dp"
                 android:fontFamily="monospace"
                 android:maxLines="1"
                 android:text="CPU  --"
@@ -92,9 +92,9 @@
 
             <TextView
                 android:id="@+id/tvTopGpu"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginEnd="10dp"
                 android:fontFamily="monospace"
                 android:maxLines="1"
                 android:text="GPU  --"
@@ -103,9 +103,9 @@
 
             <TextView
                 android:id="@+id/tvTopMem"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginEnd="10dp"
                 android:fontFamily="monospace"
                 android:maxLines="1"
                 android:text="内存 --"
@@ -114,9 +114,8 @@
 
             <TextView
                 android:id="@+id/tvTopVram"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:fontFamily="monospace"
                 android:maxLines="1"
                 android:text="显存 --"

@@ -26,6 +26,11 @@
     <!-- 屏幕页右上角格式标签最大宽度：竖屏空间紧张，超出省略，避免挤压屏幕选择器 -->
     <dimen name="screen_meta_max_width">96dp</dimen>
 
+    <!-- 性能页 KPI 卡片：紧凑高度 + 右上环形指示 + 底部细进度条 -->
+    <dimen name="perf_card_height">120dp</dimen>
+    <dimen name="perf_ring_size">30dp</dimen>
+    <dimen name="perf_bar_height">3dp</dimen>
+
     <!-- 网格列数配置（按方向与屏幕宽度自动切换） -->
     <integer name="deck_default_columns">3</integer>
 </resources>
