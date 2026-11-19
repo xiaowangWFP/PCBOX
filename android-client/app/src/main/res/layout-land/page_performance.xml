@@ -9,9 +9,10 @@
     android:paddingEnd="@dimen/page_padding_h"
     android:paddingBottom="@dimen/page_padding_v">
 
+    <!-- 横屏：单行 4 列等高 KPI 卡片，图表随可用高度伸缩 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical">
 
         <LinearLayout
@@ -38,10 +39,10 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- 横屏 4 列单行紧凑 KPI 卡片 -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:baselineAligned="false"
             android:orientation="horizontal">
 
@@ -74,8 +75,10 @@
                 <com.phoneconsole.client.ui.HistoryGraphView
                     android:id="@+id/graphCpu"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/graph_height"
-                    android:layout_marginTop="6dp" />
+                    android:layout_height="0dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_weight="1"
+                    android:minHeight="22dp" />
             </LinearLayout>
 
             <LinearLayout
@@ -107,8 +110,10 @@
                 <com.phoneconsole.client.ui.HistoryGraphView
                     android:id="@+id/graphMem"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/graph_height"
-                    android:layout_marginTop="6dp" />
+                    android:layout_height="0dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_weight="1"
+                    android:minHeight="22dp" />
             </LinearLayout>
 
             <LinearLayout
@@ -140,8 +145,10 @@
                 <com.phoneconsole.client.ui.HistoryGraphView
                     android:id="@+id/graphGpu"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/graph_height"
-                    android:layout_marginTop="6dp" />
+                    android:layout_height="0dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_weight="1"
+                    android:minHeight="22dp" />
             </LinearLayout>
 
             <LinearLayout
@@ -252,7 +259,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="14dp"
                 android:fontFamily="monospace"
-                android:text="上行 --"
+                android:text="↑ --"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp" />
 
@@ -261,7 +268,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="monospace"
-                android:text="下行 --"
+                android:text="↓ --"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp" />
         </LinearLayout>

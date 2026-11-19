@@ -82,9 +82,15 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private View statusDot;
     private View bottomNavIndicator;
     private View railNavIndicator;
+    private TextView tvTopFps;
     private TextView tvTopCpu;
+    private TextView tvTopGpu;
     private TextView tvTopMem;
-    private TextView tvTopVol;
+    private TextView tvTopVram;
+    private double lastCpu = -1;
+    private double lastMem = -1;
+    private double lastGpu = -1;
+    private double lastVram = -1;
 
     // 页面
     private View pagePerformance;
@@ -285,9 +291,12 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         statusDot = findViewById(R.id.statusDot);
         bottomNavIndicator = findViewById(R.id.bottomNavIndicator);
         railNavIndicator = findViewById(R.id.railNavIndicator);
+        tvTopFps = findViewById(R.id.tvTopFps);
         tvTopCpu = findViewById(R.id.tvTopCpu);
+        tvTopGpu = findViewById(R.id.tvTopGpu);
         tvTopMem = findViewById(R.id.tvTopMem);
-        tvTopVol = findViewById(R.id.tvTopVol);
+        tvTopVram = findViewById(R.id.tvTopVram);
+        renderTopMetrics();
 
         pagePerformance = findViewById(R.id.pagePerformance);
         pageControl = findViewById(R.id.pageControl);
@@ -339,8 +348,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                 new ControlWorkspaceController.ControlActionDispatcher() {
                     @Override
                     public void onSwitchDeckPage(String pageId) {
-                        // 服务端一次只下发一套面板，暂不支持跨页切换
-                        deckPageTitle = deckPageTitle.isEmpty() ? pageId : deckPageTitle;
+                        connection.requestLayout(pageId);
                     }
 
                     @Override
@@ -589,8 +597,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             renderSessionDetail();
         }
         if (PAGE_SCREEN.equals(page)) {
+            // 进入屏幕页只刷新状态，推流必须由用户点「开始监视」手动开启
             updateScreenUi();
-            startStreamIfPossible();
         }
         if (PAGE_CONTROL.equals(page) && controlController != null) {
             controlController.resyncIndicators();
@@ -668,10 +676,20 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
         int cols = layout.grid != null && layout.grid.cols > 0 ? layout.grid.cols : 3;
         controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), cols, 1);
-        controlController.updateDeckPages(
-                java.util.Collections.singletonList(
-                        new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle)),
-                currentPageId);
+
+        List<ControlWorkspaceController.DeckPageMeta> pages = new ArrayList<>();
+        if (layout.pages != null) {
+            for (LayoutMessage.PageRef ref : layout.pages) {
+                if (ref != null && ref.id != null) {
+                    pages.add(new ControlWorkspaceController.DeckPageMeta(
+                            ref.id, ref.title == null ? ref.id : ref.title));
+                }
+            }
+        }
+        if (pages.isEmpty()) {
+            pages.add(new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle));
+        }
+        controlController.updateDeckPages(pages, currentPageId);
     }
 
     private TactileDeckAdapter.DeckKeyItem toDeckItem(ButtonItem item) {
@@ -694,20 +712,17 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         setMetric(tvCpuValue, telemetry.cpu);
         setMetric(tvMemValue, telemetry.mem);
         setMetric(tvGpuValue, telemetry.gpu);
-        if (tvTopCpu != null) {
-            tvTopCpu.setText("CPU " + percentText(telemetry.cpu));
-        }
-        if (tvTopMem != null) {
-            tvTopMem.setText("MEM " + percentText(telemetry.mem));
-        }
+
+        lastCpu = telemetry.cpu;
+        lastMem = telemetry.mem;
+        lastGpu = telemetry.gpu;
+        lastVram = telemetry.vram;
+        renderTopMetrics();
 
         boolean muted = telemetry.isMuted;
         int volume = muted ? 0 : telemetry.volume;
         tvVolValue.setText(muted ? "静音" : volume + "%");
         tvVolSub.setText(muted ? "已静音" : "正常");
-        if (tvTopVol != null) {
-            tvTopVol.setText("VOL " + (muted ? "MUTE" : volume + "%"));
-        }
         tvNetUp.setText("↑ " + safe(telemetry.netUp));
         tvNetDown.setText("↓ " + safe(telemetry.netDown));
 
@@ -775,9 +790,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         renderConnStatus();
         updateScreenUi();
         renderSessionDetail();
-        if (PAGE_SCREEN.equals(currentPage)) {
-            startStreamIfPossible();
-        }
     }
 
     @Override
@@ -832,6 +844,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         this.actualFps = actualFps;
         this.streamKbps = kbps;
+        renderTopMetrics();
         if (streaming) {
             tvScreenMeta.setText(streamSummary());
         }
@@ -1023,6 +1036,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         btnToggleStream.setAlpha(usable ? 1f : 0.5f);
         btnToggleStream.setText((streaming || streamRequested) ? "停止监视" : "开始监视");
         btnScreenFullscreen.setVisibility(streaming ? View.VISIBLE : View.GONE);
+        renderTopMetrics();
 
         if (streaming) {
             surfaceScreen.setVisibility(View.VISIBLE);
@@ -1208,6 +1222,33 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             return;
         }
         text.setText(percentText(value));
+    }
+
+    /**
+     * 顶栏五项常驻指标：每项固定在等宽区域内，且数值补齐到固定宽度，
+     * 位数变化（如 9% -> 100%）不会推动相邻项。
+     */
+    private void renderTopMetrics() {
+        if (tvTopCpu == null) {
+            return;
+        }
+        tvTopFps.setText("FPS " + (streaming
+                ? String.format(Locale.ROOT, "%4.1f", actualFps)
+                : "  -- "));
+        tvTopCpu.setText("CPU " + metricPercent(lastCpu));
+        tvTopGpu.setText("GPU " + metricPercent(lastGpu));
+        tvTopMem.setText("内存 " + metricPercent(lastMem));
+        tvTopVram.setText("显存 " + metricVram(lastVram));
+    }
+
+    private String metricPercent(double value) {
+        return value >= 0 ? String.format(Locale.ROOT, "%3d%%", Math.round(value)) : "  --";
+    }
+
+    private String metricVram(double megabytes) {
+        return megabytes >= 0
+                ? String.format(Locale.ROOT, "%5.1fG", megabytes / 1024.0)
+                : "   --";
     }
 
     private String percentText(double value) {

@@ -158,41 +158,69 @@
                     android:textSize="@dimen/page_title_text"
                     android:textStyle="bold" />
 
-                <!-- 横屏顶栏实时硬件速览 -->
+                <!-- 横屏顶栏实时硬件速览：每项等宽占位，数值位数变化不会推动相邻项 -->
                 <LinearLayout
                     android:id="@+id/topTelemetryStrip"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <TextView
+                        android:id="@+id/tvTopFps"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="monospace"
+                        android:maxLines="1"
+                        android:text="FPS  --"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11.5sp" />
 
                     <TextView
                         android:id="@+id/tvTopCpu"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="14dp"
+                        android:layout_weight="1"
                         android:fontFamily="monospace"
-                        android:text="CPU --"
+                        android:maxLines="1"
+                        android:text="CPU  --"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11.5sp" />
+
+                    <TextView
+                        android:id="@+id/tvTopGpu"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="monospace"
+                        android:maxLines="1"
+                        android:text="GPU  --"
                         android:textColor="@color/text_secondary"
                         android:textSize="11.5sp" />
 
                     <TextView
                         android:id="@+id/tvTopMem"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="14dp"
+                        android:layout_weight="1"
                         android:fontFamily="monospace"
+                        android:maxLines="1"
                         android:text="内存 --"
                         android:textColor="@color/text_secondary"
                         android:textSize="11.5sp" />
 
                     <TextView
-                        android:id="@+id/tvTopVol"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/tvTopVram"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_weight="1"
                         android:fontFamily="monospace"
-                        android:text="音量 --"
+                        android:maxLines="1"
+                        android:text="显存 --"
                         android:textColor="@color/text_secondary"
                         android:textSize="11.5sp" />
                 </LinearLayout>

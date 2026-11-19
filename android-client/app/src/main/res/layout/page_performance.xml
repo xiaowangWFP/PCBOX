@@ -9,9 +9,10 @@
     android:paddingEnd="@dimen/page_padding_h"
     android:paddingBottom="@dimen/page_padding_v">
 
+    <!-- 竖屏：两行等高 KPI 卡片，图表随卡片高度自适应，不再出现长短不一的卡片 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical">
 
         <LinearLayout
@@ -41,13 +42,15 @@
         <!-- 第 1 行：CPU + 内存 -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:baselineAligned="false"
             android:orientation="horizontal">
 
             <LinearLayout
                 style="@style/ConsoleCard"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
@@ -73,14 +76,16 @@
                 <com.phoneconsole.client.ui.HistoryGraphView
                     android:id="@+id/graphCpu"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/graph_height"
-                    android:layout_marginTop="8dp" />
+                    android:layout_height="0dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1"
+                    android:minHeight="36dp" />
             </LinearLayout>
 
             <LinearLayout
                 style="@style/ConsoleCard"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
@@ -106,16 +111,20 @@
                 <com.phoneconsole.client.ui.HistoryGraphView
                     android:id="@+id/graphMem"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/graph_height"
-                    android:layout_marginTop="8dp" />
+                    android:layout_height="0dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1"
+                    android:minHeight="36dp" />
             </LinearLayout>
         </LinearLayout>
 
         <!-- 第 2 行：GPU + 系统音量 -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
             android:layout_marginTop="12dp"
+            android:layout_weight="1"
+            android:baselineAligned="false"
             android:orientation="horizontal">
 
             <LinearLayout
@@ -147,8 +156,10 @@
                 <com.phoneconsole.client.ui.HistoryGraphView
                     android:id="@+id/graphGpu"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/graph_height"
-                    android:layout_marginTop="8dp" />
+                    android:layout_height="0dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1"
+                    android:minHeight="36dp" />
             </LinearLayout>
 
             <LinearLayout
@@ -257,9 +268,9 @@
                 android:id="@+id/tvNetUp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="12dp"
+                android:layout_marginEnd="14dp"
                 android:fontFamily="monospace"
-                android:text="上行 --"
+                android:text="↑ --"
                 android:textColor="@color/text_primary"
                 android:textSize="12.5sp" />
 
@@ -268,7 +279,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="monospace"
-                android:text="下行 --"
+                android:text="↓ --"
                 android:textColor="@color/text_primary"
                 android:textSize="12.5sp" />
         </LinearLayout>
