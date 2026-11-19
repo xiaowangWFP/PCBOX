@@ -6,6 +6,7 @@ import com.phoneconsole.pc.protocol.TelemetryMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import oshi.SystemInfo;
+import oshi.hardware.GraphicsCard;
 import oshi.hardware.HardwareAbstractionLayer;
 import oshi.hardware.NetworkIF;
 
@@ -31,6 +32,8 @@ public class TelemetryService {
     private final Gson gson = new Gson();
     private final com.sun.management.OperatingSystemMXBean osBean;
     private final HardwareAbstractionLayer hardware;
+    /** 显存总量（MB），-1 表示无法读取；启动时算一次 */
+    private final double vramTotalMb;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "telemetry");
@@ -50,6 +53,27 @@ public class TelemetryService {
         java.lang.management.OperatingSystemMXBean bean = ManagementFactory.getOperatingSystemMXBean();
         this.osBean = bean instanceof com.sun.management.OperatingSystemMXBean sun ? sun : null;
         this.hardware = new SystemInfo().getHardware();
+        this.vramTotalMb = detectVramTotalMb();
+    }
+
+    /** 多显卡时取显存最大的一块，避免核显共享内存拉偏总量 */
+    private double detectVramTotalMb() {
+        try {
+            long max = 0;
+            for (GraphicsCard card : hardware.getGraphicsCards()) {
+                long bytes = card.getVRam();
+                if (bytes > max) {
+                    max = bytes;
+                }
+            }
+            if (max <= 0) {
+                return -1;
+            }
+            return Math.round(max / 1048576.0 * 10.0) / 10.0;
+        } catch (Throwable t) {
+            log.debug("显存总量读取失败：{}", t.getMessage());
+            return -1;
+        }
     }
 
     public void start() {
@@ -76,6 +100,7 @@ public class TelemetryService {
         message.mem = memoryUsage();
         message.gpu = gpu.usage();
         message.vram = gpu.vramUsedMb();
+        message.vramTotal = vramTotalMb;
         double[] speed = networkSpeed();
         message.netUp = formatSpeed(speed[0]);
         message.netDown = formatSpeed(speed[1]);
