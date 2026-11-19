@@ -22,7 +22,8 @@ if errorlevel 1 (
 )
 
 echo 正在后台启动（无控制台窗口）...
-start "" javaw -jar target\phone-console-pc.jar
+rem P0：限制堆与元空间上限，避免默认堆随物理内存膨胀；多端并发 OOM 时可把 -Xmx256m 调到 384m
+start "" javaw -Xms64m -Xmx256m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -jar target\phone-console-pc.jar
 
 ping -n 10 127.0.0.1 >nul
 powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 8500 -State Listen -ErrorAction SilentlyContinue) { Write-Host '启动成功：服务已在后台运行' -ForegroundColor Green } else { Write-Host '启动失败：请检查日志或端口占用' -ForegroundColor Red }"

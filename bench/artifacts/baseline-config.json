@@ -1,0 +1,349 @@
+{
+  "network": {
+    "wsPort": 18500,
+    "httpPort": 18501,
+    "adbExecutable": "d:/手机连接电脑方案/platform-tools/adb.exe",
+    "reversePollMs": 3000
+  },
+  "screen": {
+    "ffmpegExecutable": "ffmpeg",
+    "monitor": 0
+  },
+  "defaultPageId": "default_page",
+  "pages": [
+    {
+      "id": "default_page",
+      "title": "通用控制",
+      "grid": {
+        "rows": 3,
+        "cols": 3
+      },
+      "buttons": [
+        {
+          "id": "btn_mute",
+          "label": "静音",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "mute",
+            "toggle": true,
+            "activeState": "muted",
+            "activeLabel": "已静音",
+            "activeIcon": "",
+            "activeBgColor": "#7F1D1D"
+          }
+        },
+        {
+          "id": "btn_vol_down",
+          "label": "音量 -",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "volume_down",
+            "toggle": false
+          }
+        },
+        {
+          "id": "btn_vol_up",
+          "label": "音量 +",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "volume_up",
+            "toggle": false
+          }
+        },
+        {
+          "id": "btn_prev",
+          "label": "上一首",
+          "icon": "",
+          "bgColor": "#0F172A",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "prev",
+            "toggle": false
+          }
+        },
+        {
+          "id": "btn_play",
+          "label": "播放 / 暂停",
+          "icon": "",
+          "bgColor": "#0F172A",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "play_pause",
+            "toggle": false
+          }
+        },
+        {
+          "id": "btn_next",
+          "label": "下一首",
+          "icon": "",
+          "bgColor": "#0F172A",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "next",
+            "toggle": false
+          }
+        },
+        {
+          "id": "btn_taskmgr",
+          "label": "任务管理器",
+          "icon": "",
+          "bgColor": "#134E4A",
+          "state": "normal",
+          "action": {
+            "type": "hotkey",
+            "keys": [
+              "ctrl",
+              "shift",
+              "esc"
+            ],
+            "toggle": false
+          }
+        },
+        {
+          "id": "btn_alt_tab",
+          "label": "切换窗口",
+          "icon": "",
+          "bgColor": "#134E4A",
+          "state": "normal",
+          "action": {
+            "type": "hotkey",
+            "keys": [
+              "alt",
+              "tab"
+            ],
+            "toggle": false
+          }
+        },
+        {
+          "id": "btn_notepad",
+          "label": "记事本",
+          "icon": "",
+          "bgColor": "#134E4A",
+          "state": "normal",
+          "action": {
+            "type": "launch",
+            "target": "notepad.exe",
+            "toggle": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "media_page",
+      "title": "媒体播放",
+      "grid": {
+        "rows": 2,
+        "cols": 3
+      },
+      "buttons": [
+        {
+          "id": "media_prev",
+          "label": "上一首",
+          "icon": "",
+          "bgColor": "#0F172A",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "prev",
+            "toggle": false
+          }
+        },
+        {
+          "id": "media_play",
+          "label": "播放 / 暂停",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "play_pause",
+            "toggle": false
+          }
+        },
+        {
+          "id": "media_next",
+          "label": "下一首",
+          "icon": "",
+          "bgColor": "#0F172A",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "next",
+            "toggle": false
+          }
+        },
+        {
+          "id": "media_mute",
+          "label": "静音",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "mute",
+            "toggle": true,
+            "activeState": "muted",
+            "activeLabel": "已静音",
+            "activeBgColor": "#7F1D1D"
+          }
+        },
+        {
+          "id": "media_vol_down",
+          "label": "音量 -",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "volume_down",
+            "toggle": false
+          }
+        },
+        {
+          "id": "media_vol_up",
+          "label": "音量 +",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "media",
+            "command": "volume_up",
+            "toggle": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "ide_page",
+      "title": "开发模式",
+      "grid": {
+        "rows": 2,
+        "cols": 3
+      },
+      "buttons": [
+        {
+          "id": "ide_run",
+          "label": "运行",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "hotkey",
+            "keys": [
+              "ctrl",
+              "f5"
+            ],
+            "toggle": false
+          }
+        },
+        {
+          "id": "ide_stop",
+          "label": "停止",
+          "icon": "",
+          "bgColor": "#1E293B",
+          "state": "normal",
+          "action": {
+            "type": "hotkey",
+            "keys": [
+              "shift",
+              "f5"
+            ],
+            "toggle": false
+          }
+        },
+        {
+          "id": "ide_terminal",
+          "label": "终端",
+          "icon": "",
+          "bgColor": "#0F172A",
+          "state": "normal",
+          "action": {
+            "type": "hotkey",
+            "keys": [
+              "alt",
+              "f12"
+            ],
+            "toggle": false
+          }
+        },
+        {
+          "id": "ide_format",
+          "label": "格式化代码",
+          "icon": "",
+          "bgColor": "#0F172A",
+          "state": "normal",
+          "action": {
+            "type": "hotkey",
+            "keys": [
+              "ctrl",
+              "alt",
+              "l"
+            ],
+            "toggle": false
+          }
+        },
+        {
+          "id": "ide_browser",
+          "label": "打开浏览器",
+          "icon": "",
+          "bgColor": "#134E4A",
+          "state": "normal",
+          "action": {
+            "type": "url",
+            "target": "http://localhost:8080",
+            "toggle": false
+          }
+        },
+        {
+          "id": "ide_lock",
+          "label": "锁屏",
+          "icon": "",
+          "bgColor": "#7F1D1D",
+          "state": "normal",
+          "action": {
+            "type": "hotkey",
+            "keys": [
+              "win",
+              "l"
+            ],
+            "toggle": false
+          }
+        }
+      ]
+    }
+  ],
+  "appBindings": [
+    {
+      "process": "idea64.exe",
+      "pageId": "ide_page"
+    },
+    {
+      "process": "code.exe",
+      "pageId": "ide_page"
+    },
+    {
+      "process": "chrome.exe",
+      "pageId": "media_page"
+    },
+    {
+      "process": "msedge.exe",
+      "pageId": "media_page"
+    },
+    {
+      "process": "vlc.exe",
+      "pageId": "media_page"
+    }
+  ]
+}

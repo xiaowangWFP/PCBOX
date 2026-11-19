@@ -31,6 +31,11 @@ public final class ConfigStore {
     private static final Set<String> ACTION_TYPES = Set.of("hotkey", "media", "launch", "url", "script");
     private static final Set<String> MEDIA_COMMANDS = Set.of(
             "volume_up", "volume_down", "mute", "play_pause", "next", "prev", "mic_mute");
+    /** P0 允许的缩放算法与 x264 预设，写错时回退默认值而不是让服务起不来 */
+    private static final Set<String> SCALE_FLAGS = Set.of(
+            "fast_bilinear", "bilinear", "bicubic", "neighbor", "area", "lanczos");
+    private static final Set<String> X264_PRESETS = Set.of(
+            "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow");
 
     private ConfigStore() {
     }
@@ -162,6 +167,7 @@ public final class ConfigStore {
         if (config.screen.monitor < -1 || config.screen.monitor > 15) {
             errors.add("screen.monitor 需在 -1~15（-1 表示整块桌面，0 起为显示器序号）");
         }
+        normalizeScreen(config.screen, errors);
 
         List<AppConfig.AppBinding> validBindings = new ArrayList<>();
         for (AppConfig.AppBinding binding : config.appBindings) {
@@ -176,6 +182,38 @@ public final class ConfigStore {
 
         if (!errors.isEmpty()) {
             throw new IOException("配置校验失败：" + String.join("；", errors));
+        }
+    }
+
+    /** 推流参数归一化：分辨率取偶数（yuv420p 要求），算法/预设写错时静默回退 */
+    private static void normalizeScreen(AppConfig.Screen screen, List<String> errors) {
+        if (screen.maxWidth < 160 || screen.maxWidth > 7680) {
+            errors.add("screen.maxWidth 需在 160~7680");
+        }
+        if (screen.maxHeight < 120 || screen.maxHeight > 4320) {
+            errors.add("screen.maxHeight 需在 120~4320");
+        }
+        screen.maxWidth = Math.max(2, screen.maxWidth & ~1);
+        screen.maxHeight = Math.max(2, screen.maxHeight & ~1);
+        if (screen.usbFps < 1 || screen.usbFps > 120) {
+            errors.add("screen.usbFps 需在 1~120");
+        }
+        if (screen.lanFps < 1 || screen.lanFps > 120) {
+            errors.add("screen.lanFps 需在 1~120");
+        }
+        if (screen.maxBitrateKbps < 200 || screen.maxBitrateKbps > 50000) {
+            errors.add("screen.maxBitrateKbps 需在 200~50000");
+        }
+        if (screen.x264Threads < 0 || screen.x264Threads > 64) {
+            errors.add("screen.x264Threads 需在 0~64（0 = 自动）");
+        }
+        if (screen.scaleFlags == null || !SCALE_FLAGS.contains(screen.scaleFlags)) {
+            log.warn("screen.scaleFlags 不受支持（{}），回退 fast_bilinear", screen.scaleFlags);
+            screen.scaleFlags = "fast_bilinear";
+        }
+        if (screen.x264Preset == null || !X264_PRESETS.contains(screen.x264Preset)) {
+            log.warn("screen.x264Preset 不受支持（{}），回退 ultrafast", screen.x264Preset);
+            screen.x264Preset = "ultrafast";
         }
     }
 

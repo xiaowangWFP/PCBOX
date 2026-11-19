@@ -1,0 +1,13 @@
+[main] INFO com.phoneconsole.pc.Main - 配置已就绪：d:\手机连接电脑方案\bench\artifacts\p0-config.json（3 个页面）
+[main] INFO com.phoneconsole.pc.Main - 手机端连接地址：ws://<PC-IP>:18500
+[WebSocketSelector-33] INFO com.phoneconsole.pc.net.ControlWebSocketServer - WebSocket 服务已启动，监听端口 18500
+[main] INFO com.phoneconsole.pc.net.StaticHttpServer - 静态资源服务已启动，端口 18501
+[main] INFO com.phoneconsole.pc.telemetry.GpuMonitor - GPU 占用采集已启用（PDH GPU Engine）
+[main] INFO com.phoneconsole.pc.telemetry.TelemetryService - 硬件状态采集已启动，间隔 1000 ms
+[main] INFO com.phoneconsole.pc.net.AdbPortForwarder - ADB 守护线程已启动，轮询间隔 10000 ms
+[main] INFO com.phoneconsole.pc.telemetry.WindowWatcher - 前台窗口感知已启动
+[main] INFO com.phoneconsole.pc.tray.TrayManager - 托盘图标已就绪
+[main] INFO com.phoneconsole.pc.Main - PC 服务端已就绪（调试页面：http://127.0.0.1:18501/），按 Ctrl+C 退出
+[http-static] WARN com.phoneconsole.pc.config.ConfigStore - screen.scaleFlags 不受支持（bogus），回退 fast_bilinear
+[http-static] WARN com.phoneconsole.pc.config.ConfigStore - screen.x264Preset 不受支持（bogus），回退 ultrafast
+[telemetry] INFO com.phoneconsole.pc.core.AudioEndpoint - 系统音量读取已启用（Windows Core Audio）

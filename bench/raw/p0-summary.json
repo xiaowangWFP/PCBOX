@@ -1,0 +1,324 @@
+{
+  "label": "p0",
+  "jar": "d:\\手机连接电脑方案\\bench\\artifacts\\p0.jar",
+  "jvmArgs": "-Xms64m -Xmx256m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m",
+  "configPath": "d:\\手机连接电脑方案\\bench\\artifacts\\p0-config.json",
+  "cores": 12,
+  "monitor": 0,
+  "motion": true,
+  "startedAt": "2026-11-19T02:18:57",
+  "idle": {
+    "samples": 6,
+    "javaCpuPctAvg": 0.3,
+    "javaCpuPctMax": 0.6,
+    "ffmpegCpuPctAvg": 0.0,
+    "ffmpegCpuPctMax": 0.0,
+    "totalCpuPctAvg": 0.3,
+    "totalCpuPctMax": 0.6,
+    "javaRssMBAvg": 130.7,
+    "javaRssMBMax": 131.0,
+    "ffmpegRssMBAvg": 0.0,
+    "ffmpegRssMBMax": 0.0,
+    "ffmpegCountMax": 0.0,
+    "totalRssMBAvg": 130.7
+  },
+  "stream": {
+    "samples": 22,
+    "javaCpuPctAvg": 0.4,
+    "javaCpuPctMax": 1.7,
+    "ffmpegCpuPctAvg": 4.3,
+    "ffmpegCpuPctMax": 6.4,
+    "totalCpuPctAvg": 4.8,
+    "totalCpuPctMax": 7.0,
+    "javaRssMBAvg": 133.7,
+    "javaRssMBMax": 137.8,
+    "ffmpegRssMBAvg": 68.2,
+    "ffmpegRssMBMax": 74.5,
+    "ffmpegCountMax": 1.0,
+    "totalRssMBAvg": 201.9
+  },
+  "jvmHeap": "21760:\r\n def new generation   total 19648K, used 3168K [0x00000000f0000000, 0x00000000f1550000, 0x00000000f5550000)\r\n  eden space 17472K,  13% used [0x00000000f0000000, 0x00000000f0255598, 0x00000000f1110000)\r\n  from space 2176K,  35% used [0x00000000f1110000, 0x00000000f11d2e58, 0x00000000f1330000)\r\n  to   space 2176K,   0% used [0x00000000f1330000, 0x00000000f1330000, 0x00000000f1550000)\r\n tenured generation   total 43712K, used 5314K [0x00000000f5550000, 0x00000000f8000000, 0x0000000100000000)\r\n   the space 43712K,  12% used [0x00000000f5550000, 0x00000000f5a80b38, 0x00000000f5a80c00, 0x00000000f8000000)\r\n Metaspace       used 12832K, committed 13248K, reserved 180224K\r\n  class space    used 1330K, committed 1536K, reserved 114688K\r\n",
+  "ffmpegCommand": "ffmpeg -hide_banner -loglevel error -f gdigrab -framerate 30 -offset_x -1920 -offset_y 0 -video_size 1920x1080 -i desktop -vf scale=1280:720:flags=fast_bilinear,setsar=1 -c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -level 4.2 -maxrate 3000k -bufsize 6000k -pix_fmt yuv420p -x264-params aud=1:repeat_headers=1:bframes=0 -g 60 -f h264 pipe:1",
+  "probe": {
+    "url": "ws://127.0.0.1:18500",
+    "monitor": 0,
+    "seconds": 38,
+    "stats": [
+      {
+        "fps": 30,
+        "actualFps": 25.7,
+        "width": 1280,
+        "height": 720,
+        "kbps": 245
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 10
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 282
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.1,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.4,
+        "width": 1280,
+        "height": 720,
+        "kbps": 277
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.5,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 274
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.8,
+        "width": 1280,
+        "height": 720,
+        "kbps": 280
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.1,
+        "width": 1280,
+        "height": 720,
+        "kbps": 5
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 282
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 5
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.1,
+        "width": 1280,
+        "height": 720,
+        "kbps": 274
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.5,
+        "width": 1280,
+        "height": 720,
+        "kbps": 5
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.5,
+        "width": 1280,
+        "height": 720,
+        "kbps": 277
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.1,
+        "width": 1280,
+        "height": 720,
+        "kbps": 5
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 273
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 5
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.1,
+        "width": 1280,
+        "height": 720,
+        "kbps": 274
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 5
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 281
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 5
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 282
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 5
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.1,
+        "width": 1280,
+        "height": 720,
+        "kbps": 274
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 282
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.1,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 274
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.6,
+        "width": 1280,
+        "height": 720,
+        "kbps": 279
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.5,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.9,
+        "width": 1280,
+        "height": 720,
+        "kbps": 282
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.6,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.5,
+        "width": 1280,
+        "height": 720,
+        "kbps": 278
+      },
+      {
+        "fps": 30,
+        "actualFps": 30.3,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      },
+      {
+        "fps": 30,
+        "actualFps": 30,
+        "width": 1280,
+        "height": 720,
+        "kbps": 274
+      },
+      {
+        "fps": 30,
+        "actualFps": 29.6,
+        "width": 1280,
+        "height": 720,
+        "kbps": 4
+      }
+    ],
+    "states": [
+      {
+        "streaming": true,
+        "fps": 30,
+        "width": 1280,
+        "height": 720,
+        "reason": null
+      },
+      {
+        "streaming": false,
+        "fps": 0,
+        "width": 0,
+        "height": 0,
+        "reason": null
+      }
+    ]
+  }
+}

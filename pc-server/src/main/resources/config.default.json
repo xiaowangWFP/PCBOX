@@ -3,11 +3,19 @@
     "wsPort": 8500,
     "httpPort": 8501,
     "adbExecutable": "adb",
-    "reversePollMs": 3000
+    "reversePollMs": 10000
   },
   "screen": {
     "ffmpegExecutable": "ffmpeg",
-    "monitor": -1
+    "monitor": -1,
+    "maxWidth": 1280,
+    "maxHeight": 720,
+    "usbFps": 30,
+    "lanFps": 24,
+    "maxBitrateKbps": 3000,
+    "scaleFlags": "fast_bilinear",
+    "x264Preset": "ultrafast",
+    "x264Threads": 0
   },
   "defaultPageId": "default_page",
   "pages": [

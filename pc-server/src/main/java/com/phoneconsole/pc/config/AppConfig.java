@@ -23,11 +23,29 @@ public class AppConfig {
         public long reversePollMs = 3000;
     }
 
-    /** 屏幕推流参数：输出固定 1920x1080@60，采集源与 ffmpeg 路径可配置 */
+    /**
+     * 屏幕推流参数（P0 全部外置到 config.json，可按需回滚到 1080p60）：
+     * 输出分辨率上限、USB/LAN 帧率、缩放算法、x264 预设与码率预算都可配。
+     */
     public static class Screen {
         public String ffmpegExecutable = "ffmpeg";
         /** 采集目标：-1 = 整块虚拟桌面（镜像），0 起为显示器序号（扩展屏只抓那一块） */
         public int monitor = -1;
+        /** 输出分辨率上限（像素预算），按采集源比例等比缩放、不补黑边；1080p 档改回 1920x1080 */
+        public int maxWidth = 1280;
+        public int maxHeight = 720;
+        /** USB 通道（adb reverse）帧率上限；需要高刷可改回 60 */
+        public int usbFps = 30;
+        /** 局域网通道帧率上限 */
+        public int lanFps = 24;
+        /** 峰值码率（kbps）；bufsize 自动取其 2 倍 */
+        public int maxBitrateKbps = 3000;
+        /** 缩放算法：fast_bilinear 最省 CPU；追求画质可改回 bicubic */
+        public String scaleFlags = "fast_bilinear";
+        /** libx264 预设：ultrafast 最省 CPU；画质优先可改回 veryfast */
+        public String x264Preset = "ultrafast";
+        /** 编码线程数；0 = 交给 ffmpeg 自动分配，建议 2~4 防止抢占前台 */
+        public int x264Threads = 0;
     }
 
     /** 一个手机端页面（一屏按钮） */
