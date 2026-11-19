@@ -1,0 +1,79 @@
+{
+  "url": "ws://127.0.0.1:8500",
+  "monitor": 0,
+  "seconds": 8,
+  "stats": [
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 282
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1280,
+      "height": 720,
+      "kbps": 274
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 281
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 281
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    }
+  ],
+  "states": [
+    {
+      "streaming": true,
+      "fps": 30,
+      "width": 1280,
+      "height": 720,
+      "reason": null
+    },
+    {
+      "streaming": false,
+      "fps": 0,
+      "width": 0,
+      "height": 0,
+      "reason": null
+    }
+  ]
+}

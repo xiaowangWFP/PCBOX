@@ -24,7 +24,8 @@ echo.
 echo [2/2] 正在启动，日志如下：
 echo.
 
-java -jar target\phone-console-pc.jar
+rem P0：限制堆与元空间上限，避免默认堆随物理内存膨胀；多端并发 OOM 时可把 -Xmx256m 调到 384m
+java -Xms64m -Xmx256m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -jar target\phone-console-pc.jar
 set "EXITCODE=%errorlevel%"
 
 echo.

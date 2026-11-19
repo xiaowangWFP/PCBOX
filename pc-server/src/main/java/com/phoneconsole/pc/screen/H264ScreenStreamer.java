@@ -1,5 +1,6 @@
 package com.phoneconsole.pc.screen;
 
+import com.phoneconsole.pc.config.AppConfig;
 import com.phoneconsole.pc.runtime.LogBuffer;
 import org.java_websocket.WebSocket;
 import org.slf4j.Logger;
@@ -21,9 +22,10 @@ import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 /**
- * PC 桌面 H.264 推流：60fps，输出尺寸按采集源宽高比等比缩放到 1920x1080 的像素预算内（不加黑边），
- * 采集源可选整块桌面或单块显示器；单块屏统一从 GDI 合成桌面按物理坐标裁剪，
- * 避免 ddagrab 的 output_idx 与界面屏序号不一致导致抓错屏。
+ * PC 桌面 H.264 推流：帧率、输出分辨率上限、缩放算法、x264 预设与码率全部来自 config.json。
+ * 输出尺寸按采集源宽高比等比缩放到像素预算内（不加黑边）；采集源可选整块桌面或单块显示器，
+ * 单块屏统一从 GDI 合成桌面按物理坐标裁剪，避免 ddagrab 的 output_idx 与界面屏序号不一致导致抓错屏。
+ * 采集分辨率与输出分辨率一致时跳过 scale 滤镜，省掉一次 CPU 缩放。
  * libx264 编码后输出 Annex-B 裸流，按访问单元（AUD 分隔）通过 WebSocket 二进制帧下发。
  * <p>
  * 多个订阅者共享同一个编码进程；每个订阅者从下一个 IDR 关键帧开始发送，
@@ -34,10 +36,11 @@ public final class H264ScreenStreamer {
 
     private static final Logger log = LoggerFactory.getLogger(H264ScreenStreamer.class);
 
-    public static final int DEFAULT_FPS = 60;
-    /** 输出画面的像素预算：16:9 时正好 1920x1080，其它比例等比缩放，不加黑边 */
-    private static final int MAX_WIDTH = 1920;
-    private static final int MAX_HEIGHT = 1080;
+    public static final int DEFAULT_FPS = 30;
+    /** 配置缺失时的兜底参数（与 AppConfig.Screen 默认值保持一致） */
+    private static final AppConfig.Screen FALLBACK = new AppConfig.Screen();
+    private static final String FALLBACK_SCALE = "fast_bilinear";
+    private static final String FALLBACK_PRESET = "ultrafast";
 
     /** 每秒统计：实际编码帧率与码率 */
     public record Stats(double actualFps, int kbps) {
@@ -62,11 +65,12 @@ public final class H264ScreenStreamer {
         }
     }
 
-    private final Supplier<String> ffmpegExecutable;
+    /** 推流参数快照来源：每次拉起编码器时读取，配置热重载后重启编码器即可生效 */
+    private final Supplier<AppConfig.Screen> screenConfig;
     /** 采集目标：-1 = 整块桌面，>=0 = 显示器序号 */
     private final IntSupplier monitor;
     private final ScreenTargets targets;
-    /** 编码帧率：USB 走 60，局域网默认降到 30，减轻无线链路与平板解码压力 */
+    /** 编码帧率：USB / LAN 各自的上限由调用方按 config.json 决定 */
     private final int fps;
     private final Map<WebSocket, Subscriber> subscribers = new ConcurrentHashMap<>();
     private final Object lock = new Object();
@@ -85,11 +89,12 @@ public final class H264ScreenStreamer {
     private int statsFrames;
     private long statsBytes;
     /** 当前编码输出尺寸，按采集源的宽高比等比缩放，避免左右/上下黑边 */
-    private volatile int outputWidth = MAX_WIDTH;
-    private volatile int outputHeight = MAX_HEIGHT;
+    private volatile int outputWidth = FALLBACK.maxWidth;
+    private volatile int outputHeight = FALLBACK.maxHeight;
 
-    public H264ScreenStreamer(Supplier<String> ffmpegExecutable, IntSupplier monitor, ScreenTargets targets, int fps) {
-        this.ffmpegExecutable = ffmpegExecutable;
+    public H264ScreenStreamer(Supplier<AppConfig.Screen> screenConfig,
+                              IntSupplier monitor, ScreenTargets targets, int fps) {
+        this.screenConfig = screenConfig;
         this.monitor = monitor;
         this.targets = targets;
         this.fps = fps <= 0 ? DEFAULT_FPS : fps;
@@ -99,7 +104,7 @@ public final class H264ScreenStreamer {
         return running;
     }
 
-    /** 当前编码宽度（已按采集源比例换算，可能小于 1920） */
+    /** 当前编码宽度（已按采集源比例换算，可能小于 maxWidth） */
     public int width() {
         return outputWidth;
     }
@@ -184,17 +189,29 @@ public final class H264ScreenStreamer {
         return running && session == activeSession;
     }
 
+    /** 当前推流参数快照；配置缺失或读取失败时退回内置默认值 */
+    private AppConfig.Screen screen() {
+        try {
+            AppConfig.Screen value = screenConfig == null ? null : screenConfig.get();
+            return value == null ? FALLBACK : value;
+        } catch (Exception e) {
+            return FALLBACK;
+        }
+    }
+
     private String executable() {
-        String value = ffmpegExecutable.get();
+        String value = screen().ffmpegExecutable;
         return value == null ? "" : value.trim();
     }
 
     private List<String> command(int target, int mode, int width, int height) {
+        AppConfig.Screen screen = screen();
         List<String> cmd = new ArrayList<>();
         cmd.add(executable());
         cmd.addAll(List.of("-hide_banner", "-loglevel", "error"));
         Rectangle area = target >= 0 ? physicalBounds(target) : null;
-        if (target >= 0 && mode == 0 && area != null) {
+        boolean localCapture = target >= 0 && mode == 0 && area != null;
+        if (localCapture) {
             // 单块屏：从 GDI 合成桌面里按物理坐标裁剪。
             // 不用 ddagrab：它的 output_idx 只按 DXGI 输出顺序编号，和 AWT 的屏序号对不上，
             // 多屏/虚拟屏时会把「显示器 2」抓成主屏。
@@ -203,44 +220,57 @@ public final class H264ScreenStreamer {
                     "-offset_y", String.valueOf(area.y),
                     "-video_size", area.width + "x" + area.height,
                     "-i", "desktop"));
-            cmd.add("-vf");
-            cmd.add(outputFilter(width, height));
         } else {
             // 镜像：抓整块虚拟桌面（所有显示器）
             cmd.addAll(List.of("-f", "gdigrab", "-framerate", String.valueOf(fps), "-i", "desktop"));
-            cmd.add("-vf");
-            cmd.add(outputFilter(width, height));
         }
+        // 采集尺寸与输出尺寸一致时直接跳过 scale，省掉一次 CPU 缩放
+        Rectangle source = localCapture ? area : desktopBounds();
+        boolean needScale = source == null || source.width != width || source.height != height;
+        if (needScale) {
+            cmd.add("-vf");
+            cmd.add(outputFilter(width, height, screen.scaleFlags));
+        }
+        int bitrate = Math.max(200, screen.maxBitrateKbps);
+        String preset = screen.x264Preset == null || screen.x264Preset.isBlank()
+                ? FALLBACK_PRESET : screen.x264Preset;
         cmd.addAll(List.of(
                 "-c:v", "libx264",
-                "-preset", "veryfast",
+                "-preset", preset,
                 "-tune", "zerolatency",
                 "-profile:v", "baseline",
                 "-level", "4.2",
                 // 限制峰值码率，避免关键帧在无线链路上把带宽打满造成卡顿
-                "-maxrate", "6000k",
-                "-bufsize", "12000k",
+                "-maxrate", bitrate + "k",
+                "-bufsize", (bitrate * 2) + "k",
                 "-pix_fmt", "yuv420p",
                 "-x264-params", "aud=1:repeat_headers=1:bframes=0",
-                "-g", String.valueOf(fps * 2),
-                "-f", "h264",
-                "pipe:1"));
+                "-g", String.valueOf(fps * 2)));
+        if (screen.x264Threads > 0) {
+            // 限制软编线程数，避免多屏/高帧率时把前台应用挤掉
+            cmd.addAll(List.of("-threads", String.valueOf(screen.x264Threads)));
+        }
+        cmd.addAll(List.of("-f", "h264", "pipe:1"));
         return cmd;
     }
 
     /** 按采集源宽高比直接缩放到目标尺寸，不补黑边，客户端才能铺满屏幕 */
-    private static String outputFilter(int width, int height) {
-        return "scale=" + width + ":" + height + ":flags=bicubic,setsar=1";
+    private static String outputFilter(int width, int height, String flags) {
+        String value = flags == null || flags.isBlank() ? FALLBACK_SCALE : flags;
+        return "scale=" + width + ":" + height + ":flags=" + value + ",setsar=1";
     }
 
-    /** 按采集源比例算出输出尺寸：限制在 1920x1080 的像素预算内，宽高取偶数（x264 要求） */
+    /** 按采集源比例算出输出尺寸：限制在 maxWidth x maxHeight 的像素预算内，宽高取偶数（x264 要求） */
     private int[] outputSize(int target) {
+        AppConfig.Screen screen = screen();
+        int maxWidth = Math.max(2, screen.maxWidth & ~1);
+        int maxHeight = Math.max(2, screen.maxHeight & ~1);
         Rectangle source = target >= 0 ? physicalBounds(target) : desktopBounds();
         if (source == null || source.width <= 1 || source.height <= 1) {
-            return new int[]{MAX_WIDTH, MAX_HEIGHT};
+            return new int[]{maxWidth, maxHeight};
         }
         double scale = Math.min(1.0,
-                Math.min((double) MAX_WIDTH / source.width, (double) MAX_HEIGHT / source.height));
+                Math.min((double) maxWidth / source.width, (double) maxHeight / source.height));
         int width = Math.max(2, ((int) Math.round(source.width * scale)) & ~1);
         int height = Math.max(2, ((int) Math.round(source.height * scale)) & ~1);
         return new int[]{width, height};
@@ -300,8 +330,10 @@ public final class H264ScreenStreamer {
                 outputWidth = size[0];
                 outputHeight = size[1];
                 List<String> command = command(target, mode, size[0], size[1]);
-                log.info("启动 H.264 屏幕编码：{}x{}@{}，采集={}，ffmpeg={}",
-                        size[0], size[1], fps, describe(target, mode), command.get(0));
+                AppConfig.Screen settings = screen();
+                log.info("启动 H.264 屏幕编码：{}x{}@{}，采集={}，缩放={}，预设={}，码率={}k，ffmpeg={}",
+                        size[0], size[1], fps, describe(target, mode),
+                        settings.scaleFlags, settings.x264Preset, settings.maxBitrateKbps, command.get(0));
                 Process started = new ProcessBuilder(command)
                         .redirectErrorStream(false)
                         .start();

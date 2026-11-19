@@ -1,0 +1,254 @@
+{
+  "url": "ws://127.0.0.1:18500",
+  "monitor": 0,
+  "seconds": 34,
+  "stats": [
+    {
+      "fps": 30,
+      "actualFps": 25.5,
+      "width": 1280,
+      "height": 720,
+      "kbps": 252
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 10
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.8,
+      "width": 1280,
+      "height": 720,
+      "kbps": 281
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 273
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1280,
+      "height": 720,
+      "kbps": 274
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 273
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 282
+    },
+    {
+      "fps": 30,
+      "actualFps": 1.6,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 254
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.6,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 280
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 618
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 602
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 581
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 584
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 584
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 584
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 582
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 584
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 582
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 585
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1920,
+      "height": 1080,
+      "kbps": 602
+    }
+  ],
+  "states": [
+    {
+      "streaming": true,
+      "fps": 30,
+      "width": 1280,
+      "height": 720,
+      "reason": null
+    },
+    {
+      "streaming": false,
+      "fps": 0,
+      "width": 0,
+      "height": 0,
+      "reason": null
+    }
+  ]
+}

@@ -21,3 +21,6 @@ local.properties
 keystore.properties
 keystore/
 config.json
+
+# 基准测试二进制产物（脚本与采样数据保留）
+bench/artifacts/*.jar

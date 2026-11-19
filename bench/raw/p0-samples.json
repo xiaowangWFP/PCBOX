@@ -1,0 +1,344 @@
+[
+  {
+    "phase": "idle",
+    "second": 0,
+    "javaCpuPct": 1.3,
+    "ffmpegCpuPct": 0.0,
+    "javaRssMB": 143.7,
+    "ffmpegRssMB": 0.0,
+    "ffmpegCount": 0
+  },
+  {
+    "phase": "idle",
+    "second": 1,
+    "javaCpuPct": 0.4,
+    "ffmpegCpuPct": 0.0,
+    "javaRssMB": 129.7,
+    "ffmpegRssMB": 0.0,
+    "ffmpegCount": 0
+  },
+  {
+    "phase": "idle",
+    "second": 2,
+    "javaCpuPct": 0.4,
+    "ffmpegCpuPct": 0.0,
+    "javaRssMB": 130.7,
+    "ffmpegRssMB": 0.0,
+    "ffmpegCount": 0
+  },
+  {
+    "phase": "idle",
+    "second": 3,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 0.0,
+    "javaRssMB": 130.9,
+    "ffmpegRssMB": 0.0,
+    "ffmpegCount": 0
+  },
+  {
+    "phase": "idle",
+    "second": 4,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 0.0,
+    "javaRssMB": 131.0,
+    "ffmpegRssMB": 0.0,
+    "ffmpegCount": 0
+  },
+  {
+    "phase": "idle",
+    "second": 5,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 0.0,
+    "javaRssMB": 131.0,
+    "ffmpegRssMB": 0.0,
+    "ffmpegCount": 0
+  },
+  {
+    "phase": "idle",
+    "second": 6,
+    "javaCpuPct": 0.1,
+    "ffmpegCpuPct": 0.0,
+    "javaRssMB": 130.1,
+    "ffmpegRssMB": 0.0,
+    "ffmpegCount": 0
+  },
+  {
+    "phase": "idle",
+    "second": 7,
+    "javaCpuPct": 0.6,
+    "ffmpegCpuPct": 0.0,
+    "javaRssMB": 130.2,
+    "ffmpegRssMB": 0.0,
+    "ffmpegCount": 0
+  },
+  {
+    "phase": "stream",
+    "second": 0,
+    "javaCpuPct": 0.5,
+    "ffmpegCpuPct": 4.2,
+    "javaRssMB": 141.9,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 1,
+    "javaCpuPct": 0.5,
+    "ffmpegCpuPct": 4.8,
+    "javaRssMB": 142.2,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 2,
+    "javaCpuPct": 0.4,
+    "ffmpegCpuPct": 4.8,
+    "javaRssMB": 131.8,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 3,
+    "javaCpuPct": 0.5,
+    "ffmpegCpuPct": 4.1,
+    "javaRssMB": 133.0,
+    "ffmpegRssMB": 73.5,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 4,
+    "javaCpuPct": 0.6,
+    "ffmpegCpuPct": 3.5,
+    "javaRssMB": 134.5,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 5,
+    "javaCpuPct": 0.1,
+    "ffmpegCpuPct": 4.2,
+    "javaRssMB": 134.9,
+    "ffmpegRssMB": 69.6,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 6,
+    "javaCpuPct": 0.4,
+    "ffmpegCpuPct": 4.9,
+    "javaRssMB": 134.9,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 7,
+    "javaCpuPct": 0.1,
+    "ffmpegCpuPct": 3.7,
+    "javaRssMB": 132.5,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 8,
+    "javaCpuPct": 0.1,
+    "ffmpegCpuPct": 5.5,
+    "javaRssMB": 133.1,
+    "ffmpegRssMB": 73.2,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 9,
+    "javaCpuPct": 0.6,
+    "ffmpegCpuPct": 6.4,
+    "javaRssMB": 133.7,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 10,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 4.1,
+    "javaRssMB": 133.8,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 11,
+    "javaCpuPct": 0.1,
+    "ffmpegCpuPct": 5.0,
+    "javaRssMB": 133.9,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 12,
+    "javaCpuPct": 0.6,
+    "ffmpegCpuPct": 2.6,
+    "javaRssMB": 132.0,
+    "ffmpegRssMB": 73.4,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 13,
+    "javaCpuPct": 0.6,
+    "ffmpegCpuPct": 5.0,
+    "javaRssMB": 133.2,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 14,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 4.2,
+    "javaRssMB": 133.3,
+    "ffmpegRssMB": 74.5,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 15,
+    "javaCpuPct": 0.6,
+    "ffmpegCpuPct": 4.4,
+    "javaRssMB": 134.1,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 16,
+    "javaCpuPct": 0.4,
+    "ffmpegCpuPct": 4.2,
+    "javaRssMB": 134.1,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 17,
+    "javaCpuPct": 0.5,
+    "ffmpegCpuPct": 4.2,
+    "javaRssMB": 132.3,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 18,
+    "javaCpuPct": 1.3,
+    "ffmpegCpuPct": 3.9,
+    "javaRssMB": 132.7,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 19,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 3.2,
+    "javaRssMB": 133.0,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 20,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 4.8,
+    "javaRssMB": 133.0,
+    "ffmpegRssMB": 71.5,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 21,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 4.1,
+    "javaRssMB": 133.1,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 22,
+    "javaCpuPct": 0.3,
+    "ffmpegCpuPct": 4.1,
+    "javaRssMB": 132.9,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 23,
+    "javaCpuPct": 0.4,
+    "ffmpegCpuPct": 3.2,
+    "javaRssMB": 133.1,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 24,
+    "javaCpuPct": 0.1,
+    "ffmpegCpuPct": 5.1,
+    "javaRssMB": 133.2,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 25,
+    "javaCpuPct": 0.4,
+    "ffmpegCpuPct": 5.8,
+    "javaRssMB": 133.2,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 26,
+    "javaCpuPct": 0.1,
+    "ffmpegCpuPct": 3.9,
+    "javaRssMB": 133.2,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 27,
+    "javaCpuPct": 0.5,
+    "ffmpegCpuPct": 3.7,
+    "javaRssMB": 137.3,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 28,
+    "javaCpuPct": 1.7,
+    "ffmpegCpuPct": 3.6,
+    "javaRssMB": 137.8,
+    "ffmpegRssMB": 66.9,
+    "ffmpegCount": 1
+  },
+  {
+    "phase": "stream",
+    "second": 29,
+    "javaCpuPct": 0.1,
+    "ffmpegCpuPct": 3.9,
+    "javaRssMB": 135.6,
+    "ffmpegRssMB": 70.1,
+    "ffmpegCount": 1
+  }
+]

@@ -1,0 +1,17 @@
+[main] INFO com.phoneconsole.pc.Main - 配置已就绪：d:\手机连接电脑方案\bench\artifacts\baseline-config.json（3 个页面）
+[main] INFO com.phoneconsole.pc.Main - 手机端连接地址：ws://<PC-IP>:18500
+[WebSocketSelector-33] INFO com.phoneconsole.pc.net.ControlWebSocketServer - WebSocket 服务已启动，监听端口 18500
+[main] INFO com.phoneconsole.pc.net.StaticHttpServer - 静态资源服务已启动，端口 18501
+[main] INFO com.phoneconsole.pc.telemetry.GpuMonitor - GPU 占用采集已启用（PDH GPU Engine）
+[main] INFO com.phoneconsole.pc.telemetry.TelemetryService - 硬件状态采集已启动，间隔 1000 ms
+[main] INFO com.phoneconsole.pc.net.AdbPortForwarder - ADB 守护线程已启动，轮询间隔 3000 ms
+[main] INFO com.phoneconsole.pc.telemetry.WindowWatcher - 前台窗口感知已启动
+[main] INFO com.phoneconsole.pc.tray.TrayManager - 托盘图标已就绪
+[main] INFO com.phoneconsole.pc.Main - PC 服务端已就绪（调试页面：http://127.0.0.1:18501/），按 Ctrl+C 退出
+[telemetry] INFO com.phoneconsole.pc.core.AudioEndpoint - 系统音量读取已启用（Windows Core Audio）
+[adb-watchdog] INFO com.phoneconsole.pc.net.AdbPortForwarder - 已建立有线端口映射 [GYQGVSNJSCJVAYNF]：tcp:18500（serial 寻址）
+[window-watcher] INFO com.phoneconsole.pc.telemetry.WindowWatcher - 前台进程切换为 codebuddy cn.exe，下发页面 default_page
+[window-watcher] INFO com.phoneconsole.pc.net.ControlWebSocketServer - 切换页面 -> 通用控制（default_page）
+[WebSocketWorker-21] INFO com.phoneconsole.pc.net.ControlWebSocketServer - 手机端接入：/127.0.0.1:5375（USB 通道）
+[screen-h264-pump] INFO com.phoneconsole.pc.screen.H264ScreenStreamer - 启动 H.264 屏幕编码：1920x1080@60，采集=显示器 0（gdigrab 裁剪），ffmpeg=ffmpeg
+[WebSocketSelector-33] INFO com.phoneconsole.pc.net.ControlWebSocketServer - 手机端断开：code=1000 reason= remote=true

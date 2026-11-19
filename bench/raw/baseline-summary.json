@@ -1,0 +1,324 @@
+{
+  "label": "baseline",
+  "jar": "d:\\手机连接电脑方案\\bench\\artifacts\\baseline.jar",
+  "jvmArgs": "",
+  "configPath": "d:\\手机连接电脑方案\\bench\\artifacts\\baseline-config.json",
+  "cores": 12,
+  "monitor": 0,
+  "motion": true,
+  "startedAt": "2026-11-19T02:17:56",
+  "idle": {
+    "samples": 6,
+    "javaCpuPctAvg": 0.6,
+    "javaCpuPctMax": 1.0,
+    "ffmpegCpuPctAvg": 0.0,
+    "ffmpegCpuPctMax": 0.0,
+    "totalCpuPctAvg": 0.6,
+    "totalCpuPctMax": 1.0,
+    "javaRssMBAvg": 173.0,
+    "javaRssMBMax": 186.2,
+    "ffmpegRssMBAvg": 0.0,
+    "ffmpegRssMBMax": 0.0,
+    "ffmpegCountMax": 0.0,
+    "totalRssMBAvg": 173.0
+  },
+  "stream": {
+    "samples": 22,
+    "javaCpuPctAvg": 0.7,
+    "javaCpuPctMax": 1.7,
+    "ffmpegCpuPctAvg": 13.8,
+    "ffmpegCpuPctMax": 15.8,
+    "totalCpuPctAvg": 14.4,
+    "totalCpuPctMax": 17.4,
+    "javaRssMBAvg": 292.5,
+    "javaRssMBMax": 361.2,
+    "ffmpegRssMBAvg": 100.7,
+    "ffmpegRssMBMax": 107.5,
+    "ffmpegCountMax": 1.0,
+    "totalRssMBAvg": 393.2
+  },
+  "jvmHeap": "25744:\r\n garbage-first heap   total 524288K, used 254958K [0x0000000603400000, 0x0000000800000000)\r\n  region size 4096K, 62 young (253952K), 2 survivors (8192K)\r\n Metaspace       used 12826K, committed 13248K, reserved 1114112K\r\n  class space    used 1324K, committed 1536K, reserved 1048576K\r\n",
+  "ffmpegCommand": "ffmpeg -hide_banner -loglevel error -f gdigrab -framerate 60 -offset_x -1920 -offset_y 0 -video_size 1920x1080 -i desktop -vf scale=1920:1080:flags=bicubic,setsar=1 -c:v libx264 -preset veryfast -tune zerolatency -profile:v baseline -level 4.2 -maxrate 6000k -bufsize 12000k -pix_fmt yuv420p -x264-params aud=1:repeat_headers=1:bframes=0 -g 120 -f h264 pipe:1",
+  "probe": {
+    "url": "ws://127.0.0.1:18500",
+    "monitor": 0,
+    "seconds": 38,
+    "stats": [
+      {
+        "fps": 60,
+        "actualFps": 51.6,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 451
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.8,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 83
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.2,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 532
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 524
+      },
+      {
+        "fps": 60,
+        "actualFps": 61,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 17
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.1,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 524
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 60.8,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 531
+      },
+      {
+        "fps": 60,
+        "actualFps": 60.3,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 532
+      },
+      {
+        "fps": 60,
+        "actualFps": 58.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 531
+      },
+      {
+        "fps": 60,
+        "actualFps": 60.8,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 17
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.3,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 517
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 532
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 60.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 532
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.1,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 61,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 532
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 17
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.3,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 517
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 17
+      },
+      {
+        "fps": 60,
+        "actualFps": 60.8,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 531
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 17
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.3,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 517
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 17
+      },
+      {
+        "fps": 60,
+        "actualFps": 60.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 531
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.2,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 532
+      },
+      {
+        "fps": 60,
+        "actualFps": 60.9,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 17
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.1,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 516
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 61,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 532
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      },
+      {
+        "fps": 60,
+        "actualFps": 59.2,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 517
+      },
+      {
+        "fps": 60,
+        "actualFps": 60,
+        "width": 1920,
+        "height": 1080,
+        "kbps": 16
+      }
+    ],
+    "states": [
+      {
+        "streaming": true,
+        "fps": 60,
+        "width": 1920,
+        "height": 1080,
+        "reason": null
+      },
+      {
+        "streaming": false,
+        "fps": 0,
+        "width": 0,
+        "height": 0,
+        "reason": null
+      }
+    ]
+  }
+}

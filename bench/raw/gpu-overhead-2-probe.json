@@ -1,0 +1,359 @@
+{
+  "url": "ws://127.0.0.1:18500",
+  "monitor": 0,
+  "seconds": 50,
+  "stats": [
+    {
+      "fps": 30,
+      "actualFps": 25.2,
+      "width": 1280,
+      "height": 720,
+      "kbps": 249
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 10
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1280,
+      "height": 720,
+      "kbps": 275
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.2,
+      "width": 1280,
+      "height": 720,
+      "kbps": 275
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1280,
+      "height": 720,
+      "kbps": 273
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 273
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.5,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.4,
+      "width": 1280,
+      "height": 720,
+      "kbps": 276
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 273
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.5,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 282
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.5,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 273
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 273
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 282
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 274
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 282
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 274
+    },
+    {
+      "fps": 30,
+      "actualFps": 26.5,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.5,
+      "width": 1280,
+      "height": 720,
+      "kbps": 278
+    },
+    {
+      "fps": 30,
+      "actualFps": 26.6,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 33.3,
+      "width": 1280,
+      "height": 720,
+      "kbps": 277
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.1,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.3,
+      "width": 1280,
+      "height": 720,
+      "kbps": 259
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.6,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 31.5,
+      "width": 1280,
+      "height": 720,
+      "kbps": 278
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.3,
+      "width": 1280,
+      "height": 720,
+      "kbps": 276
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.8,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 26.2,
+      "width": 1280,
+      "height": 720,
+      "kbps": 264
+    },
+    {
+      "fps": 30,
+      "actualFps": 33.8,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.6,
+      "width": 1280,
+      "height": 720,
+      "kbps": 278
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.7,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.6,
+      "width": 1280,
+      "height": 720,
+      "kbps": 262
+    },
+    {
+      "fps": 30,
+      "actualFps": 30,
+      "width": 1280,
+      "height": 720,
+      "kbps": 4
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.9,
+      "width": 1280,
+      "height": 720,
+      "kbps": 264
+    },
+    {
+      "fps": 30,
+      "actualFps": 29.7,
+      "width": 1280,
+      "height": 720,
+      "kbps": 254
+    },
+    {
+      "fps": 30,
+      "actualFps": 30.5,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    },
+    {
+      "fps": 30,
+      "actualFps": 27.7,
+      "width": 1280,
+      "height": 720,
+      "kbps": 269
+    },
+    {
+      "fps": 30,
+      "actualFps": 31.2,
+      "width": 1280,
+      "height": 720,
+      "kbps": 5
+    }
+  ],
+  "states": [
+    {
+      "streaming": true,
+      "fps": 30,
+      "width": 1280,
+      "height": 720,
+      "reason": null
+    },
+    {
+      "streaming": false,
+      "fps": 0,
+      "width": 0,
+      "height": 0,
+      "reason": null
+    }
+  ]
+}
