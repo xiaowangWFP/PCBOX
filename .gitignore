@@ -24,3 +24,6 @@ config.json
 
 # 基准测试二进制产物（脚本与采样数据保留）
 bench/artifacts/*.jar
+
+# jpackage 生成的免安装镜像（体积大，本地构建产物）
+dist/PhoneConsole/

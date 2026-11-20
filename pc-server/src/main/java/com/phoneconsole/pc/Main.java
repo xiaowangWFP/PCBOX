@@ -47,7 +47,10 @@ public final class Main {
     }
 
     private static void run(String[] args) throws Exception {
-        Path configPath = Path.of(System.getProperty("config", "config.json"));
+        String configOverride = System.getProperty("config");
+        Path configPath = configOverride != null && !configOverride.isBlank()
+                ? Path.of(configOverride)
+                : AppPaths.home().resolve("config.json");
         AppConfig config = ConfigStore.loadOrCreate(configPath);
         ensurePortAvailable(config.network.wsPort, "WebSocket");
         ensurePortAvailable(config.network.httpPort, "网页控制台");

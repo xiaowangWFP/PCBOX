@@ -1,5 +1,6 @@
 package com.phoneconsole.pc.net;
 
+import com.phoneconsole.pc.ToolPaths;
 import com.phoneconsole.pc.config.AppConfig;
 import com.phoneconsole.pc.runtime.LogBuffer;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -79,7 +81,7 @@ public class AdbPortForwarder {
     public AdbPortForwarder(AppConfig.Network network, int wsPort) {
         this.network = network;
         this.port = wsPort;
-        this.status = new Status(network != null ? network.adbExecutable : "adb");
+        this.status = new Status(adb());
     }
 
     /** 配置热重载后更新 adb 路径等参数（轮询间隔需重启生效） */
@@ -92,6 +94,25 @@ public class AdbPortForwarder {
     private AppConfig.Network net() {
         AppConfig.Network current = network;
         return current != null ? current : new AppConfig.Network();
+    }
+
+    private volatile String resolvedAdb;
+    private volatile String resolvedFrom;
+
+    /**
+     * adb 可执行文件：优先用配置值（绝对路径或 PATH 中的名字），
+     * 都找不到时回退到应用目录内的 platform-tools，便于 app-image 免配置运行。
+     */
+    private String adb() {
+        String configured = net().adbExecutable;
+        if (!Objects.equals(configured, resolvedFrom)) {
+            resolvedAdb = ToolPaths.resolve(configured, "platform-tools");
+            resolvedFrom = configured;
+            if (!Objects.equals(configured, resolvedAdb)) {
+                log.info("adb 路径已解析：{} -> {}", configured, resolvedAdb);
+            }
+        }
+        return resolvedAdb == null || resolvedAdb.isBlank() ? "adb" : resolvedAdb;
     }
 
     public void start() {
@@ -128,7 +149,7 @@ public class AdbPortForwarder {
     private void tick() {
         try {
             synchronized (adbLock) {
-                Result devicesResult = run(net().adbExecutable, "devices", "-l");
+                Result devicesResult = run(adb(), "devices", "-l");
                 if (!devicesResult.ok()) {
                     publishStatus(List.of(), false, firstLine(devicesResult.output, "adb 不可用"));
                     lastMapped = "";
@@ -179,10 +200,10 @@ public class AdbPortForwarder {
     public Status probe() {
         synchronized (adbLock) {
             AppConfig.Network net = net();
-            Status snapshot = new Status(net.adbExecutable);
+            Status snapshot = new Status(adb());
             snapshot.checkedAt = System.currentTimeMillis();
 
-            Result devices = run(net.adbExecutable, "devices", "-l");
+            Result devices = run(adb(), "devices", "-l");
             if (!devices.ok()) {
                 adbMissing = devices.unavailable();
                 snapshot.message = firstLine(devices.output, "adb 不可用");
@@ -213,10 +234,10 @@ public class AdbPortForwarder {
     public Status rebuild() {
         synchronized (adbLock) {
             AppConfig.Network net = net();
-            Status snapshot = new Status(net.adbExecutable);
+            Status snapshot = new Status(adb());
             snapshot.checkedAt = System.currentTimeMillis();
 
-            Result devices = run(net.adbExecutable, "devices", "-l");
+            Result devices = run(adb(), "devices", "-l");
             if (!devices.ok()) {
                 adbMissing = devices.unavailable();
                 snapshot.message = firstLine(devices.output, "adb 不可用");
@@ -287,7 +308,7 @@ public class AdbPortForwarder {
     }
 
     private void publishStatus(List<Device> details, boolean available, String message) {
-        Status snapshot = new Status(net().adbExecutable);
+        Status snapshot = new Status(adb());
         snapshot.adbAvailable = available;
         snapshot.deviceDetails = List.copyOf(details);
         snapshot.devices = List.copyOf(onlineSerials(details));
@@ -343,7 +364,7 @@ public class AdbPortForwarder {
 
     private Result execOn(String option, String target, String... args) {
         List<String> command = new ArrayList<>();
-        command.add(net().adbExecutable);
+        command.add(adb());
         command.add(option);
         command.add(target);
         command.addAll(Arrays.asList(args));
@@ -486,8 +507,8 @@ public class AdbPortForwarder {
             if (!adbMissing) {
                 adbMissing = true;
                 log.warn("未检测到 adb（{}），有线模式将不可用；仅影响 USB 直连，无线模式不受影响",
-                        net().adbExecutable);
-                LogBuffer.get().warn("ADB", "未检测到 adb（" + net().adbExecutable + "），有线模式不可用");
+                        adb());
+                LogBuffer.get().warn("ADB", "未检测到 adb（" + adb() + "），有线模式不可用");
             }
             return new Result(-1, "无法执行 " + command[0] + "：" + e.getMessage(), true);
         } catch (InterruptedException e) {
