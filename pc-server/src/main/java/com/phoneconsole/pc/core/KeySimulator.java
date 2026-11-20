@@ -87,6 +87,10 @@ public final class KeySimulator {
      * 明确要求“不休眠、不强制、允许唤醒事件”。
      */
     private static void sleepSystem() {
+        if (isDryRun()) {
+            log.info("[沙箱] 命中睡眠分支：应调用 SetSuspendState(hibernate=false, forceCritical=false, disableWakeEvent=false)，已跳过实际挂起");
+            return;
+        }
         Thread worker = new Thread(() -> {
             try {
                 boolean ok = PowrProfLib.INSTANCE.SetSuspendState(false, false, false);
@@ -101,6 +105,18 @@ public final class KeySimulator {
         }, "system-sleep");
         worker.setDaemon(true);
         worker.start();
+    }
+
+    /**
+     * 沙箱开关：启动参数 -Dphoneconsole.dryRun=true 或环境变量 PHONE_CONSOLE_DRY_RUN=true。
+     * 开启后睡眠只写日志，不会真正挂起系统，用于验证「按钮 → 协议 → 系统调用」这条链路。
+     */
+    static boolean isDryRun() {
+        String property = System.getProperty("phoneconsole.dryRun");
+        if (property != null) {
+            return Boolean.parseBoolean(property);
+        }
+        return Boolean.parseBoolean(System.getenv("PHONE_CONSOLE_DRY_RUN"));
     }
 
     /** powrprof.dll：SetSuspendState(BOOLEAN hibernate, BOOLEAN force, BOOLEAN disableWakeEvent) */
