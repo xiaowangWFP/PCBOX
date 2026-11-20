@@ -211,23 +211,40 @@
       <div id="logList"></div>
     </section>
 
-    <section class="card">
-      <h2>系统操作</h2>
-      <p class="hint" style="margin-top:0;">
-        退出后 PC 端 WebSocket、网页控制台、遥测与 ADB 守护会一并停止，手机端将断开连接。
-        再次使用需重新运行 <code>start.cmd</code>。
-      </p>
-      <div class="row">
-        <button class="danger" id="btnShutdown">退出服务</button>
-      </div>
-      <div class="msg" id="sysMsg"></div>
-      <div class="hint" id="sysInfo">--</div>
-    </section>
+    <div style="display:grid; gap:16px; align-content:start;">
+      <section class="card">
+        <h2>扫码连接 <span class="tag">Wi-Fi</span></h2>
+        <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+          <div id="qrBox" style="background:#fff; padding:10px; border-radius:10px; line-height:0;"></div>
+          <div style="flex:1; min-width:150px;">
+            <div class="path" id="qrUri">--</div>
+            <div class="hint" style="margin-top:8px;">
+              手机端：连接设置 → 扫码连接，对准二维码即可自动填入地址并保存为一个通道。
+            </div>
+            <div class="path" id="qrIps" style="margin-top:8px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>系统操作</h2>
+        <p class="hint" style="margin-top:0;">
+          退出后 PC 端 WebSocket、网页控制台、遥测与 ADB 守护会一并停止，手机端将断开连接。
+          再次使用需重新运行 <code>run.cmd</code>。
+        </p>
+        <div class="row">
+          <button class="danger" id="btnShutdown">退出服务</button>
+        </div>
+        <div class="msg" id="sysMsg"></div>
+        <div class="hint" id="sysInfo">--</div>
+      </section>
+    </div>
   </div>
 
   <footer>手机控制台 · 服务端管理页 &nbsp;|&nbsp; 仅用于服务运行状态与配置维护</footer>
 </div>
 
+<script src="vendor/qrcode.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -476,6 +493,46 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  // ---------------- 扫码连接 ----------------
+  async function refreshConnectInfo() {
+    let data;
+    try {
+      data = await api('/api/connect');
+    } catch (e) {
+      return;
+    }
+    if (!data || !data.ok) return;
+    $('qrUri').textContent = data.uri || '--';
+    const others = (data.ips || []).filter((ip) => ip !== data.host);
+    $('qrIps').textContent = others.length ? ('其它网卡地址：' + others.join('、')) : '';
+    renderQr(data.uri);
+  }
+
+  function renderQr(text) {
+    const box = $('qrBox');
+    if (!text) {
+      box.textContent = '无可用地址';
+      return;
+    }
+    if (typeof qrcode !== 'function') {
+      box.textContent = '二维码库未加载';
+      return;
+    }
+    try {
+      const qr = qrcode(0, 'M');
+      qr.addData(text);
+      qr.make();
+      box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      const svg = box.querySelector('svg');
+      if (svg) {
+        svg.setAttribute('width', '168');
+        svg.setAttribute('height', '168');
+      }
+    } catch (e) {
+      box.textContent = '生成失败：' + e.message;
+    }
+  }
+
   // ---------------- 绑定 ----------------
   $('btnAdbProbe').addEventListener('click', () => adbAction(false));
   $('btnAdbRebuild').addEventListener('click', () => adbAction(true));
@@ -497,9 +554,11 @@
   refreshStatus();
   loadConfig(true);
   refreshLogs();
+  refreshConnectInfo();
 
   setInterval(refreshStatus, 2000);
   setInterval(refreshLogs, 1500);
+  setInterval(refreshConnectInfo, 10000);
 })();
 </script>
 </body>

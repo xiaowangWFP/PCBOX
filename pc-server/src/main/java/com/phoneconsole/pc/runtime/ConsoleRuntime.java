@@ -60,6 +60,11 @@ public final class ConsoleRuntime {
         return configPath;
     }
 
+    /** 实际监听的 WebSocket 端口（供扫码连接生成地址） */
+    public int wsPort() {
+        return boundWsPort;
+    }
+
     public AdbPortForwarder adb() {
         return adb;
     }
