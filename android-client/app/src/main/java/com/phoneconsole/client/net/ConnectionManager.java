@@ -165,6 +165,75 @@ public class ConnectionManager {
         ws.send(payload.toString());
     }
 
+    public void sendAddCustomKey(String pageId, String label, String actionType, String target, String bgColorHex) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "deck_key_add");
+        payload.addProperty("pageId", pageId);
+        payload.addProperty("label", label);
+        payload.addProperty("actionType", actionType);
+        payload.addProperty("target", target);
+        payload.addProperty("bgColorHex", bgColorHex);
+        sendJson(payload);
+    }
+
+    public void sendDeleteCustomKey(String pageId, String buttonId) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "deck_key_delete");
+        payload.addProperty("pageId", pageId);
+        payload.addProperty("buttonId", buttonId);
+        sendJson(payload);
+    }
+
+    public void sendToggleMicMute() {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "mic_mute");
+        sendJson(payload);
+    }
+
+    public void sendQuickHotkey(String combo) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "hotkey");
+        payload.addProperty("combo", combo);
+        sendJson(payload);
+    }
+
+    public void sendRemoteText(String text, boolean pressEnter) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "remote_text");
+        payload.addProperty("text", text);
+        payload.addProperty("pressEnter", pressEnter);
+        sendJson(payload);
+    }
+
+    public void sendTouchpadMove(int dx, int dy) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "touchpad_move");
+        payload.addProperty("dx", dx);
+        payload.addProperty("dy", dy);
+        sendJson(payload);
+    }
+
+    public void sendTouchpadClick(String mouseButton) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "touchpad_click");
+        payload.addProperty("button", mouseButton);
+        sendJson(payload);
+    }
+
+    public void sendTouchpadScroll(int deltaY) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "touchpad_scroll");
+        payload.addProperty("deltaY", deltaY);
+        sendJson(payload);
+    }
+
+    private void sendJson(JsonObject payload) {
+        WebSocket ws = socket;
+        if (ws != null) {
+            ws.send(gson.toJson(payload));
+        }
+    }
+
     /** 请求服务端下发指定面板的布局（用于控制页切换面板） */
     public void requestLayout(String pageId) {
         WebSocket ws = socket;

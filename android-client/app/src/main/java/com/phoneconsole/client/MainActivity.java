@@ -64,10 +64,18 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private static final int DEFAULT_STREAM_HEIGHT = 720;
     private static final int DEFAULT_STREAM_FPS = 30;
 
-    /** 服务端默认页 / 媒体页（用于把新 UI 的快捷指令映射到既有按键） */
+    /** 服务端默认页（媒体快捷指令已并入该页，不再单独维护媒体面板） */
     private static final String DEFAULT_PAGE_ID = "default_page";
-    private static final String MEDIA_PAGE_ID = "media_page";
     private static final String DEFAULT_PORT = "8500";
+
+    /** 快捷指令 → 通用控制页按键 id 的映射 */
+    private static final Map<String, String> MEDIA_BUTTON_ALIAS = Map.of(
+            "media_vol_up", "btn_vol_up",
+            "media_vol_down", "btn_vol_down",
+            "media_mute", "btn_mute",
+            "media_prev", "btn_prev",
+            "media_play", "btn_play",
+            "media_next", "btn_next");
 
     // 布局骨架：竖屏底栏与横屏图标轨互斥，另一侧为 null
     private View topBar;
@@ -171,8 +179,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     private int lastVolumeSent = -1;
     private long lastVolumeInputAt;
-    private long lastUnsupportedToastAt;
-    private String lastUnsupportedFeature = "";
+
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -400,12 +407,17 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
                     @Override
                     public void onDeckKeyDelete(String buttonId, String label) {
-                        notifyUnsupported("删除自定义按键");
+                        connection.sendDeleteCustomKey(currentPageId, buttonId);
                     }
 
                     @Override
                     public void onAddCustomKey(ControlWorkspaceController.CustomKeyDraft draft) {
-                        notifyUnsupported("新增自定义按键");
+                        connection.sendAddCustomKey(
+                                currentPageId,
+                                draft.label,
+                                draft.actionType,
+                                draft.target,
+                                draft.bgColorHex);
                     }
 
                     @Override
@@ -420,7 +432,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
                     @Override
                     public void onToggleMicMute() {
-                        notifyUnsupported("麦克风静音");
+                        connection.sendToggleMicMute();
                     }
 
                     @Override
@@ -439,28 +451,31 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                         if ("alt+tab".equals(combo)) {
                             connection.sendAction(DEFAULT_PAGE_ID, "btn_alt_tab", "click");
                         } else {
-                            notifyUnsupported("快捷键 " + combo);
+                            connection.sendQuickHotkey(combo);
                         }
                     }
 
                     @Override
                     public void onSendRemoteText(String text, boolean pressEnter) {
-                        notifyUnsupported("远程文本输入");
+                        if (text == null || text.isEmpty()) {
+                            return;
+                        }
+                        connection.sendRemoteText(text, pressEnter);
                     }
 
                     @Override
                     public void onTouchpadMove(int dx, int dy) {
-                        notifyUnsupported("触控板鼠标移动");
+                        connection.sendTouchpadMove(dx, dy);
                     }
 
                     @Override
                     public void onTouchpadClick(String mouseButton) {
-                        notifyUnsupported("触控板点击");
+                        connection.sendTouchpadClick(mouseButton);
                     }
 
                     @Override
                     public void onTouchpadScroll(int deltaY) {
-                        notifyUnsupported("触控板滚动");
+                        connection.sendTouchpadScroll(deltaY);
                     }
                 });
     }
@@ -770,7 +785,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         updateVramCard(telemetry.vram, telemetry.vramTotal);
 
         if (controlController != null) {
-            controlController.updateAudioTelemetry(volume, muted, false);
+            controlController.updateAudioTelemetry(volume, muted, telemetry.micMuted);
         }
         if (System.currentTimeMillis() - lastVolumeInputAt > 1500) {
             lastVolumeSent = volume;
@@ -1221,9 +1236,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     // ---------------- 动作映射 ----------------
 
-    /** 新版 UI 的媒体/音量快捷按钮映射到服务端既有的媒体面板按键 */
+    /** 新版 UI 的媒体/音量快捷按钮映射到通用控制页的对应按键 */
     private void sendMedia(String buttonId) {
-        connection.sendAction(MEDIA_PAGE_ID, buttonId, "click");
+        String mapped = MEDIA_BUTTON_ALIAS.getOrDefault(buttonId, buttonId);
+        connection.sendAction(DEFAULT_PAGE_ID, mapped, "click");
     }
 
     /** 音量滑块按差值换算成若干次 volume_up / volume_down */
@@ -1238,22 +1254,11 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             return;
         }
         int steps = Math.min(10, Math.max(1, Math.abs(diff) / 4));
-        String buttonId = diff > 0 ? "media_vol_up" : "media_vol_down";
+        String buttonId = diff > 0 ? "btn_vol_up" : "btn_vol_down";
         for (int i = 0; i < steps; i++) {
-            connection.sendAction(MEDIA_PAGE_ID, buttonId, "click");
+            connection.sendAction(DEFAULT_PAGE_ID, buttonId, "click");
         }
         lastVolumeSent = percent;
-    }
-
-    /** 服务端当前协议尚未提供的能力：明确提示而不是静默失败 */
-    private void notifyUnsupported(String feature) {
-        long now = System.currentTimeMillis();
-        if (feature.equals(lastUnsupportedFeature) && now - lastUnsupportedToastAt < 2500) {
-            return;
-        }
-        lastUnsupportedFeature = feature;
-        lastUnsupportedToastAt = now;
-        Toast.makeText(this, "PC 服务端暂不支持：" + feature, Toast.LENGTH_SHORT).show();
     }
 
     // ---------------- 其它 ----------------

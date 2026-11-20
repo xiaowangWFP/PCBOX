@@ -59,6 +59,14 @@ public final class Main {
 
         ControlWebSocketServer wsServer = new ControlWebSocketServer(
                 new InetSocketAddress("0.0.0.0", config.network.wsPort), config, engine);
+        // 手机端增删自定义按键后，把最新配置写回 config.json
+        wsServer.setConfigPersister(updated -> {
+            try {
+                ConfigStore.save(configPath, updated);
+            } catch (IOException e) {
+                log.error("保存自定义按键配置失败", e);
+            }
+        });
         wsServer.start();
         log.info("手机端连接地址：ws://<PC-IP>:{}", config.network.wsPort);
 

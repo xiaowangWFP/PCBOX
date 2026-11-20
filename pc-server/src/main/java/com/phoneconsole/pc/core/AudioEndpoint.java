@@ -28,9 +28,11 @@ public class AudioEndpoint {
     private static final String IID_IMM_DEVICE_ENUMERATOR = "{A95664D2-9614-4F35-A746-DE8DB63617E6}";
     private static final String IID_IAUDIO_ENDPOINT_VOLUME = "{5CDF2C82-841E-4546-9722-0CF74078229A}";
 
-    private static final int E_RENDER = 0;
+    /** 数据流向：0 = 播放（扬声器），1 = 采集（麦克风） */
     private static final int E_CONSOLE = 0;
     private static final int CLSCTX_ALL = 0x17;
+
+    private final int dataFlow;
 
     private static final int VTABLE_RELEASE = 2;
     private static final int VTABLE_GET_DEFAULT_ENDPOINT = 4;
@@ -44,6 +46,17 @@ public class AudioEndpoint {
     private Pointer device;
     private Pointer endpoint;
     private boolean initialized;
+
+    public AudioEndpoint() {
+        this(0);
+    }
+
+    /**
+     * @param dataFlow 0 = 默认播放设备，1 = 默认采集设备（麦克风）
+     */
+    public AudioEndpoint(int dataFlow) {
+        this.dataFlow = dataFlow;
+    }
 
     /** 系统默认播放端点是否可用 */
     public synchronized boolean isAvailable() {
@@ -145,7 +158,7 @@ public class AudioEndpoint {
                 return;
             }
             PointerByReference deviceRef = new PointerByReference();
-            if (invoke(enumerator, VTABLE_GET_DEFAULT_ENDPOINT, E_RENDER, E_CONSOLE, deviceRef) != 0) {
+            if (invoke(enumerator, VTABLE_GET_DEFAULT_ENDPOINT, dataFlow, E_CONSOLE, deviceRef) != 0) {
                 return;
             }
             device = deviceRef.getValue();
@@ -158,7 +171,9 @@ public class AudioEndpoint {
             }
             endpoint = endpointRef.getValue();
             if (endpoint != null) {
-                log.info("系统音量读取已启用（Windows Core Audio）");
+                log.info(dataFlow == 0
+                        ? "系统音量读取已启用（Windows Core Audio）"
+                        : "麦克风音量/静音控制已启用（Windows Core Audio）");
             }
         } catch (Throwable t) {
             log.warn("Core Audio 初始化失败，音量回退为估算值：{}", t.getMessage());

@@ -72,6 +72,11 @@ public class ActionEngine {
         return media;
     }
 
+    /** 供 WebSocket 层直接调用的麦克风静音切换 */
+    public void toggleMicMute() {
+        media.command("mic_mute");
+    }
+
     public void handle(ActionMessage message) {
         handle(null, message);
     }

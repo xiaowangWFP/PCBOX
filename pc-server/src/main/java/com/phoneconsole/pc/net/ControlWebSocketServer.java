@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.phoneconsole.pc.config.AppConfig;
 import com.phoneconsole.pc.core.ActionEngine;
+import com.phoneconsole.pc.core.KeySimulator;
+import com.phoneconsole.pc.core.MouseController;
 import com.phoneconsole.pc.protocol.ActionMessage;
 import com.phoneconsole.pc.protocol.LayoutMessage;
 import com.phoneconsole.pc.protocol.ScreenDevicesMessage;
@@ -22,10 +24,13 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * 手机端长连接入口：下发页面布局、接收触控动作、广播遥测与按钮状态。
@@ -37,6 +42,8 @@ public class ControlWebSocketServer extends WebSocketServer {
     private final Gson gson = new Gson();
     private volatile AppConfig config;
     private final ActionEngine engine;
+    /** 自定义按键增删后的配置落盘回调，由 Main 注入 */
+    private volatile Consumer<AppConfig> configPersister;
     /** 通道帧率上限来自 config.json（screen.usbFps / screen.lanFps），改动后对后续订阅生效 */
     private static final int USB_FPS_FALLBACK = 30;
     private static final int LAN_FPS_FALLBACK = 24;
@@ -67,6 +74,11 @@ public class ControlWebSocketServer extends WebSocketServer {
         setReuseAddr(true);
         setConnectionLostTimeout(30);
         engine.setStateSink(this::broadcast);
+    }
+
+    /** 注入配置落盘回调：自定义按键增删后由 Main 负责写回 config.json */
+    public void setConfigPersister(Consumer<AppConfig> persister) {
+        this.configPersister = persister;
     }
 
     /** 配置热重载：替换快照，并更新后续新客户端使用的默认采集目标 */
@@ -128,7 +140,11 @@ public class ControlWebSocketServer extends WebSocketServer {
         }
     }
 
-    /** 在线连接数（手机端与网页端都计入） */
+    /**
+     * 在线手机端数量。
+     * 网页控制台是纯 HTTP 管理页，不再建立 WebSocket 连接，因此这里统计到的都是手机端，
+     * PC 自身不会出现在「在线设备」里。
+     */
     public int clientCount() {
         return getConnections().size();
     }
@@ -198,6 +214,31 @@ public class ControlWebSocketServer extends WebSocketServer {
                     broadcastLayout(pageId);
                 }
             }
+            case "hotkey" -> {
+                String combo = json.has("combo") ? json.get("combo").getAsString() : "";
+                KeySimulator.pressCombo(combo);
+            }
+            case "remote_text" -> {
+                String text = json.has("text") ? json.get("text").getAsString() : "";
+                boolean pressEnter = json.has("pressEnter") && json.get("pressEnter").getAsBoolean();
+                KeySimulator.typeText(text, pressEnter);
+            }
+            case "touchpad_move" -> {
+                int dx = json.has("dx") ? json.get("dx").getAsInt() : 0;
+                int dy = json.has("dy") ? json.get("dy").getAsInt() : 0;
+                MouseController.moveBy(dx, dy);
+            }
+            case "touchpad_click" -> {
+                String button = json.has("button") ? json.get("button").getAsString() : "left";
+                MouseController.click(button);
+            }
+            case "touchpad_scroll" -> {
+                int deltaY = json.has("deltaY") ? json.get("deltaY").getAsInt() : 0;
+                MouseController.scroll(deltaY);
+            }
+            case "mic_mute" -> engine.toggleMicMute();
+            case "deck_key_add" -> handleDeckKeyAdd(json);
+            case "deck_key_delete" -> handleDeckKeyDelete(json);
             default -> log.debug("忽略消息类型：{}", type);
         }
     }
@@ -438,6 +479,92 @@ public class ControlWebSocketServer extends WebSocketServer {
         }
         streamers.clear();
         connMonitors.clear();
+    }
+
+    /** 新增自定义按键：写入配置并广播最新布局 */
+    private synchronized void handleDeckKeyAdd(JsonObject json) {
+        String pageId = json.has("pageId") ? json.get("pageId").getAsString() : config.defaultPageId;
+        String label = json.has("label") ? json.get("label").getAsString().trim() : "";
+        String actionType = json.has("actionType") ? json.get("actionType").getAsString().trim() : "";
+        String target = json.has("target") ? json.get("target").getAsString().trim() : "";
+        String bgColorHex = json.has("bgColorHex") ? json.get("bgColorHex").getAsString().trim() : "#1E293B";
+
+        if (label.isEmpty() || actionType.isEmpty() || target.isEmpty()) {
+            log.warn("忽略新增按键：参数不完整（label={} type={} target={}）", label, actionType, target);
+            return;
+        }
+        AppConfig.PageConfig page = findPage(pageId);
+        if (page == null) {
+            log.warn("新增按键失败：页面不存在 {}", pageId);
+            return;
+        }
+
+        AppConfig.ActionConfig action = new AppConfig.ActionConfig();
+        action.type = actionType;
+        switch (actionType) {
+            case "hotkey" -> action.keys = Arrays.stream(target.toLowerCase().split("\\+"))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+            case "media" -> action.command = target.toLowerCase();
+            case "launch", "url", "script" -> action.target = target;
+            default -> {
+                log.warn("忽略新增按键：不支持的动作类型 {}", actionType);
+                return;
+            }
+        }
+
+        AppConfig.ButtonConfig button = new AppConfig.ButtonConfig();
+        button.id = "custom_" + UUID.randomUUID().toString().substring(0, 8);
+        button.label = label;
+        button.bgColor = bgColorHex.isEmpty() ? "#1E293B" : bgColorHex;
+        button.state = "normal";
+        button.action = action;
+
+        page.buttons.add(button);
+        persistConfig();
+        log.info("新增自定义按键：{}（{} -> {}）", button.label, actionType, target);
+        LogBuffer.get().info("DECK", "新增自定义按键：" + button.label);
+        broadcastLayout(page.id);
+    }
+
+    /** 删除自定义按键：写入配置并广播最新布局 */
+    private synchronized void handleDeckKeyDelete(JsonObject json) {
+        String pageId = json.has("pageId") ? json.get("pageId").getAsString() : config.defaultPageId;
+        String buttonId = json.has("buttonId") ? json.get("buttonId").getAsString().trim() : "";
+        if (buttonId.isEmpty()) {
+            return;
+        }
+        AppConfig.PageConfig page = findPage(pageId);
+        if (page == null) {
+            return;
+        }
+        boolean removed = page.buttons.removeIf(b -> buttonId.equals(b.id));
+        if (removed) {
+            persistConfig();
+            log.info("删除自定义按键：{}", buttonId);
+            LogBuffer.get().info("DECK", "删除自定义按键：" + buttonId);
+            broadcastLayout(page.id);
+        }
+    }
+
+    private AppConfig.PageConfig findPage(String pageId) {
+        if (config == null || config.pages == null) {
+            return null;
+        }
+        for (AppConfig.PageConfig page : config.pages) {
+            if (page.id != null && page.id.equals(pageId)) {
+                return page;
+            }
+        }
+        return config.pages.isEmpty() ? null : config.pages.get(0);
+    }
+
+    private void persistConfig() {
+        Consumer<AppConfig> persister = configPersister;
+        if (persister != null) {
+            persister.accept(config);
+        }
     }
 
     private LayoutMessage buildLayout(String pageId) {
