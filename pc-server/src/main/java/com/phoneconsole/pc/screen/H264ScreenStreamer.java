@@ -1,6 +1,5 @@
 package com.phoneconsole.pc.screen;
 
-import com.phoneconsole.pc.ToolPaths;
 import com.phoneconsole.pc.config.AppConfig;
 import com.phoneconsole.pc.runtime.LogBuffer;
 import org.java_websocket.WebSocket;
@@ -202,11 +201,7 @@ public final class H264ScreenStreamer {
 
     private String executable() {
         String value = screen().ffmpegExecutable;
-        if (value == null || value.isBlank()) {
-            return "";
-        }
-        // 依次尝试 PATH、应用目录下的 bin、应用目录本身，便于 app-image 免配置
-        return ToolPaths.resolve(value.trim(), "bin", ".");
+        return value == null ? "" : value.trim();
     }
 
     private List<String> command(int target, int mode, int width, int height) {
@@ -383,8 +378,7 @@ public final class H264ScreenStreamer {
                 if (!isActive(session)) {
                     break;
                 }
-                String message = "无法启动 H.264 编码器（" + executable() + "）：" + e.getMessage()
-                        + "。请安装 ffmpeg 并加入 PATH，或把 ffmpeg.exe 放到应用目录的 bin 下";
+                String message = "无法启动 H.264 编码器（" + executable() + "）：" + e.getMessage();
                 log.warn(message);
                 LogBuffer.get().error("SCREEN", message);
                 failAll("encoder_unavailable", session);

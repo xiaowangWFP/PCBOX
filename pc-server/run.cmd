@@ -5,9 +5,13 @@ cd /d "%~dp0"
 title 手机控制台 - PC 服务端
 
 echo ================================================================
-echo  Hello~~~~~~
+echo  手机控制台 PC 服务端（唯一入口）
+echo.
+echo  * 本窗口开着 = 服务在跑；关闭本窗口 = 服务停止
+echo  * 每次启动都会先结束旧实例，再启动新实例，无需手动 stop
+echo  * 启动完成后会自动打开网页控制台
 echo ================================================================
-echo. 
+echo.
 
 echo [1/3] 结束旧实例...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ports=@(8500,8501); $ids = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $ports -contains $_.LocalPort } | Select-Object -ExpandProperty OwningProcess -Unique; foreach ($id in $ids) { $p = Get-Process -Id $id -ErrorAction SilentlyContinue; if ($p -and ($p.ProcessName -eq 'java' -or $p.ProcessName -eq 'javaw')) { Write-Host ('  结束旧实例 PID ' + $id); Stop-Process -Id $id -Force -ErrorAction SilentlyContinue } }"
@@ -19,7 +23,6 @@ if errorlevel 1 (
     echo   端口 8500 / 8501 仍被占用，且占用者不是 java 进程。
     echo   请检查是否有其他程序占用了这两个端口后重试。
     pause
-    
     exit /b 1
 )
 echo   旧实例已清理完成
