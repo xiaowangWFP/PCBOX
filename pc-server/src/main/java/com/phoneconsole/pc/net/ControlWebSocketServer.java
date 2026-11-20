@@ -44,6 +44,11 @@ public class ControlWebSocketServer extends WebSocketServer {
     private final ActionEngine engine;
     /** 自定义按键增删后的配置落盘回调，由 Main 注入 */
     private volatile Consumer<AppConfig> configPersister;
+
+    private static final String CLIENT_WEB = "web";
+    private static final String CLIENT_PHONE = "phone";
+    /** 每条连接的客户端类型：默认手机端，收到 client_hello 后按声明改写 */
+    private final Map<WebSocket, String> clientKinds = new ConcurrentHashMap<>();
     /** 通道帧率上限来自 config.json（screen.usbFps / screen.lanFps），改动后对后续订阅生效 */
     private static final int USB_FPS_FALLBACK = 30;
     private static final int LAN_FPS_FALLBACK = 24;
@@ -141,12 +146,28 @@ public class ControlWebSocketServer extends WebSocketServer {
     }
 
     /**
-     * 在线手机端数量。
-     * 网页控制台是纯 HTTP 管理页，不再建立 WebSocket 连接，因此这里统计到的都是手机端，
-     * PC 自身不会出现在「在线设备」里。
+     * 在线手机端数量：连接后主动声明 client=web 的是浏览器控制端，
+     * 不计入「在线设备」，避免把 PC 上的网页端当成一台手机。
      */
     public int clientCount() {
-        return getConnections().size();
+        int count = 0;
+        for (String kind : clientKinds.values()) {
+            if (!CLIENT_WEB.equals(kind)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** 网页控制端（浏览器）连接数 */
+    public int webClientCount() {
+        int count = 0;
+        for (String kind : clientKinds.values()) {
+            if (CLIENT_WEB.equals(kind)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /** 配置热重载后重新校验当前页面并广播最新布局 */
@@ -171,6 +192,7 @@ public class ControlWebSocketServer extends WebSocketServer {
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
+        clientKinds.put(conn, CLIENT_PHONE);
         boolean usb = isUsbChannel(conn);
         log.info("手机端接入：{}（{} 通道）", conn.getRemoteSocketAddress(), usb ? "USB" : "LAN");
         LogBuffer.get().info("WS", "客户端接入（" + (usb ? "USB" : "LAN") + "）：" + conn.getRemoteSocketAddress());
@@ -208,6 +230,13 @@ public class ControlWebSocketServer extends WebSocketServer {
                 }
             }
             case "screen_control" -> handleScreenControl(conn, json);
+            case "client_hello" -> {
+                String kind = json.has("client") ? json.get("client").getAsString() : "";
+                if (CLIENT_WEB.equalsIgnoreCase(kind)) {
+                    clientKinds.put(conn, CLIENT_WEB);
+                    log.info("网页控制端接入：{}", conn.getRemoteSocketAddress());
+                }
+            }
             case "layout_request" -> {
                 String pageId = json.has("pageId") ? json.get("pageId").getAsString() : null;
                 if (pageId != null && !pageId.isBlank()) {
@@ -245,6 +274,7 @@ public class ControlWebSocketServer extends WebSocketServer {
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
+        clientKinds.remove(conn);
         log.info("手机端断开：code={} reason={} remote={}", code, reason, remote);
         LogBuffer.get().info("WS", "客户端断开：code=" + code + (reason == null || reason.isBlank() ? "" : " " + reason));
         engine.stopAllRepeats(conn);

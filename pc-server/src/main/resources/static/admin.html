@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PC 服务端管理 · 手机控制台</title>
+<style>
+  :root {
+    --bg: #0b0d11;
+    --panel: #12151c;
+    --panel-2: #171b24;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --text: #f3f5f8;
+    --text-2: #9aa3b2;
+    --text-3: #6e7788;
+    --accent: #60a5fa;
+    --accent-deep: #3b82f6;
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+    --purple: #a78bfa;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 20% -10%, #16233a 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .3px; }
+  header .sub { color: var(--text-3); font-size: 12.5px; }
+  .spacer { flex: 1; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--line);
+    color: var(--text-2); font-size: 12.5px; font-variant-numeric: tabular-nums;
+  }
+  a.pill { text-decoration: none; }
+  a.pill:hover { color: var(--text); border-color: var(--line-strong); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 0 4px rgba(34, 197, 94, .14); }
+  .dot.off { background: var(--bad); box-shadow: 0 0 0 4px rgba(239, 68, 68, .14); }
+
+  .grid { display: grid; gap: 16px; }
+  .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 900px) {
+    .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .card h2 {
+    font-size: 13px; margin: 0 0 12px;
+    color: var(--text-2); font-weight: 600; letter-spacing: .4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .tag {
+    font-size: 11px; color: var(--text-3); font-weight: 400;
+    border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px;
+  }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat { background: rgba(255,255,255,.02); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .stat .k { color: var(--text-3); font-size: 11.5px; }
+  .stat .v { font-family: ui-monospace, Consolas, monospace; font-size: 16px; margin-top: 2px; }
+  .stat .v.small { font-size: 13px; color: var(--text-2); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--text-3); font-weight: 500; }
+  td { color: var(--text-2); font-family: ui-monospace, Consolas, monospace; }
+  tr:last-child td { border-bottom: none; }
+  .empty { color: var(--text-3); font-size: 12.5px; padding: 12px 0; }
+
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .between { display: flex; align-items: center; gap: 10px; }
+  .between .spacer { flex: 1; }
+
+  button {
+    font: inherit; cursor: pointer; border-radius: 9px;
+    border: 1px solid var(--line-strong);
+    background: var(--panel-2); color: var(--text);
+    padding: 7px 14px; font-size: 12.5px;
+    transition: border-color .15s, background .15s, transform .1s;
+  }
+  button:hover { border-color: var(--accent); color: #bfdbfe; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent-deep); border-color: transparent; color: #fff; }
+  button.primary:hover { background: #2563eb; color: #fff; }
+  button.danger { border-color: rgba(239, 68, 68, .45); color: #fca5a5; }
+  button.danger:hover { background: rgba(239, 68, 68, .14); border-color: var(--bad); color: #fecaca; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  textarea {
+    width: 100%; min-height: 300px; resize: vertical;
+    background: #0d1117; color: #dbe3f0;
+    border: 1px solid var(--line-strong); border-radius: 10px;
+    padding: 12px 14px; font-family: ui-monospace, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.55; outline: none;
+  }
+  textarea:focus { border-color: var(--accent); }
+
+  .path {
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    color: var(--text-3); word-break: break-all;
+  }
+
+  .hint { color: var(--text-3); font-size: 12px; margin-top: 8px; }
+  .msg { font-size: 12.5px; margin-top: 10px; min-height: 18px; }
+  .msg.ok { color: #86efac; }
+  .msg.err { color: #fca5a5; }
+  .msg.warn { color: #fcd34d; }
+
+  #logList {
+    height: 300px; overflow: auto; border: 1px solid var(--line);
+    border-radius: 10px; background: #0a0d12; padding: 8px 10px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+  }
+  .log-line { display: flex; gap: 10px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.03); }
+  .log-line .t { color: var(--text-3); flex: 0 0 auto; }
+  .log-line .lv { flex: 0 0 46px; font-weight: 600; }
+  .log-line .tg { color: var(--purple); flex: 0 0 auto; min-width: 46px; }
+  .log-line .ms { color: var(--text-2); word-break: break-all; }
+  .lv-INFO { color: #7dd3fc; }
+  .lv-WARN { color: var(--warn); }
+  .lv-ERROR { color: var(--bad); }
+
+  footer { margin-top: 26px; color: var(--text-3); font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>服务端管理</h1>
+    <span class="sub">手机控制台 · PC 服务端</span>
+    <span class="spacer"></span>
+    <span class="pill"><span class="dot" id="statusDot"></span><span id="statusText">连接中…</span></span>
+    <span class="pill" id="uptimePill">运行 --</span>
+    <a class="pill" href="/" rel="noopener">手机控制端</a>
+    </header>
+
+  <div class="grid cols-2" style="margin-bottom:16px;">
+    <section class="card">
+      <h2>服务概览 <span class="tag">实时</span></h2>
+      <div class="stats">
+        <div class="stat"><div class="k">WebSocket 端口</div><div class="v" id="statWs">--</div></div>
+        <div class="stat"><div class="k">HTTP 端口</div><div class="v" id="statHttp">--</div></div>
+        <div class="stat"><div class="k">在线设备</div><div class="v" id="statClients">--</div></div>
+        <div class="stat"><div class="k">网页控制端</div><div class="v" id="statWeb">--</div></div>
+        <div class="stat"><div class="k">运行时长</div><div class="v" id="statUptime">--</div></div>
+        <div class="stat"><div class="k">日志条数</div><div class="v" id="statLogs">--</div></div>
+        <div class="stat"><div class="k">配置修改时间</div><div class="v small" id="statConfigTime">--</div></div>
+        <div class="stat"><div class="k">Wi-Fi 连接地址</div><div class="v small" id="statEndpoint">--</div></div>
+      </div>
+      <div class="hint">在线设备只统计手机端；浏览器打开的网页控制端单独计入「网页控制端」，不会混进设备数。</div>
+    </section>
+
+    <section class="card">
+      <h2>设备与通道 <span class="tag">ADB</span></h2>
+      <div class="between" style="margin-bottom:10px;">
+        <div class="path" id="adbPath">--</div>
+        <span class="spacer"></span>
+        <button id="btnAdbProbe">检测</button>
+        <button id="btnAdbRebuild">重建映射</button>
+      </div>
+      <div class="path" id="adbState" style="margin-bottom:8px;">--</div>
+      <table>
+        <thead><tr><th style="width:38%">设备</th><th style="width:22%">状态</th><th>型号</th></tr></thead>
+        <tbody id="adbDevices"><tr><td colspan="3" class="empty">暂无设备</td></tr></tbody>
+      </table>
+      <div class="hint" id="adbMappings"></div>
+      <div class="msg" id="adbMsg"></div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-bottom:16px;">
+    <h2>配置管理 <span class="tag">config.json</span></h2>
+    <div class="between" style="margin-bottom:10px;">
+      <div class="path" id="configPath">--</div>
+      <span class="spacer"></span>
+      <span class="path" id="configDirty"></span>
+      <button id="btnConfigReload">重新载入</button>
+      <button class="primary" id="btnConfigSave">保存并热重载</button>
+    </div>
+    <textarea id="configEditor" spellcheck="false"></textarea>
+    <div class="msg" id="configMsg"></div>
+    <div class="hint">保存前会校验 JSON 与字段范围；校验失败不会写入文件，运行中的旧配置保持不变。端口 / adb 路径 / 轮询间隔改动需重启服务生效。</div>
+  </section>
+
+  <div class="grid cols-2">
+    <section class="card">
+      <h2>运行日志 <span class="tag" id="logTag">--</span></h2>
+      <div class="between" style="margin-bottom:10px;">
+        <label class="hint" style="margin:0;"><input type="checkbox" id="logAutoScroll" checked /> 自动滚动</label>
+        <span class="spacer"></span>
+        <button id="btnLogClear">清空日志</button>
+      </div>
+      <div id="logList"></div>
+    </section>
+
+    <div style="display:grid; gap:16px; align-content:start;">
+      <section class="card">
+        <h2>扫码连接 <span class="tag">Wi-Fi</span></h2>
+        <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+          <div id="qrBox" style="background:#fff; padding:10px; border-radius:10px; line-height:0;"></div>
+          <div style="flex:1; min-width:150px;">
+            <div class="path" id="qrUri">--</div>
+            <div class="row" style="margin-top:8px;">
+              <button id="btnCopyUri">复制地址</button>
+            </div>
+            <div class="hint" style="margin-top:8px;">
+              手机端：连接设置 → 扫码连接，对准二维码即可自动填入地址并保存为一个通道。
+            </div>
+            <div class="path" id="qrIps" style="margin-top:8px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>系统操作</h2>
+        <p class="hint" style="margin-top:0;">
+          退出后 PC 端 WebSocket、网页控制台、遥测与 ADB 守护会一并停止，手机端将断开连接。
+          再次使用需重新运行 <code>run.cmd</code>。
+        </p>
+        <div class="row">
+          <button class="danger" id="btnShutdown">退出服务</button>
+        </div>
+        <div class="msg" id="sysMsg"></div>
+        <div class="hint" id="sysInfo">--</div>
+      </section>
+    </div>
+  </div>
+
+  <footer>手机控制台 · 服务端管理页 &nbsp;|&nbsp; 仅用于服务运行状态与配置维护</footer>
+</div>
+
+<script src="vendor/qrcode.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  const state = {
+    logSeq: 0,
+    configLoaded: false,
+    configDirty: false,
+    busy: false,
+  };
+
+  async function api(path, options) {
+    const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = { ok: false, error: text }; }
+    if (!res.ok && (!data || data.ok !== false)) {
+      return { ok: false, error: 'HTTP ' + res.status };
+    }
+    return data || { ok: false, error: '空响应' };
+  }
+
+  function fmtDuration(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return '--';
+    const s = Math.floor(ms / 1000);
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (d > 0) return d + ' 天 ' + h + ' 小时';
+    if (h > 0) return h + ' 小时 ' + m + ' 分';
+    if (m > 0) return m + ' 分 ' + sec + ' 秒';
+    return sec + ' 秒';
+  }
+
+  function fmtTime(ts) {
+    if (!ts) return '--';
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  function fmtDateTime(ts) {
+    if (!ts) return '--';
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, '0');
+    return (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  function setMsg(id, text, kind) {
+    const el = $(id);
+    el.textContent = text || '';
+    el.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+
+  // ---------------- 状态轮询 ----------------
+  async function refreshStatus() {
+    let data;
+    try {
+      data = await api('/api/status');
+    } catch (e) {
+      data = { ok: false };
+    }
+    if (!data.ok) {
+      $('statusDot').className = 'dot off';
+      $('statusText').textContent = '服务未响应';
+      $('uptimePill').textContent = '运行 --';
+      return;
+    }
+    $('statusDot').className = 'dot on';
+    $('statusText').textContent = data.shuttingDown ? '正在退出' : '服务运行中';
+    $('uptimePill').textContent = '运行 ' + fmtDuration(data.uptimeMs);
+
+    $('statWs').textContent = data.wsPort || '--';
+    $('statHttp').textContent = data.httpPort || '--';
+    $('statClients').textContent = (data.clients || 0) + ' 台';
+    $('statWeb').textContent = (data.webClients || 0) + ' 个';
+    $('statUptime').textContent = fmtDuration(data.uptimeMs);
+    $('statLogs').textContent = data.logCount == null ? '--' : data.logCount;
+    $('statConfigTime').textContent = fmtDateTime(data.configModified);
+    $('configPath').textContent = data.configPath || '--';
+    $('sysInfo').textContent = '配置：' + (data.configPath || '--');
+
+    renderAdb(data.adb);
+  }
+
+  function renderAdb(adb) {
+    if (!adb) {
+      $('adbPath').textContent = '--';
+      $('adbState').textContent = '--';
+      return;
+    }
+    $('adbPath').textContent = 'adb：' + (adb.executable || '--');
+    const okText = adb.available ? '可用' : '不可用';
+    const msg = adb.message ? ' · ' + adb.message : '';
+    $('adbState').textContent = '状态：' + okText + ' · 监听端口 ' + (adb.port || '--') + msg;
+    $('adbState').style.color = adb.available ? 'var(--text-2)' : '#fca5a5';
+
+    const body = $('adbDevices');
+    const details = adb.deviceDetails || [];
+    if (!details.length) {
+      body.innerHTML = '<tr><td colspan="3" class="empty">暂无已连接设备</td></tr>';
+    } else {
+      body.innerHTML = details.map((d) =>
+        '<tr><td>' + esc(d.serial || '--') + '</td><td>' + esc(d.state || '--') + '</td><td>' + esc(d.model || '--') + '</td></tr>'
+      ).join('');
+    }
+
+    const mappings = adb.mappings || [];
+    if (mappings.length) {
+      $('adbMappings').textContent = '端口映射：' + mappings.join('；');
+    } else if (details.length) {
+      $('adbMappings').textContent = '端口映射：同步中（每 10 秒自动检测一次，也可以点「重建映射」）';
+    } else {
+      $('adbMappings').textContent = '端口映射：无（未检测到已授权设备）';
+    }
+  }
+
+  async function adbAction(rebuild) {
+    setMsg('adbMsg', rebuild ? '正在重建端口映射…' : '正在检测 ADB…');
+    try {
+      const data = await api(rebuild ? '/api/adb/reverse' : '/api/adb', { method: rebuild ? 'POST' : 'GET' });
+      if (data.ok) {
+        renderAdb(data.adb);
+        setMsg('adbMsg', rebuild ? '端口映射已重建' : '检测完成', 'ok');
+      } else {
+        setMsg('adbMsg', data.error || '操作失败', 'err');
+      }
+    } catch (e) {
+      setMsg('adbMsg', '请求失败：' + e.message, 'err');
+    }
+  }
+
+  // ---------------- 配置 ----------------
+  async function loadConfig(force) {
+    if (state.configDirty && !force) {
+      return;
+    }
+    try {
+      const data = await api('/api/config');
+      if (!data.ok) {
+        setMsg('configMsg', data.error || '读取配置失败', 'err');
+        return;
+      }
+      $('configEditor').value = data.content || '';
+      $('configPath').textContent = data.path || '--';
+      state.configLoaded = true;
+      state.configDirty = false;
+      $('configDirty').textContent = '';
+      setMsg('configMsg', '已载入当前配置', 'ok');
+    } catch (e) {
+      setMsg('configMsg', '读取配置失败：' + e.message, 'err');
+    }
+  }
+
+  async function saveConfig() {
+    const content = $('configEditor').value;
+    if (!content.trim()) {
+      setMsg('configMsg', '配置内容为空', 'err');
+      return;
+    }
+    $('btnConfigSave').disabled = true;
+    setMsg('configMsg', '正在校验并保存…');
+    try {
+      const data = await api('/api/config', { method: 'POST', body: content });
+      if (data.ok) {
+        state.configDirty = false;
+        $('configDirty').textContent = '';
+        const warnings = data.warnings || [];
+        if (warnings.length) {
+          setMsg('configMsg', (data.message || '已保存') + '；' + warnings.join('；'), 'warn');
+        } else {
+          setMsg('configMsg', (data.message || '已保存') + '（' + fmtTime(data.configModified) + '）', 'ok');
+        }
+        refreshStatus();
+      } else {
+        setMsg('configMsg', data.error || '保存失败', 'err');
+      }
+    } catch (e) {
+      setMsg('configMsg', '保存失败：' + e.message, 'err');
+    } finally {
+      $('btnConfigSave').disabled = false;
+    }
+  }
+
+  // ---------------- 日志 ----------------
+  async function refreshLogs() {
+    let data;
+    try {
+      data = await api('/api/logs?since=' + state.logSeq + '&limit=200');
+    } catch (e) {
+      return;
+    }
+    if (!data || !data.ok) return;
+    const entries = data.entries || [];
+    if (entries.length) {
+      const list = $('logList');
+      const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 24;
+      const frag = document.createDocumentFragment();
+      entries.forEach((e) => {
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.innerHTML =
+          '<span class="t">' + fmtTime(e.time) + '</span>' +
+          '<span class="lv lv-' + esc(e.level) + '">' + esc(e.level) + '</span>' +
+          '<span class="tg">' + esc(e.tag || '') + '</span>' +
+          '<span class="ms">' + esc(e.message || '') + '</span>';
+        frag.appendChild(line);
+      });
+      list.appendChild(frag);
+      while (list.childElementCount > 600) {
+        list.removeChild(list.firstElementChild);
+      }
+      if ($('logAutoScroll').checked && atBottom) {
+        list.scrollTop = list.scrollHeight;
+      }
+      state.logSeq = data.lastSeq;
+      $('logTag').textContent = 'seq ' + data.lastSeq;
+    } else if (data.lastSeq != null) {
+      state.logSeq = data.lastSeq;
+    }
+  }
+
+  async function clearLogs() {
+    const data = await api('/api/logs/clear', { method: 'POST' });
+    if (data && data.ok) {
+      $('logList').innerHTML = '';
+      state.logSeq = data.lastSeq || 0;
+      $('logTag').textContent = 'seq ' + state.logSeq;
+    }
+  }
+
+  // ---------------- 系统 ----------------
+  async function shutdownService() {
+    if (!confirm('确认退出 PC 服务端？退出后手机端会断开，需要重新运行 run.cmd 才能恢复。')) {
+      return;
+    }
+    $('btnShutdown').disabled = true;
+    setMsg('sysMsg', '正在退出服务…');
+    try {
+      const data = await api('/api/shutdown', { method: 'POST' });
+      setMsg('sysMsg', data && data.ok ? '服务正在退出，可关闭此页面' : ((data && data.error) || '退出失败'), data && data.ok ? 'ok' : 'err');
+    } catch (e) {
+      setMsg('sysMsg', '已发送退出请求（连接中断属正常现象）', 'warn');
+    }
+  }
+
+  function esc(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ---------------- 扫码连接 ----------------
+  let connectUri = '';
+
+  async function refreshConnectInfo() {
+    let data;
+    try {
+      data = await api('/api/connect');
+    } catch (e) {
+      return;
+    }
+    if (!data || !data.ok) return;
+    connectUri = data.uri || '';
+    $('qrUri').textContent = data.uri || '--';
+    $('statEndpoint').textContent = data.uri || '--';
+    const others = (data.ips || []).filter((ip) => ip !== data.host);
+    $('qrIps').textContent = others.length ? ('其它网卡地址：' + others.join('、')) : '';
+    renderQr(data.uri);
+  }
+
+  function copyConnectUri() {
+    if (!connectUri) {
+      return;
+    }
+    const btn = $('btnCopyUri');
+    const original = btn.textContent;
+    const done = () => {
+      btn.textContent = '已复制';
+      setTimeout(() => { btn.textContent = original; }, 1200);
+    };
+    const fallback = () => {
+      const area = document.createElement('textarea');
+      area.value = connectUri;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      try {
+        document.execCommand('copy');
+        done();
+      } catch (e) {
+        btn.textContent = '复制失败';
+        setTimeout(() => { btn.textContent = original; }, 1200);
+      }
+      document.body.removeChild(area);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(connectUri).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function renderQr(text) {
+    const box = $('qrBox');
+    if (!text) {
+      box.textContent = '无可用地址';
+      return;
+    }
+    if (typeof qrcode !== 'function') {
+      box.textContent = '二维码库未加载';
+      return;
+    }
+    try {
+      const qr = qrcode(0, 'M');
+      qr.addData(text);
+      qr.make();
+      box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      const svg = box.querySelector('svg');
+      if (svg) {
+        svg.setAttribute('width', '168');
+        svg.setAttribute('height', '168');
+      }
+    } catch (e) {
+      box.textContent = '生成失败：' + e.message;
+    }
+  }
+
+  // ---------------- 绑定 ----------------
+  $('btnCopyUri').addEventListener('click', copyConnectUri);
+  $('btnAdbProbe').addEventListener('click', () => adbAction(false));
+  $('btnAdbRebuild').addEventListener('click', () => adbAction(true));
+  $('btnConfigReload').addEventListener('click', () => {
+    if (state.configDirty && !confirm('编辑器中有未保存的修改，确认放弃并重新载入？')) {
+      return;
+    }
+    loadConfig(true);
+  });
+  $('btnConfigSave').addEventListener('click', saveConfig);
+  $('btnLogClear').addEventListener('click', clearLogs);
+  $('btnShutdown').addEventListener('click', shutdownService);
+
+  $('configEditor').addEventListener('input', () => {
+    state.configDirty = true;
+    $('configDirty').textContent = '未保存';
+  });
+
+  refreshStatus();
+  loadConfig(true);
+  refreshLogs();
+  refreshConnectInfo();
+
+  setInterval(refreshStatus, 2000);
+  setInterval(refreshLogs, 1500);
+  setInterval(refreshConnectInfo, 10000);
+})();
+</script>
+</body>
+</html>

@@ -85,6 +85,7 @@ public final class ConsoleRuntime {
         status.put("adbExecutable", snapshot.network.adbExecutable);
         status.put("reversePollMs", snapshot.network.reversePollMs);
         status.put("clients", wsServer.clientCount());
+        status.put("webClients", wsServer.webClientCount());
         status.put("adb", adb.statusMap());
         status.put("logCount", LogBuffer.get().size());
         status.put("shuttingDown", shuttingDown);
