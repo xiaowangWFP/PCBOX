@@ -49,6 +49,12 @@ public class ControlWebSocketServer extends WebSocketServer {
     private static final String CLIENT_PHONE = "phone";
     /** 每条连接的客户端类型：默认手机端，收到 client_hello 后按声明改写 */
     private final Map<WebSocket, String> clientKinds = new ConcurrentHashMap<>();
+    /** 遥测快照提供方：连接建立时立即给新客户端一帧 */
+    private volatile java.util.function.Supplier<String> telemetrySource;
+
+    public void setTelemetrySource(java.util.function.Supplier<String> source) {
+        this.telemetrySource = source;
+    }
     /** 通道帧率上限来自 config.json（screen.usbFps / screen.lanFps），改动后对后续订阅生效 */
     private static final int USB_FPS_FALLBACK = 30;
     private static final int LAN_FPS_FALLBACK = 24;
@@ -203,6 +209,15 @@ public class ControlWebSocketServer extends WebSocketServer {
         session.screenStream = true;
         session.screenMaxFps = usb ? usbFps() : lanFps();
         conn.send(gson.toJson(session));
+
+        java.util.function.Supplier<String> telemetry = telemetrySource;
+        if (telemetry != null) {
+            try {
+                conn.send(telemetry.get());
+            } catch (Exception e) {
+                log.debug("首帧遥测下发失败：{}", e.getMessage());
+            }
+        }
 
         String pageId = currentPageId != null ? currentPageId : config.defaultPageId;
         LayoutMessage layout = buildLayout(pageId);
