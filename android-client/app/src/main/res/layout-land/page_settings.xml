@@ -36,6 +36,46 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Spinner
+                    android:id="@+id/spinnerChannels"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:minWidth="100dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/btnAddChannel"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:minHeight="36dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="添加" />
+
+                <TextView
+                    android:id="@+id/btnDeleteChannel"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:minHeight="36dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="删除" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <LinearLayout
@@ -92,14 +132,31 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/btnReconnect"
-                style="@style/ConsolePrimaryButton"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="38dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:minHeight="38dp"
-                android:text="保存并重新连接" />
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnReconnect"
+                    style="@style/ConsolePrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:minHeight="38dp"
+                    android:text="保存并重新连接" />
+
+                <TextView
+                    android:id="@+id/btnScanQr"
+                    style="@style/ConsoleGhostButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="0.8"
+                    android:minHeight="38dp"
+                    android:text="扫码连接" />
+            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout

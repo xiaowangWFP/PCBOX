@@ -594,6 +594,16 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     private void setupSettingsPage() {
+        // 横竖屏布局各自独立维护，这里统一做空值保护，避免某个方向缺控件时直接崩溃
+        if (spinnerChannels == null || btnAddChannel == null || btnDeleteChannel == null
+                || btnScanQr == null || etServerHost == null || etServerPort == null) {
+            View reconnect = findViewById(R.id.btnReconnect);
+            if (reconnect != null) {
+                reconnect.setOnClickListener(v -> saveAndReconnect());
+            }
+            return;
+        }
+
         spinnerChannels.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -650,7 +660,18 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     private void renderChannelSpinner() {
-        if (spinnerChannels == null || channels.isEmpty()) {
+        if (channels.isEmpty()) {
+            return;
+        }
+        channelIndex = Math.max(0, Math.min(channelIndex, channels.size() - 1));
+        ChannelStore.Channel current = channels.get(channelIndex);
+        if (etServerHost != null) {
+            etServerHost.setText(current.host);
+        }
+        if (etServerPort != null) {
+            etServerPort.setText(String.valueOf(current.port));
+        }
+        if (spinnerChannels == null) {
             return;
         }
         List<String> labels = new ArrayList<>();
@@ -659,13 +680,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         suppressChannelCallback = true;
         spinnerChannels.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, labels));
-        channelIndex = Math.max(0, Math.min(channelIndex, labels.size() - 1));
         spinnerChannels.setSelection(channelIndex);
         suppressChannelCallback = false;
-
-        ChannelStore.Channel current = channels.get(channelIndex);
-        etServerHost.setText(current.host);
-        etServerPort.setText(String.valueOf(current.port));
     }
 
     private void saveAndReconnect() {
