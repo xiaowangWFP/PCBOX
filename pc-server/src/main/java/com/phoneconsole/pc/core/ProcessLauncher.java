@@ -22,15 +22,27 @@ public class ProcessLauncher {
         log.info("已启动应用：{}", target);
     }
 
+    /**
+     * 打开链接：优先 java.awt.Desktop；在部分 Windows 环境下 Desktop.browse 会抛
+     * UnsupportedOperationException / IOException，此时回退到 rundll32 url.dll。
+     */
     public void openUrl(String url) throws Exception {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("url 动作缺少 target 配置");
         }
-        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            throw new IllegalStateException("当前系统不支持调用默认浏览器");
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            try {
+                Desktop.getDesktop().browse(URI.create(url));
+                log.info("已打开链接：{}", url);
+                return;
+            } catch (Exception e) {
+                log.warn("Desktop.browse 打开失败，改用 rundll32：{}", e.getMessage());
+            }
+        } else {
+            log.warn("当前系统不支持 Desktop.browse，改用 rundll32 打开链接");
         }
-        Desktop.getDesktop().browse(URI.create(url));
-        log.info("已打开链接：{}", url);
+        new ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", url).start();
+        log.info("已通过 rundll32 打开链接：{}", url);
     }
 
     public void runScript(String script) throws IOException {

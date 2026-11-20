@@ -58,6 +58,10 @@ public final class KeySimulator {
             lockWorkstation();
             return;
         }
+        if ("sleep".equals(normalized)) {
+            sleepSystem();
+            return;
+        }
         List<String> keys = Arrays.stream(normalized.split("\\+"))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
@@ -69,6 +73,16 @@ public final class KeySimulator {
             press(keys);
         } catch (RuntimeException e) {
             log.warn("快捷组合键执行失败（{}）：{}", combo, e.getMessage());
+        }
+    }
+
+    /** 进入睡眠（S3）：rundll32 调用 powrprof 的 SetSuspendState */
+    private static void sleepSystem() {
+        try {
+            new ProcessBuilder("rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0").start();
+            log.info("已触发系统睡眠");
+        } catch (Exception e) {
+            log.error("触发系统睡眠失败", e);
         }
     }
 

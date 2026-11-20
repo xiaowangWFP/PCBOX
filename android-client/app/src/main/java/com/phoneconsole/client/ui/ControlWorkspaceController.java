@@ -254,9 +254,7 @@ public class ControlWorkspaceController {
             recordHistory("切换麦克风静音", "音频控制", dispatcher::onToggleMicMute);
         });
 
-        bindQuickMedia(R.id.btnMediaPrev, "prev", "上一首");
-        bindQuickMedia(R.id.btnMediaPlay, "play_pause", "播放 / 暂停");
-        bindQuickMedia(R.id.btnMediaNext, "next", "下一首");
+        bindQuickHotkey(R.id.btnQuickSleep, "sleep", "睡眠");
 
         bindQuickHotkey(R.id.btnQuickShot, "win+shift+s", "区域截图");
         bindQuickHotkey(R.id.btnQuickDesktop, "win+d", "显示桌面");

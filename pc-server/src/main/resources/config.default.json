@@ -107,68 +107,6 @@
       ]
     },
     {
-      "id": "media_page",
-      "title": "媒体播放",
-      "grid": { "rows": 2, "cols": 3 },
-      "buttons": [
-        {
-          "id": "media_prev",
-          "label": "上一首",
-          "icon": "",
-          "bgColor": "#0F172A",
-          "state": "normal",
-          "action": { "type": "media", "command": "prev" }
-        },
-        {
-          "id": "media_play",
-          "label": "播放 / 暂停",
-          "icon": "",
-          "bgColor": "#1E293B",
-          "state": "normal",
-          "action": { "type": "media", "command": "play_pause" }
-        },
-        {
-          "id": "media_next",
-          "label": "下一首",
-          "icon": "",
-          "bgColor": "#0F172A",
-          "state": "normal",
-          "action": { "type": "media", "command": "next" }
-        },
-        {
-          "id": "media_mute",
-          "label": "静音",
-          "icon": "",
-          "bgColor": "#1E293B",
-          "state": "normal",
-          "action": {
-            "type": "media",
-            "command": "mute",
-            "toggle": true,
-            "activeState": "muted",
-            "activeLabel": "已静音",
-            "activeBgColor": "#7F1D1D"
-          }
-        },
-        {
-          "id": "media_vol_down",
-          "label": "音量 -",
-          "icon": "",
-          "bgColor": "#1E293B",
-          "state": "normal",
-          "action": { "type": "media", "command": "volume_down" }
-        },
-        {
-          "id": "media_vol_up",
-          "label": "音量 +",
-          "icon": "",
-          "bgColor": "#1E293B",
-          "state": "normal",
-          "action": { "type": "media", "command": "volume_up" }
-        }
-      ]
-    },
-    {
       "id": "ide_page",
       "title": "开发模式",
       "grid": { "rows": 2, "cols": 3 },
@@ -211,15 +149,7 @@
           "icon": "",
           "bgColor": "#134E4A",
           "state": "normal",
-          "action": { "type": "url", "target": "http://localhost:8080" }
-        },
-        {
-          "id": "ide_lock",
-          "label": "锁屏",
-          "icon": "",
-          "bgColor": "#7F1D1D",
-          "state": "normal",
-          "action": { "type": "hotkey", "keys": ["win", "l"] }
+          "action": { "type": "url", "target": "https://www.google.com" }
         }
       ]
     }
@@ -227,8 +157,8 @@
   "appBindings": [
     { "process": "idea64.exe", "pageId": "ide_page" },
     { "process": "code.exe", "pageId": "ide_page" },
-    { "process": "chrome.exe", "pageId": "media_page" },
-    { "process": "msedge.exe", "pageId": "media_page" },
-    { "process": "vlc.exe", "pageId": "media_page" }
+    { "process": "chrome.exe", "pageId": "default_page" },
+    { "process": "msedge.exe", "pageId": "default_page" },
+    { "process": "vlc.exe", "pageId": "default_page" }
   ]
 }

@@ -18,6 +18,7 @@
     <string name="ctrl_speaker_muted">已静音</string>
     <string name="ctrl_mic">麦克风</string>
     <string name="ctrl_mic_muted">已闭麦</string>
+    <string name="ctrl_sleep">睡眠</string>
     <string name="ctrl_prev">上一首</string>
     <string name="ctrl_play">播放</string>
     <string name="ctrl_next">下一首</string>
