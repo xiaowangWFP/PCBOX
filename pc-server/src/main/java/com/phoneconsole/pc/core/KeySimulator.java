@@ -1,6 +1,8 @@
 package com.phoneconsole.pc.core;
 
 
+import com.sun.jna.Library;
+import com.sun.jna.Native;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,14 +78,36 @@ public final class KeySimulator {
         }
     }
 
-    /** 进入睡眠（S3）：rundll32 调用 powrprof 的 SetSuspendState */
+    /**
+     * 进入睡眠（S3）。
+     * <p>
+     * 不使用 {@code rundll32 powrprof.dll,SetSuspendState 0,1,0}：这条命令行对参数的传递
+     * 并不可靠，在开启休眠的机器上经常变成休眠（S4）甚至行为异常。
+     * 这里直接调用 powrprof 的 SetSuspendState(false, false, false)，
+     * 明确要求“不休眠、不强制、允许唤醒事件”。
+     */
     private static void sleepSystem() {
-        try {
-            new ProcessBuilder("rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0").start();
-            log.info("已触发系统睡眠");
-        } catch (Exception e) {
-            log.error("触发系统睡眠失败", e);
-        }
+        Thread worker = new Thread(() -> {
+            try {
+                boolean ok = PowrProfLib.INSTANCE.SetSuspendState(false, false, false);
+                if (ok) {
+                    log.info("已进入睡眠");
+                } else {
+                    log.warn("SetSuspendState 调用失败（可能缺少睡眠状态或权限不足）");
+                }
+            } catch (Throwable t) {
+                log.error("触发系统睡眠失败", t);
+            }
+        }, "system-sleep");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    /** powrprof.dll：SetSuspendState(BOOLEAN hibernate, BOOLEAN force, BOOLEAN disableWakeEvent) */
+    interface PowrProfLib extends Library {
+        PowrProfLib INSTANCE = Native.load("powrprof", PowrProfLib.class);
+
+        boolean SetSuspendState(boolean hibernate, boolean forceCritical, boolean disableWakeEvent);
     }
 
     private static void lockWorkstation() {
