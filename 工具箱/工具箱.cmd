@@ -32,17 +32,15 @@ echo   [7]  查看已连接设备        (ADB)
 echo.
 echo   -- PC 服务端 --
 echo   [8]  构建 jar
-echo   [9]  前台运行
-echo   [10] 后台运行
-echo   [11] 停止
+echo   [9]  启动服务（自动重启并打开控制台）
 echo.
 echo   -- 共享 --
-echo   [12] 打开发布目录 dist
-echo   [13] 打包为 zip
+echo   [10] 打开发布目录 dist
+echo   [11] 打包为 zip
 echo   [0]  退出
 echo  ==========================================================
 set "CH="
-set /p "CH=请选择 [0-13]: "
+set /p "CH=请选择 [0-11]: "
 
 if "!CH!"=="0" exit /b 0
 if "!CH!"=="1" goto ENV
@@ -54,10 +52,8 @@ if "!CH!"=="6" goto ADB_INSTALL
 if "!CH!"=="7" goto ADB_DEVICES
 if "!CH!"=="8" goto SRV_BUILD
 if "!CH!"=="9" goto SRV_RUN
-if "!CH!"=="10" goto SRV_START
-if "!CH!"=="11" goto SRV_STOP
-if "!CH!"=="12" goto OPEN_DIST
-if "!CH!"=="13" goto PACKAGE
+if "!CH!"=="10" goto OPEN_DIST
+if "!CH!"=="11" goto PACKAGE
 goto MENU
 
 :ENV
@@ -211,16 +207,6 @@ goto MENU
 :SRV_RUN
 cls
 call "%SRV%\run.cmd"
-goto MENU
-
-:SRV_START
-cls
-call "%SRV%\start.cmd"
-goto MENU
-
-:SRV_STOP
-cls
-call "%SRV%\stop.cmd"
 goto MENU
 
 :OPEN_DIST
