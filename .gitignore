@@ -17,6 +17,7 @@
 *.log
 
 # 启动时按需下载的依赖（JRE / ffmpeg / platform-tools）
+deps/
 tools/
 
 # 本地配置与密钥

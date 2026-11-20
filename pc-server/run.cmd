@@ -2,12 +2,9 @@
 
 chcp 65001 >nul
 cd /d "%~dp0"
-title 手机控制台 - PC 服务端
+title PC 服务端
 
 echo ================================================================
-echo  手机控制台 PC 服务端（唯一入口）
-echo.
-echo  * 本窗口开着 = 服务在跑；关闭本窗口 = 服务停止
 echo  * 每次启动都会先结束旧实例，再启动新实例，无需手动 stop
 echo  * 启动完成后会自动打开网页控制台
 echo ================================================================
@@ -39,11 +36,11 @@ if errorlevel 1 (
 echo.
 
 rem 把本地依赖目录加入 PATH，服务端默认配置里的 adb / ffmpeg 即可直接命中
-set "TOOLS=%~dp0..\tools"
+set "DEPS=%~dp0..\deps"
 if exist "%~dp0..\platform-tools\adb.exe" set "PATH=%~dp0..\platform-tools;%PATH%"
-if exist "%TOOLS%\platform-tools\adb.exe" set "PATH=%TOOLS%\platform-tools;%PATH%"
-if exist "%TOOLS%\ffmpeg\bin\ffmpeg.exe" set "PATH=%TOOLS%\ffmpeg\bin;%PATH%"
-if exist "%TOOLS%\jre\bin\java.exe" set "PATH=%TOOLS%\jre\bin;%PATH%"
+if exist "%DEPS%\platform-tools\adb.exe" set "PATH=%DEPS%\platform-tools;%PATH%"
+if exist "%DEPS%\ffmpeg\bin\ffmpeg.exe" set "PATH=%DEPS%\ffmpeg\bin;%PATH%"
+if exist "%DEPS%\jre\bin\java.exe" set "PATH=%DEPS%\jre\bin;%PATH%"
 echo.
 
 echo [3/4] 检查 jar...
@@ -68,7 +65,7 @@ start "" /b powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -C
 rem 优先用本地下载的 JRE，其次 JAVA_HOME，最后 PATH 里的 java
 set "JAVA_CMD=java"
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "JAVA_CMD=%JAVA_HOME%\bin\java.exe"
-if exist "%TOOLS%\jre\bin\java.exe" set "JAVA_CMD=%TOOLS%\jre\bin\java.exe"
+if exist "%DEPS%\jre\bin\java.exe" set "JAVA_CMD=%DEPS%\jre\bin\java.exe"
 
 rem P0：限制堆与元空间上限，避免默认堆随物理内存膨胀；多端并发 OOM 时可把 -Xmx256m 调到 384m
 "%JAVA_CMD%" -Xms64m -Xmx256m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -jar target\phone-console-pc.jar
