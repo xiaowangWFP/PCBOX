@@ -162,12 +162,29 @@
                 android:layout_marginBottom="10dp"
                 android:background="@color/divider_line" />
 
-            <TextView
-                android:id="@+id/btnQuickSleep"
-                style="@style/ConsoleMiniButton"
+            <!-- 睡眠与锁屏并排成组，两者均需双击确认，避免误触 -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/ctrl_sleep" />
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnQuickSleep"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_sleep" />
+
+                <TextView
+                    android:id="@+id/btnQuickLock"
+                    style="@style/ConsoleMiniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/ctrl_lock" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -189,17 +206,8 @@
                     style="@style/ConsoleMiniButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:text="@string/ctrl_desktop" />
-
-                <TextView
-                    android:id="@+id/btnQuickLock"
-                    style="@style/ConsoleMiniButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/ctrl_lock" />
             </LinearLayout>
         </LinearLayout>
 

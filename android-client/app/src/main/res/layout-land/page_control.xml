@@ -194,7 +194,7 @@
                             style="@style/ConsoleMiniButton"
                             android:layout_width="0dp"
                             android:layout_height="32dp"
-                            android:layout_marginEnd="6dp"
+                            android:layout_marginEnd="4dp"
                             android:layout_weight="1"
                             android:minHeight="32dp"
                             android:paddingStart="4dp"
@@ -203,12 +203,25 @@
                             android:textSize="11sp" />
 
                         <TextView
+                            android:id="@+id/btnQuickLock"
+                            style="@style/ConsoleMiniButton"
+                            android:layout_width="0dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="4dp"
+                            android:layout_weight="1"
+                            android:minHeight="32dp"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:text="@string/ctrl_lock"
+                            android:textSize="11sp" />
+
+                        <TextView
                             android:id="@+id/btnQuickShot"
                             style="@style/ConsoleMiniButton"
                             android:layout_width="0dp"
                             android:layout_height="32dp"
                             android:layout_marginEnd="4dp"
-                            android:layout_weight="0.85"
+                            android:layout_weight="1"
                             android:minHeight="32dp"
                             android:paddingStart="4dp"
                             android:paddingEnd="4dp"
@@ -220,24 +233,11 @@
                             style="@style/ConsoleMiniButton"
                             android:layout_width="0dp"
                             android:layout_height="32dp"
-                            android:layout_marginEnd="4dp"
-                            android:layout_weight="0.85"
+                            android:layout_weight="1"
                             android:minHeight="32dp"
                             android:paddingStart="4dp"
                             android:paddingEnd="4dp"
                             android:text="@string/ctrl_desktop"
-                            android:textSize="11sp" />
-
-                        <TextView
-                            android:id="@+id/btnQuickLock"
-                            style="@style/ConsoleMiniButton"
-                            android:layout_width="0dp"
-                            android:layout_height="32dp"
-                            android:layout_weight="0.85"
-                            android:minHeight="32dp"
-                            android:paddingStart="4dp"
-                            android:paddingEnd="4dp"
-                            android:text="@string/ctrl_lock"
                             android:textSize="11sp" />
                     </LinearLayout>
                 </LinearLayout>

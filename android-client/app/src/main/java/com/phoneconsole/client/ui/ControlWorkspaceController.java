@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.os.SystemClock;
 import android.view.Window;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
@@ -17,6 +18,7 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -131,6 +133,17 @@ public class ControlWorkspaceController {
     private SeekBar seekVolume;
     private TextView tvVolumeValue;
     private RecyclerView rvDeckButtons;
+
+    /** 需要双击确认的按钮：首次点击进入待确认态，限定时间内再次点击才真正下发 */
+    private static final long CONFIRM_WINDOW_MS = 1500;
+    private View armedView;
+    private long armedAt;
+    private final Runnable disarmConfirm = () -> {
+        if (armedView != null) {
+            armedView.setAlpha(1f);
+            armedView = null;
+        }
+    };
 
     private TextView tabInput;
     private TextView tabTouchpad;
@@ -254,11 +267,11 @@ public class ControlWorkspaceController {
             recordHistory("切换麦克风静音", "音频控制", dispatcher::onToggleMicMute);
         });
 
-        bindQuickHotkey(R.id.btnQuickSleep, "sleep", "睡眠");
+        bindQuickConfirm(R.id.btnQuickSleep, "sleep", "睡眠");
+        bindQuickConfirm(R.id.btnQuickLock, "win+l", "锁定屏幕");
 
         bindQuickHotkey(R.id.btnQuickShot, "win+shift+s", "区域截图");
         bindQuickHotkey(R.id.btnQuickDesktop, "win+d", "显示桌面");
-        bindQuickHotkey(R.id.btnQuickLock, "win+l", "锁定屏幕");
 
         // 工具舱切换
         tabInput.setOnClickListener(v -> selectCompanionTab(0, true));
@@ -483,6 +496,38 @@ public class ControlWorkspaceController {
                 recordHistory(label, combo.toUpperCase(Locale.ROOT), () -> dispatcher.onQuickHotkey(combo));
             });
         }
+    }
+
+    /**
+     * 危险操作（睡眠 / 锁屏）绑定：首次点击只进入待确认态——按钮变暗并弹出提示，
+     * 1.5 秒内再次点击才真正下发，避免误触直接把电脑锁屏或挂起。
+     */
+    private void bindQuickConfirm(int viewId, @NonNull String combo, @NonNull String label) {
+        View v = root.findViewById(viewId);
+        if (v == null) {
+            return;
+        }
+        v.setOnClickListener(btn -> {
+            long now = SystemClock.elapsedRealtime();
+            boolean confirmed = armedView == v && now - armedAt <= CONFIRM_WINDOW_MS;
+            if (!confirmed) {
+                if (armedView != null && armedView != v) {
+                    armedView.setAlpha(1f);
+                }
+                armedView = v;
+                armedAt = now;
+                v.setAlpha(0.5f);
+                Toast.makeText(context, "再点一次确认「" + label + "」", Toast.LENGTH_SHORT).show();
+                root.removeCallbacks(disarmConfirm);
+                root.postDelayed(disarmConfirm, CONFIRM_WINDOW_MS);
+                return;
+            }
+            root.removeCallbacks(disarmConfirm);
+            v.setAlpha(1f);
+            armedView = null;
+            dispatcher.onQuickHotkey(combo);
+            recordHistory(label, combo.toUpperCase(Locale.ROOT), () -> dispatcher.onQuickHotkey(combo));
+        });
     }
 
     private void bindMouseClick(int viewId, @NonNull String mouseButton, @NonNull String label) {
