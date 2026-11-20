@@ -16,6 +16,9 @@
 .DS_Store
 *.log
 
+# 启动时按需下载的依赖（JRE / ffmpeg / platform-tools）
+tools/
+
 # 本地配置与密钥
 local.properties
 keystore.properties
