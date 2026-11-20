@@ -27,3 +27,7 @@ bench/artifacts/*.jar
 
 # jpackage 生成的免安装镜像（体积大，本地构建产物）
 dist/PhoneConsole/
+
+# 内置的外部二进制（ffmpeg 等，约 100MB，构建时本地准备）
+bin/*.exe
+tools/*.exe
