@@ -62,6 +62,10 @@ public class StaticHttpServer {
             if (path == null || path.isEmpty() || "/".equals(path)) {
                 path = "/index.html";
             }
+            // 服务端管理页放在独立路径，根路径保留给手机控制端
+            if ("/admin".equals(path) || "/admin/".equals(path)) {
+                path = "/admin.html";
+            }
             if ("/api/layout".equals(path)) {
                 writeJson(exchange, 200, gson.toJson(config.get()));
                 return;

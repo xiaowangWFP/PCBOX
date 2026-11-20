@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 网页控制台的运行时入口：状态查询、配置热重载、页面切换、日志与退出。
+ * 服务端管理页的运行时入口：状态查询、配置热重载、日志与退出。
  * <p>
  * 配置对象整体替换（volatile），各组件通过 setConfig 拿到新快照，
  * 避免运行中修改集合导致并发问题。
@@ -60,6 +60,11 @@ public final class ConsoleRuntime {
         return configPath;
     }
 
+    /** 实际监听的 WebSocket 端口（供扫码连接生成地址） */
+    public int wsPort() {
+        return boundWsPort;
+    }
+
     public AdbPortForwarder adb() {
         return adb;
     }
@@ -80,6 +85,7 @@ public final class ConsoleRuntime {
         status.put("adbExecutable", snapshot.network.adbExecutable);
         status.put("reversePollMs", snapshot.network.reversePollMs);
         status.put("clients", wsServer.clientCount());
+        status.put("webClients", wsServer.webClientCount());
         status.put("adb", adb.statusMap());
         status.put("logCount", LogBuffer.get().size());
         status.put("shuttingDown", shuttingDown);

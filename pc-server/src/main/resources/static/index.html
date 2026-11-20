@@ -2,504 +2,995 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>PC 服务端管理 · 手机控制台</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#0B0D11" />
+<title>手机控制台 · 网页控制端</title>
 <style>
   :root {
-    --bg: #0b0d11;
-    --panel: #12151c;
-    --panel-2: #171b24;
-    --line: rgba(255, 255, 255, 0.07);
-    --line-strong: rgba(255, 255, 255, 0.14);
-    --text: #f3f5f8;
-    --text-2: #9aa3b2;
-    --text-3: #6e7788;
-    --accent: #60a5fa;
-    --accent-deep: #3b82f6;
-    --ok: #22c55e;
-    --warn: #f59e0b;
-    --bad: #ef4444;
-    --purple: #a78bfa;
-    --radius: 14px;
+    --bg: #0B0D11;
+    --panel: #12151C;
+    --elevated: #181C25;
+    --hover: #1E2330;
+    --line: rgba(255, 255, 255, .07);
+    --line-strong: rgba(255, 255, 255, .14);
+    --text: #F3F5F8;
+    --text-2: #9AA3B2;
+    --text-3: #6E7788;
+    --accent: #3B82F6;
+    --accent-bright: #60A5FA;
+    --cyan: #22D3EE;
+    --ok: #34D399;
+    --warn: #FBBF24;
+    --purple: #A78BFA;
+    --danger: #EF4444;
+    --nav-h: 58px;
+    --top-h: 56px;
   }
 
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-  body {
-    margin: 0;
-    background: radial-gradient(1200px 600px at 20% -10%, #16233a 0%, var(--bg) 60%);
-    color: var(--text);
-    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-    font-size: 14px;
-    line-height: 1.6;
-    min-height: 100vh;
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    overflow: hidden; user-select: none;
   }
 
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
-
-  header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
-  header h1 { font-size: 20px; margin: 0; letter-spacing: .3px; }
-  header .sub { color: var(--text-3); font-size: 12.5px; }
-  .spacer { flex: 1; }
-  .pill {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 6px 12px; border-radius: 999px;
-    background: var(--panel); border: 1px solid var(--line);
-    color: var(--text-2); font-size: 12.5px; font-variant-numeric: tabular-nums;
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
-  .dot.on { background: var(--ok); box-shadow: 0 0 0 4px rgba(34, 197, 94, .14); }
-  .dot.off { background: var(--bad); box-shadow: 0 0 0 4px rgba(239, 68, 68, .14); }
-
-  .grid { display: grid; gap: 16px; }
-  .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  @media (max-width: 900px) {
-    .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; }
+  #app {
+    height: 100%;
+    display: grid;
+    grid-template-rows: var(--top-h) 1fr var(--nav-h);
+    grid-template-areas: "top" "main" "nav";
   }
 
+  /* ---------- 顶栏 ---------- */
+  #topbar {
+    grid-area: top;
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+  }
+
+  .brand {
+    width: 26px; height: 26px; flex: 0 0 26px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #6366F1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+
+  .titles { display: flex; flex-direction: column; min-width: 0; }
+  .titles h1 { margin: 0; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .titles span {
+    font-size: 11px; color: var(--text-3);
+    display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 0 3px rgba(52, 211, 153, .16); }
+
+  .metrics {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; color: var(--text-2);
+    overflow: hidden;
+  }
+  .metrics span { white-space: nowrap; }
+  .metrics b { color: var(--text); font-weight: 600; }
+
+  /* ---------- 内容 ---------- */
+  #content { grid-area: main; overflow: auto; padding: 12px; min-width: 0; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ---------- 底部导航 ---------- */
+  #nav {
+    grid-area: nav;
+    display: flex;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; color: var(--text-3); font-size: 10.5px; cursor: pointer;
+    position: relative;
+  }
+  .nav-item .ico { font-size: 17px; line-height: 1; }
+  .nav-item.active { color: var(--accent-bright); }
+  .nav-item.active::before {
+    content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 22px; height: 2px; border-radius: 0 0 2px 2px; background: var(--accent-bright);
+  }
+
+  /* ---------- 通用卡片 ---------- */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
   .card {
-    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 16px 18px;
+    border-radius: 14px;
+    padding: 12px;
+    min-width: 0;
+    display: flex; flex-direction: column;
   }
-  .card h2 {
-    font-size: 13px; margin: 0 0 12px;
-    color: var(--text-2); font-weight: 600; letter-spacing: .4px;
-    display: flex; align-items: center; gap: 8px;
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .card-title { font-size: 12px; color: var(--text-2); }
+  .card-value {
+    margin-top: 4px;
+    font-size: 30px; font-weight: 600; line-height: 1.05;
+    font-variant-numeric: tabular-nums;
   }
-  .card h2 .tag {
-    font-size: 11px; color: var(--text-3); font-weight: 400;
-    border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px;
+  .card-value small { font-size: 14px; color: var(--text-3); margin-left: 2px; font-weight: 500; }
+  .card-bar {
+    margin-top: auto; height: 3px; border-radius: 2px;
+    background: var(--line-strong); overflow: hidden;
+  }
+  .card-bar i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--accent); transition: width .25s; }
+
+  .ring { width: 34px; height: 34px; flex: 0 0 34px; }
+  .ring circle { fill: none; stroke-width: 3.5; }
+  .ring .track { stroke: var(--line-strong); }
+  .ring .value {
+    stroke: var(--accent); stroke-linecap: round;
+    stroke-dasharray: 100.53; stroke-dashoffset: 100.53;
+    transition: stroke-dashoffset .25s;
+  }
+  .card[data-key="cpu"] .ring .value { stroke: #60A5FA; }
+  .card[data-key="mem"] .ring .value { stroke: #34D399; }
+  .card[data-key="gpu"] .ring .value { stroke: #FBBF24; }
+  .card[data-key="vram"] .ring .value { stroke: #60A5FA; }
+  .card[data-key="fps"] .ring .value { stroke: #22D3EE; }
+  .card[data-key="vol"] .ring .value { stroke: #A78BFA; }
+  .card[data-key="cpu"] .card-bar i { background: #60A5FA; }
+  .card[data-key="mem"] .card-bar i { background: #34D399; }
+  .card[data-key="gpu"] .card-bar i { background: #FBBF24; }
+  .card[data-key="vram"] .card-bar i { background: #60A5FA; }
+  .card[data-key="fps"] .card-bar i { background: #22D3EE; }
+  .card[data-key="vol"] .card-bar i { background: #A78BFA; }
+
+  /* ---------- 控制页 ---------- */
+  .section-title {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 14px 2px 8px; font-size: 12px; color: var(--text-3);
+  }
+  .section-title:first-child { margin-top: 2px; }
+
+  .volume-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .volume-row { display: flex; align-items: center; gap: 12px; }
+  .volume-row .vol-value { font-size: 22px; font-weight: 600; min-width: 62px; font-variant-numeric: tabular-nums; }
+  .volume-btns { margin-left: auto; display: flex; gap: 8px; }
+  .volume-card .card-bar { margin-top: 10px; }
+
+  .mini-btn {
+    background: var(--elevated); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 14px; font-size: 13px; cursor: pointer;
+  }
+  .mini-btn:active { background: var(--hover); }
+  .mini-btn.armed { border-color: var(--danger); color: #FCA5A5; }
+
+  .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .quick-btn {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 10px; text-align: center; font-size: 13.5px; color: var(--text);
+    cursor: pointer;
+  }
+  .quick-btn:active { background: var(--hover); }
+  .quick-btn.danger { color: #FCA5A5; }
+  .quick-btn.armed { border-color: var(--danger); background: rgba(239, 68, 68, .12); }
+
+  .tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .tab {
+    flex: 0 0 auto;
+    padding: 7px 14px; border-radius: 999px;
+    background: var(--elevated); border: 1px solid var(--line);
+    color: var(--text-2); font-size: 12.5px; cursor: pointer; white-space: nowrap;
+  }
+  .tab.active { background: rgba(59, 130, 246, .16); border-color: var(--accent); color: var(--accent-bright); }
+
+  #deck { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .deck-key {
+    background: var(--elevated); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 8px; text-align: center; font-size: 12.5px; cursor: pointer;
+    min-height: 54px; display: flex; align-items: center; justify-content: center;
+    word-break: break-all;
+  }
+  .deck-key:active, .deck-key.pressed { background: var(--hover); transform: scale(.98); }
+  .deck-key.toggled { border-color: var(--accent); color: var(--accent-bright); }
+
+  /* ---------- 屏幕页 ---------- */
+  .screen-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .screen-toolbar select {
+    background: var(--elevated); color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 10px; font-size: 12.5px; max-width: 190px;
+  }
+  .screen-stage {
+    position: relative; margin-top: 10px; min-height: 260px;
+    background: #05070A; border: 1px solid var(--line); border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  #screenCanvas { max-width: 100%; max-height: 68vh; display: none; }
+  .screen-hint {
+    padding: 24px 18px; text-align: center; color: var(--text-3);
+    font-size: 12.5px; line-height: 1.7;
+  }
+  .screen-meta {
+    margin-top: 8px; font-family: ui-monospace, Consolas, monospace;
+    font-size: 11.5px; color: var(--text-3);
   }
 
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .stat { background: rgba(255,255,255,.02); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  .stat .k { color: var(--text-3); font-size: 11.5px; }
-  .stat .v { font-family: ui-monospace, Consolas, monospace; font-size: 16px; margin-top: 2px; }
-  .stat .v.small { font-size: 13px; color: var(--text-2); }
-
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
-  th { color: var(--text-3); font-weight: 500; }
-  td { color: var(--text-2); font-family: ui-monospace, Consolas, monospace; }
-  tr:last-child td { border-bottom: none; }
-  .empty { color: var(--text-3); font-size: 12.5px; padding: 12px 0; }
-
-  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .between { display: flex; align-items: center; gap: 10px; }
-  .between .spacer { flex: 1; }
-
-  button {
-    font: inherit; cursor: pointer; border-radius: 9px;
-    border: 1px solid var(--line-strong);
-    background: var(--panel-2); color: var(--text);
-    padding: 7px 14px; font-size: 12.5px;
-    transition: border-color .15s, background .15s, transform .1s;
+  /* ---------- 设置页 ---------- */
+  .field { margin-top: 10px; }
+  .field label { display: block; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
+  .field input {
+    width: 100%; background: var(--elevated); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font-size: 13px; font-family: ui-monospace, Consolas, monospace;
   }
-  button:hover { border-color: var(--accent); color: #bfdbfe; }
-  button:active { transform: translateY(1px); }
-  button.primary { background: var(--accent-deep); border-color: transparent; color: #fff; }
-  button.primary:hover { background: #2563eb; color: #fff; }
-  button.danger { border-color: rgba(239, 68, 68, .45); color: #fca5a5; }
-  button.danger:hover { background: rgba(239, 68, 68, .14); border-color: var(--bad); color: #fecaca; }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-
-  textarea {
-    width: 100%; min-height: 300px; resize: vertical;
-    background: #0d1117; color: #dbe3f0;
-    border: 1px solid var(--line-strong); border-radius: 10px;
-    padding: 12px 14px; font-family: ui-monospace, Consolas, monospace;
-    font-size: 12.5px; line-height: 1.55; outline: none;
+  .primary-btn {
+    width: 100%; margin-top: 14px; padding: 11px;
+    background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
   }
-  textarea:focus { border-color: var(--accent); }
-
-  .path {
-    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
-    color: var(--text-3); word-break: break-all;
+  .ghost-btn {
+    width: 100%; margin-top: 8px; padding: 10px;
+    background: transparent; color: var(--text-2);
+    border: 1px solid var(--line); border-radius: 10px;
+    font-size: 12.5px; cursor: pointer; text-decoration: none; display: block; text-align: center;
   }
 
-  .hint { color: var(--text-3); font-size: 12px; margin-top: 8px; }
-  .msg { font-size: 12.5px; margin-top: 10px; min-height: 18px; }
-  .msg.ok { color: #86efac; }
-  .msg.err { color: #fca5a5; }
-  .msg.warn { color: #fcd34d; }
-
-  #logList {
-    height: 300px; overflow: auto; border: 1px solid var(--line);
-    border-radius: 10px; background: #0a0d12; padding: 8px 10px;
-    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+  /* ---------- 横屏：左侧图标轨 + 三列卡片 ---------- */
+  @media (orientation: landscape) and (min-width: 720px) {
+    #app {
+      grid-template-rows: var(--top-h) 1fr;
+      grid-template-columns: 68px 1fr;
+      grid-template-areas: "nav top" "nav main";
+    }
+    #nav { flex-direction: column; border-top: 0; border-right: 1px solid var(--line); padding: 10px 0; }
+    .nav-item { flex: 0 0 auto; padding: 12px 0; }
+    .nav-item.active::before { top: 50%; left: 0; transform: translateY(-50%); width: 2px; height: 22px; border-radius: 0 2px 2px 0; }
+    .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .card { min-height: 128px; }
+    .card-value { font-size: 34px; }
+    #deck { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .quick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   }
-  .log-line { display: flex; gap: 10px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.03); }
-  .log-line .t { color: var(--text-3); flex: 0 0 auto; }
-  .log-line .lv { flex: 0 0 46px; font-weight: 600; }
-  .log-line .tg { color: var(--purple); flex: 0 0 auto; min-width: 46px; }
-  .log-line .ms { color: var(--text-2); word-break: break-all; }
-  .lv-INFO { color: #7dd3fc; }
-  .lv-WARN { color: var(--warn); }
-  .lv-ERROR { color: var(--bad); }
-
-  footer { margin-top: 26px; color: var(--text-3); font-size: 12px; text-align: center; }
 </style>
 </head>
 <body>
-<div class="wrap">
-
-  <header>
-    <h1>服务端管理</h1>
-    <span class="sub">手机控制台 · PC 服务端</span>
-    <span class="spacer"></span>
-    <span class="pill"><span class="dot" id="statusDot"></span><span id="statusText">连接中…</span></span>
-    <span class="pill" id="uptimePill">运行 --</span>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">PC</div>
+    <div class="titles">
+      <h1 id="pageTitle">性能监视</h1>
+      <span><i class="dot" id="connDot"></i><span id="connText">未连接</span></span>
+    </div>
+    <div class="metrics">
+      <span>FPS <b id="mFps">--</b></span>
+      <span>CPU <b id="mCpu">--</b></span>
+      <span>GPU <b id="mGpu">--</b></span>
+      <span>内存 <b id="mMem">--</b></span>
+      <span>显存 <b id="mVram">--</b></span>
+    </div>
   </header>
 
-  <div class="grid cols-2" style="margin-bottom:16px;">
-    <section class="card">
-      <h2>服务概览 <span class="tag">实时</span></h2>
-      <div class="stats">
-        <div class="stat"><div class="k">WebSocket 端口</div><div class="v" id="statWs">--</div></div>
-        <div class="stat"><div class="k">HTTP 端口</div><div class="v" id="statHttp">--</div></div>
-        <div class="stat"><div class="k">在线设备</div><div class="v" id="statClients">--</div></div>
-        <div class="stat"><div class="k">运行时长</div><div class="v" id="statUptime">--</div></div>
-        <div class="stat"><div class="k">日志条数</div><div class="v" id="statLogs">--</div></div>
-        <div class="stat"><div class="k">配置修改时间</div><div class="v small" id="statConfigTime">--</div></div>
+  <main id="content">
+    <!-- 性能 -->
+    <section class="page active" id="page-performance">
+      <div class="cards">
+        <article class="card" data-key="cpu">
+          <div class="card-head"><span class="card-title">CPU 占用</span>
+            <svg class="ring" viewBox="0 0 40 40"><circle class="track" cx="20" cy="20" r="16"></circle><circle class="value" cx="20" cy="20" r="16"></circle></svg>
+          </div>
+          <div class="card-value"><span id="cpuBig">--</span><small>%</small></div>
+          <div class="card-bar"><i id="cpuBar"></i></div>
+        </article>
+        <article class="card" data-key="mem">
+          <div class="card-head"><span class="card-title">内存占用</span>
+            <svg class="ring" viewBox="0 0 40 40"><circle class="track" cx="20" cy="20" r="16"></circle><circle class="value" cx="20" cy="20" r="16"></circle></svg>
+          </div>
+          <div class="card-value"><span id="memBig">--</span><small>%</small></div>
+          <div class="card-bar"><i id="memBar"></i></div>
+        </article>
+        <article class="card" data-key="gpu">
+          <div class="card-head"><span class="card-title">GPU 占用</span>
+            <svg class="ring" viewBox="0 0 40 40"><circle class="track" cx="20" cy="20" r="16"></circle><circle class="value" cx="20" cy="20" r="16"></circle></svg>
+          </div>
+          <div class="card-value"><span id="gpuBig">--</span><small>%</small></div>
+          <div class="card-bar"><i id="gpuBar"></i></div>
+        </article>
+        <article class="card" data-key="vram">
+          <div class="card-head"><span class="card-title">显存占用</span>
+            <svg class="ring" viewBox="0 0 40 40"><circle class="track" cx="20" cy="20" r="16"></circle><circle class="value" cx="20" cy="20" r="16"></circle></svg>
+          </div>
+          <div class="card-value"><span id="vramBig">--</span><small>G</small></div>
+          <div class="card-bar"><i id="vramBar"></i></div>
+        </article>
+        <article class="card" data-key="fps">
+          <div class="card-head"><span class="card-title">画面帧率</span>
+            <svg class="ring" viewBox="0 0 40 40"><circle class="track" cx="20" cy="20" r="16"></circle><circle class="value" cx="20" cy="20" r="16"></circle></svg>
+          </div>
+          <div class="card-value"><span id="fpsBig">--</span><small>fps</small></div>
+          <div class="card-bar"><i id="fpsBar"></i></div>
+        </article>
+        <article class="card" data-key="vol">
+          <div class="card-head"><span class="card-title">系统音量</span>
+            <svg class="ring" viewBox="0 0 40 40"><circle class="track" cx="20" cy="20" r="16"></circle><circle class="value" cx="20" cy="20" r="16"></circle></svg>
+          </div>
+          <div class="card-value"><span id="volBig">--</span><small>%</small></div>
+          <div class="card-bar"><i id="volBar"></i></div>
+        </article>
       </div>
-      <div class="hint">在线设备仅统计手机端长连接，不包含本管理页面。</div>
     </section>
 
-    <section class="card">
-      <h2>设备与通道 <span class="tag">ADB</span></h2>
-      <div class="between" style="margin-bottom:10px;">
-        <div class="path" id="adbPath">--</div>
-        <span class="spacer"></span>
-        <button id="btnAdbProbe">检测</button>
-        <button id="btnAdbRebuild">重建映射</button>
+    <!-- 控制 -->
+    <section class="page" id="page-control">
+      <div class="volume-card">
+        <div class="volume-row">
+          <div class="vol-value" id="volumeText">--</div>
+          <div class="volume-btns">
+            <button class="mini-btn" id="volDown">−</button>
+            <button class="mini-btn" id="volMute">静音</button>
+            <button class="mini-btn" id="volUp">+</button>
+          </div>
+        </div>
+        <div class="card-bar"><i id="volumeBar"></i></div>
       </div>
-      <div class="path" id="adbState" style="margin-bottom:8px;">--</div>
-      <table>
-        <thead><tr><th style="width:38%">设备</th><th style="width:22%">状态</th><th>型号</th></tr></thead>
-        <tbody id="adbDevices"><tr><td colspan="3" class="empty">暂无设备</td></tr></tbody>
-      </table>
-      <div class="hint" id="adbMappings"></div>
-      <div class="msg" id="adbMsg"></div>
-    </section>
-  </div>
 
-  <section class="card" style="margin-bottom:16px;">
-    <h2>配置管理 <span class="tag">config.json</span></h2>
-    <div class="between" style="margin-bottom:10px;">
-      <div class="path" id="configPath">--</div>
-      <span class="spacer"></span>
-      <span class="path" id="configDirty"></span>
-      <button id="btnConfigReload">重新载入</button>
-      <button class="primary" id="btnConfigSave">保存并热重载</button>
-    </div>
-    <textarea id="configEditor" spellcheck="false"></textarea>
-    <div class="msg" id="configMsg"></div>
-    <div class="hint">保存前会校验 JSON 与字段范围；校验失败不会写入文件，运行中的旧配置保持不变。端口 / adb 路径 / 轮询间隔改动需重启服务生效。</div>
-  </section>
-
-  <div class="grid cols-2">
-    <section class="card">
-      <h2>运行日志 <span class="tag" id="logTag">--</span></h2>
-      <div class="between" style="margin-bottom:10px;">
-        <label class="hint" style="margin:0;"><input type="checkbox" id="logAutoScroll" checked /> 自动滚动</label>
-        <span class="spacer"></span>
-        <button id="btnLogClear">清空日志</button>
+      <div class="section-title"><span>快捷操作</span><span>睡眠与锁屏需连点两次</span></div>
+      <div class="quick-grid">
+        <div class="quick-btn danger" id="btnSleep">睡眠</div>
+        <div class="quick-btn danger" id="btnLock">锁屏</div>
+        <div class="quick-btn" id="btnShot">截图</div>
+        <div class="quick-btn" id="btnDesktop">桌面</div>
       </div>
-      <div id="logList"></div>
+
+      <div class="section-title"><span>控制面板</span><span id="deckMeta">--</span></div>
+      <div class="tabs" id="deckTabs"></div>
+      <div class="section-title" style="margin-top:10px;"><span id="deckTitle">按键</span><span></span></div>
+      <div id="deck"></div>
     </section>
 
-    <section class="card">
-      <h2>系统操作</h2>
-      <p class="hint" style="margin-top:0;">
-        退出后 PC 端 WebSocket、网页控制台、遥测与 ADB 守护会一并停止，手机端将断开连接。
-        再次使用需重新运行 <code>start.cmd</code>。
-      </p>
-      <div class="row">
-        <button class="danger" id="btnShutdown">退出服务</button>
+    <!-- 屏幕 -->
+    <section class="page" id="page-screen">
+      <div class="screen-toolbar">
+        <button class="mini-btn" id="streamBtn">开始监视</button>
+        <select id="monitorSelect"><option value="-1">整块桌面</option></select>
+        <button class="mini-btn" id="fullscreenBtn" style="display:none;">全屏</button>
       </div>
-      <div class="msg" id="sysMsg"></div>
-      <div class="hint" id="sysInfo">--</div>
+      <div class="screen-stage" id="screenStage">
+        <canvas id="screenCanvas"></canvas>
+        <div class="screen-hint" id="screenHint">通道就绪后，点击「开始监视」查看实时画面。</div>
+      </div>
+      <div class="screen-meta" id="screenMeta">--</div>
     </section>
-  </div>
 
-  <footer>手机控制台 · 服务端管理页 &nbsp;|&nbsp; 仅用于服务运行状态与配置维护</footer>
+    <!-- 设置 -->
+    <section class="page" id="page-settings">
+      <div class="card" style="padding:14px;">
+        <div class="card-title" style="font-size:13px;color:var(--text);font-weight:600;">连接设置</div>
+        <div class="field">
+          <label for="hostInput">PC 服务端地址</label>
+          <input id="hostInput" type="text" placeholder="127.0.0.1（USB）或 192.168.x.x（Wi-Fi）" />
+        </div>
+        <div class="field">
+          <label for="portInput">WebSocket 端口</label>
+          <input id="portInput" type="number" min="1" max="65535" placeholder="8500" />
+        </div>
+        <button class="primary-btn" id="reconnectBtn">保存并重新连接</button>
+        <a class="ghost-btn" href="/admin" rel="noopener">打开服务端管理页</a>
+      </div>
+
+      <div class="card" style="margin-top:12px;padding:14px;">
+        <div class="card-title" style="font-size:13px;color:var(--text);font-weight:600;">当前会话</div>
+        <div class="screen-meta" id="sessionInfo">尚未连接</div>
+      </div>
+    </section>
+  </main>
+
+  <nav id="nav">
+    <div class="nav-item active" data-page="performance"><span class="ico">📈</span><span>性能</span></div>
+    <div class="nav-item" data-page="control"><span class="ico">🎛️</span><span>控制</span></div>
+    <div class="nav-item" data-page="screen"><span class="ico">🖥️</span><span>屏幕</span></div>
+    <div class="nav-item" data-page="settings"><span class="ico">⚙️</span><span>设置</span></div>
+  </nav>
 </div>
 
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
 
   const state = {
-    logSeq: 0,
-    configLoaded: false,
-    configDirty: false,
-    busy: false,
+    socket: null,
+    connected: false,
+    transport: 'lan',
+    page: 'performance',
+    pageId: 'default_page',
+    pages: [],
+    streaming: false,
+    screenAllowed: false,
+    monitors: [],
+    monitor: -1,
+    actualFps: 0,
+    kbps: 0,
+    videoWidth: 1920,
+    videoHeight: 1080,
+    videoFps: 60,
+    vram: -1,
+    vramTotal: -1,
+    volume: 0,
+    muted: false,
+    latencyTimer: null,
+    retryTimer: null,
+    fpsTimer: null
   };
 
-  async function api(path, options) {
-    const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
-    const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (e) { data = { ok: false, error: text }; }
-    if (!res.ok && (!data || data.ok !== false)) {
-      return { ok: false, error: 'HTTP ' + res.status };
+  const PAGE_TITLES = { performance: '性能监视', control: '功能控制', screen: '屏幕监视', settings: '连接设置' };
+
+  /* ---------------- 导航 ---------------- */
+  function switchPage(name) {
+    if (state.page === 'screen' && name !== 'screen' && state.streaming) stopStream();
+    state.page = name;
+    document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === 'page-' + name));
+    document.querySelectorAll('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.page === name));
+    $('pageTitle').textContent = PAGE_TITLES[name] || name;
+    if (name === 'screen') {
+      updateScreenUi();
+      if (state.connected && state.screenAllowed) send({ type: 'screen_control', action: 'list' });
     }
-    return data || { ok: false, error: '空响应' };
+    if (name === 'settings') renderSession();
   }
 
-  function fmtDuration(ms) {
-    if (!Number.isFinite(ms) || ms < 0) return '--';
-    const s = Math.floor(ms / 1000);
-    const d = Math.floor(s / 86400);
-    const h = Math.floor((s % 86400) / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    if (d > 0) return d + ' 天 ' + h + ' 小时';
-    if (h > 0) return h + ' 小时 ' + m + ' 分';
-    if (m > 0) return m + ' 分 ' + sec + ' 秒';
-    return sec + ' 秒';
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.addEventListener('click', () => switchPage(item.dataset.page));
+  });
+
+  /* ---------------- 连接 ---------------- */
+  function wsUrl() {
+    const host = $('hostInput').value.trim() || location.hostname || '127.0.0.1';
+    const port = $('portInput').value.trim() || '8500';
+    return 'ws://' + host + ':' + port;
   }
 
-  function fmtTime(ts) {
-    if (!ts) return '--';
-    const d = new Date(ts);
-    const p = (n) => String(n).padStart(2, '0');
-    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-  }
-
-  function fmtDateTime(ts) {
-    if (!ts) return '--';
-    const d = new Date(ts);
-    const p = (n) => String(n).padStart(2, '0');
-    return (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-  }
-
-  function setMsg(id, text, kind) {
-    const el = $(id);
-    el.textContent = text || '';
-    el.className = 'msg' + (kind ? ' ' + kind : '');
-  }
-
-  // ---------------- 状态轮询 ----------------
-  async function refreshStatus() {
-    let data;
+  function connect() {
+    if (state.socket) {
+      try { state.socket.close(); } catch (e) { /* 忽略 */ }
+      state.socket = null;
+    }
+    let socket;
     try {
-      data = await api('/api/status');
+      socket = new WebSocket(wsUrl());
     } catch (e) {
-      data = { ok: false };
-    }
-    if (!data.ok) {
-      $('statusDot').className = 'dot off';
-      $('statusText').textContent = '服务未响应';
-      $('uptimePill').textContent = '运行 --';
+      scheduleRetry();
       return;
     }
-    $('statusDot').className = 'dot on';
-    $('statusText').textContent = data.shuttingDown ? '正在退出' : '服务运行中';
-    $('uptimePill').textContent = '运行 ' + fmtDuration(data.uptimeMs);
+    state.socket = socket;
 
-    $('statWs').textContent = data.wsPort || '--';
-    $('statHttp').textContent = data.httpPort || '--';
-    $('statClients').textContent = (data.clients || 0) + ' 台';
-    $('statUptime').textContent = fmtDuration(data.uptimeMs);
-    $('statLogs').textContent = data.logCount == null ? '--' : data.logCount;
-    $('statConfigTime').textContent = fmtDateTime(data.configModified);
-    $('configPath').textContent = data.configPath || '--';
-    $('sysInfo').textContent = '配置：' + (data.configPath || '--');
+    socket.onopen = () => {
+      state.connected = true;
+      socket.send(JSON.stringify({ type: 'client_hello', client: 'web' }));
+      renderConn();
+      send({ type: 'screen_control', action: 'list' });
+    };
 
-    renderAdb(data.adb);
-  }
+    socket.onclose = () => {
+      state.connected = false;
+      state.streaming = false;
+      resetDecoder();
+      renderConn();
+      updateScreenUi();
+      scheduleRetry();
+    };
 
-  function renderAdb(adb) {
-    if (!adb) {
-      $('adbPath').textContent = '--';
-      $('adbState').textContent = '--';
-      return;
-    }
-    $('adbPath').textContent = 'adb：' + (adb.executable || '--');
-    const okText = adb.available ? '可用' : '不可用';
-    const msg = adb.message ? ' · ' + adb.message : '';
-    $('adbState').textContent = '状态：' + okText + ' · 监听端口 ' + (adb.port || '--') + msg;
-    $('adbState').style.color = adb.available ? 'var(--text-2)' : '#fca5a5';
+    socket.onerror = () => { /* onclose 会接管重连 */ };
 
-    const body = $('adbDevices');
-    const details = adb.deviceDetails || [];
-    if (!details.length) {
-      body.innerHTML = '<tr><td colspan="3" class="empty">暂无已连接设备</td></tr>';
-    } else {
-      body.innerHTML = details.map((d) =>
-        '<tr><td>' + esc(d.serial || '--') + '</td><td>' + esc(d.state || '--') + '</td><td>' + esc(d.model || '--') + '</td></tr>'
-      ).join('');
-    }
-
-    const mappings = adb.mappings || [];
-    $('adbMappings').textContent = mappings.length
-      ? '端口映射：' + mappings.join('；')
-      : '端口映射：无';
-  }
-
-  async function adbAction(rebuild) {
-    setMsg('adbMsg', rebuild ? '正在重建端口映射…' : '正在检测 ADB…');
-    try {
-      const data = await api(rebuild ? '/api/adb/reverse' : '/api/adb', { method: rebuild ? 'POST' : 'GET' });
-      if (data.ok) {
-        renderAdb(data.adb);
-        setMsg('adbMsg', rebuild ? '端口映射已重建' : '检测完成', 'ok');
-      } else {
-        setMsg('adbMsg', data.error || '操作失败', 'err');
-      }
-    } catch (e) {
-      setMsg('adbMsg', '请求失败：' + e.message, 'err');
-    }
-  }
-
-  // ---------------- 配置 ----------------
-  async function loadConfig(force) {
-    if (state.configDirty && !force) {
-      return;
-    }
-    try {
-      const data = await api('/api/config');
-      if (!data.ok) {
-        setMsg('configMsg', data.error || '读取配置失败', 'err');
+    socket.onmessage = (event) => {
+      if (typeof event.data !== 'string') {
+        onBinaryFrame(event.data);
         return;
       }
-      $('configEditor').value = data.content || '';
-      $('configPath').textContent = data.path || '--';
-      state.configLoaded = true;
-      state.configDirty = false;
-      $('configDirty').textContent = '';
-      setMsg('configMsg', '已载入当前配置', 'ok');
-    } catch (e) {
-      setMsg('configMsg', '读取配置失败：' + e.message, 'err');
+      let msg;
+      try { msg = JSON.parse(event.data); } catch (e) { return; }
+      switch (msg.type) {
+        case 'session': onSession(msg); break;
+        case 'layout_sync': renderLayout(msg); break;
+        case 'telemetry': renderTelemetry(msg); break;
+        case 'button_state': renderButtonState(msg); break;
+        case 'screen_state': onScreenState(msg); break;
+        case 'screen_stats': onScreenStats(msg); break;
+        case 'screen_devices': onScreenDevices(msg); break;
+      }
+    };
+  }
+
+  function scheduleRetry() {
+    clearTimeout(state.retryTimer);
+    state.retryTimer = setTimeout(connect, 2000);
+  }
+
+  function send(payload) {
+    const socket = state.socket;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
     }
   }
 
-  async function saveConfig() {
-    const content = $('configEditor').value;
-    if (!content.trim()) {
-      setMsg('configMsg', '配置内容为空', 'err');
+  function renderConn() {
+    $('connDot').classList.toggle('on', state.connected);
+    $('connText').textContent = state.connected
+      ? (state.transport === 'usb' ? 'USB 通道' : 'Wi-Fi 通道')
+      : '未连接';
+    renderSession();
+  }
+
+  function onSession(msg) {
+    state.transport = msg.transport || 'lan';
+    state.screenAllowed = !!msg.screenStream;
+    state.videoFps = msg.screenMaxFps || 30;
+    renderConn();
+    updateScreenUi();
+  }
+
+  /* ---------------- 遥测 ---------------- */
+  function ringOffset(card, percent) {
+    const ring = card.querySelector('.ring .value');
+    if (!ring) return;
+    const r = 16;
+    const c = 2 * Math.PI * r;
+    ring.style.strokeDasharray = c.toFixed(2);
+    ring.style.strokeDashoffset = (c * (1 - Math.max(0, Math.min(100, percent)) / 100)).toFixed(2);
+  }
+
+  function paintCard(card, percent, text, unit) {
+    const p = Math.max(0, Math.min(100, percent || 0));
+    card.querySelector('.card-bar i').style.width = p + '%';
+    ringOffset(card, p);
+    const big = card.querySelector('.card-value span');
+    if (big) big.textContent = text;
+    const small = card.querySelector('.card-value small');
+    if (small && unit) small.textContent = unit;
+  }
+
+  function cardOf(key) {
+    return document.querySelector('.card[data-key="' + key + '"]');
+  }
+
+  function pctText(value) {
+    return (value === null || value === undefined || value < 0) ? '--' : String(Math.round(value));
+  }
+
+  function renderTelemetry(msg) {
+    state.volume = msg.volume || 0;
+    state.muted = !!msg.isMuted;
+    state.vram = msg.vram;
+    state.vramTotal = msg.vramTotal;
+
+    paintCard(cardOf('cpu'), msg.cpu, pctText(msg.cpu), '%');
+    paintCard(cardOf('mem'), msg.mem, pctText(msg.mem), '%');
+    paintCard(cardOf('gpu'), msg.gpu, pctText(msg.gpu), '%');
+
+    const vramPercent = (msg.vram >= 0 && msg.vramTotal > 0) ? msg.vram / msg.vramTotal * 100 : 0;
+    paintCard(cardOf('vram'), vramPercent,
+      msg.vram >= 0 ? (msg.vram / 1024).toFixed(1) : '--', 'G');
+
+    const volume = msg.isMuted ? 0 : msg.volume;
+    paintCard(cardOf('vol'), volume, String(volume), '%');
+
+    paintCard(cardOf('fps'), state.streaming ? Math.min(100, state.actualFps / 60 * 100) : 0,
+      state.streaming ? state.actualFps.toFixed(1) : '--', 'fps');
+
+    $('mCpu').textContent = pctText(msg.cpu) + '%';
+    $('mGpu').textContent = pctText(msg.gpu) + '%';
+    $('mMem').textContent = pctText(msg.mem) + '%';
+    $('mVram').textContent = msg.vram >= 0 ? (msg.vram / 1024).toFixed(1) + 'G' : '--';
+    $('mFps').textContent = state.streaming ? state.actualFps.toFixed(1) : '--';
+
+    $('volumeText').textContent = msg.isMuted ? '静音' : msg.volume + '%';
+    $('volumeBar').style.width = volume + '%';
+
+    renderSession();
+  }
+
+  function renderSession() {
+    const info = $('sessionInfo');
+    if (!info) return;
+    info.innerHTML =
+      '连接地址：' + escapeHtml(wsUrl()) + '<br>' +
+      '状态：' + (state.connected ? '已连接' : '未连接') + '<br>' +
+      '通道：' + (state.transport === 'usb' ? 'USB（adb reverse）' : 'Wi-Fi 局域网') + '<br>' +
+      '屏幕推流：' + (state.screenAllowed ? '可用' : '不可用') + '<br>' +
+      '当前画面：' + state.videoWidth + '×' + state.videoHeight + ' · ' + state.videoFps + 'fps';
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* ---------------- 控制页 ---------------- */
+  function renderLayout(msg) {
+    state.pageId = msg.pageId || state.pageId;
+    $('deckTitle').textContent = msg.pageTitle || '按键';
+    $('deckMeta').textContent = (msg.grid ? msg.grid.cols + '×' + msg.grid.rows : '') || '';
+
+    const deck = $('deck');
+    deck.innerHTML = '';
+    (msg.buttons || []).forEach((item) => {
+      const el = document.createElement('div');
+      el.className = 'deck-key';
+      el.dataset.id = item.id;
+      el.textContent = item.label || '';
+      if (item.bgColor) el.style.background = item.bgColor;
+      bindGesture(el, item.id);
+      deck.appendChild(el);
+    });
+
+    const tabs = $('deckTabs');
+    tabs.innerHTML = '';
+    (msg.pages || []).forEach((page) => {
+      const tab = document.createElement('div');
+      tab.className = 'tab' + (page.id === msg.pageId ? ' active' : '');
+      tab.textContent = page.title || page.id;
+      tab.addEventListener('click', () => send({ type: 'layout_request', pageId: page.id }));
+      tabs.appendChild(tab);
+    });
+  }
+
+  function renderButtonState(msg) {
+    const el = $('deck').querySelector('[data-id="' + msg.buttonId + '"]');
+    if (!el) return;
+    if (msg.label) el.textContent = msg.label;
+    if (msg.bgColor) el.style.background = msg.bgColor;
+    el.classList.toggle('toggled', !!msg.state && msg.state !== 'normal');
+  }
+
+  function sendAction(buttonId, event) {
+    send({ type: 'action', pageId: state.pageId, buttonId: buttonId, event: event, timestamp: Date.now() });
+  }
+
+  function bindGesture(el, buttonId) {
+    let timer = null;
+    let longPressed = false;
+    el.addEventListener('pointerdown', () => {
+      longPressed = false;
+      el.classList.add('pressed');
+      timer = setTimeout(() => { longPressed = true; sendAction(buttonId, 'long_press_start'); }, 400);
+    });
+    el.addEventListener('pointerup', () => {
+      el.classList.remove('pressed');
+      clearTimeout(timer);
+      const was = longPressed;
+      longPressed = false;
+      sendAction(buttonId, was ? 'long_press_end' : 'click');
+    });
+    el.addEventListener('pointerleave', () => {
+      el.classList.remove('pressed');
+      clearTimeout(timer);
+      if (longPressed) { longPressed = false; sendAction(buttonId, 'long_press_cancel'); }
+    });
+  }
+
+  // 音量走通用控制页的既有按键
+  function clickPageButton(id) {
+    send({ type: 'action', pageId: 'default_page', buttonId: id, event: 'click', timestamp: Date.now() });
+  }
+  $('volUp').addEventListener('click', () => clickPageButton('btn_vol_up'));
+  $('volDown').addEventListener('click', () => clickPageButton('btn_vol_down'));
+  $('volMute').addEventListener('click', () => clickPageButton('btn_mute'));
+
+  function hotkey(combo) {
+    send({ type: 'hotkey', combo: combo });
+  }
+
+  // 睡眠 / 锁屏需要连点两次
+  function bindDanger(id, combo, label) {
+    const el = $(id);
+    let armedAt = 0;
+    el.addEventListener('click', () => {
+      const now = Date.now();
+      if (now - armedAt <= 1500) {
+        armedAt = 0;
+        el.classList.remove('armed');
+        hotkey(combo);
+        return;
+      }
+      armedAt = now;
+      el.classList.add('armed');
+      setTimeout(() => { if (Date.now() - armedAt >= 1500) el.classList.remove('armed'); }, 1600);
+    });
+  }
+  bindDanger('btnSleep', 'sleep');
+  bindDanger('btnLock', 'win+l');
+  $('btnShot').addEventListener('click', () => hotkey('win+shift+s'));
+  $('btnDesktop').addEventListener('click', () => hotkey('win+d'));
+
+  /* ---------------- 屏幕 ---------------- */
+  const h264 = {
+    codec: 'avc1.42C02A',
+    supported: typeof VideoDecoder !== 'undefined',
+    decoder: null,
+    needKey: true,
+    timestamp: 0,
+    firstFrame: false,
+    error: '',
+    frames: 0,
+    bytes: 0
+  };
+
+  function checkDecoder() {
+    if (!h264.supported) {
+      h264.error = '当前浏览器不支持 WebCodecs（需 Chrome / Edge，且通过 127.0.0.1 或 HTTPS 访问）';
+      updateScreenUi();
       return;
     }
-    $('btnConfigSave').disabled = true;
-    setMsg('configMsg', '正在校验并保存…');
+    VideoDecoder.isConfigSupported({ codec: h264.codec, avc: { format: 'annexb' }, optimizeForLatency: true })
+      .then((result) => {
+        h264.supported = !!result.supported;
+        if (!h264.supported) h264.error = '浏览器不支持 H.264 Annex-B 解码';
+        updateScreenUi();
+      })
+      .catch((e) => { h264.supported = false; h264.error = '解码能力检测失败：' + e.message; updateScreenUi(); });
+  }
+
+  function resetDecoder() {
+    if (h264.decoder) {
+      try { h264.decoder.close(); } catch (e) { /* 已关闭 */ }
+      h264.decoder = null;
+    }
+    h264.needKey = true;
+    h264.timestamp = 0;
+    h264.firstFrame = false;
+    h264.frames = 0;
+    h264.bytes = 0;
+    state.actualFps = 0;
+    state.kbps = 0;
+  }
+
+  function ensureDecoder() {
+    if (!h264.supported) return null;
+    if (h264.decoder && h264.decoder.state === 'configured') return h264.decoder;
     try {
-      const data = await api('/api/config', { method: 'POST', body: content });
-      if (data.ok) {
-        state.configDirty = false;
-        $('configDirty').textContent = '';
-        const warnings = data.warnings || [];
-        if (warnings.length) {
-          setMsg('configMsg', (data.message || '已保存') + '；' + warnings.join('；'), 'warn');
-        } else {
-          setMsg('configMsg', (data.message || '已保存') + '（' + fmtTime(data.configModified) + '）', 'ok');
+      const decoder = new VideoDecoder({
+        output: drawFrame,
+        error: (e) => {
+          console.warn('H.264 解码错误', e);
+          h264.needKey = true;
+          try { h264.decoder && h264.decoder.close(); } catch (ignored) { /* 已关闭 */ }
+          h264.decoder = null;
         }
-        refreshStatus();
-      } else {
-        setMsg('configMsg', data.error || '保存失败', 'err');
-      }
-    } catch (e) {
-      setMsg('configMsg', '保存失败：' + e.message, 'err');
-    } finally {
-      $('btnConfigSave').disabled = false;
-    }
-  }
-
-  // ---------------- 日志 ----------------
-  async function refreshLogs() {
-    let data;
-    try {
-      data = await api('/api/logs?since=' + state.logSeq + '&limit=200');
-    } catch (e) {
-      return;
-    }
-    if (!data || !data.ok) return;
-    const entries = data.entries || [];
-    if (entries.length) {
-      const list = $('logList');
-      const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 24;
-      const frag = document.createDocumentFragment();
-      entries.forEach((e) => {
-        const line = document.createElement('div');
-        line.className = 'log-line';
-        line.innerHTML =
-          '<span class="t">' + fmtTime(e.time) + '</span>' +
-          '<span class="lv lv-' + esc(e.level) + '">' + esc(e.level) + '</span>' +
-          '<span class="tg">' + esc(e.tag || '') + '</span>' +
-          '<span class="ms">' + esc(e.message || '') + '</span>';
-        frag.appendChild(line);
       });
-      list.appendChild(frag);
-      while (list.childElementCount > 600) {
-        list.removeChild(list.firstElementChild);
-      }
-      if ($('logAutoScroll').checked && atBottom) {
-        list.scrollTop = list.scrollHeight;
-      }
-      state.logSeq = data.lastSeq;
-      $('logTag').textContent = 'seq ' + data.lastSeq;
-    } else if (data.lastSeq != null) {
-      state.logSeq = data.lastSeq;
-    }
-  }
-
-  async function clearLogs() {
-    const data = await api('/api/logs/clear', { method: 'POST' });
-    if (data && data.ok) {
-      $('logList').innerHTML = '';
-      state.logSeq = data.lastSeq || 0;
-      $('logTag').textContent = 'seq ' + state.logSeq;
-    }
-  }
-
-  // ---------------- 系统 ----------------
-  async function shutdownService() {
-    if (!confirm('确认退出 PC 服务端？退出后手机端会断开，需要重新运行 start.cmd 才能恢复。')) {
-      return;
-    }
-    $('btnShutdown').disabled = true;
-    setMsg('sysMsg', '正在退出服务…');
-    try {
-      const data = await api('/api/shutdown', { method: 'POST' });
-      setMsg('sysMsg', data && data.ok ? '服务正在退出，可关闭此页面' : ((data && data.error) || '退出失败'), data && data.ok ? 'ok' : 'err');
+      decoder.configure({ codec: h264.codec, avc: { format: 'annexb' }, optimizeForLatency: true });
+      h264.decoder = decoder;
+      h264.needKey = true;
+      return decoder;
     } catch (e) {
-      setMsg('sysMsg', '已发送退出请求（连接中断属正常现象）', 'warn');
+      h264.error = '解码器初始化失败：' + e.message;
+      return null;
     }
   }
 
-  function esc(text) {
-    return String(text == null ? '' : text)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  function drawFrame(frame) {
+    const canvas = $('screenCanvas');
+    const width = frame.displayWidth || state.videoWidth;
+    const height = frame.displayHeight || state.videoHeight;
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    canvas.getContext('2d').drawImage(frame, 0, 0, canvas.width, canvas.height);
+    frame.close();
+    h264.frames++;
+    if (!h264.firstFrame) {
+      h264.firstFrame = true;
+      h264.error = '';
+      updateScreenUi();
+    }
   }
 
-  // ---------------- 绑定 ----------------
-  $('btnAdbProbe').addEventListener('click', () => adbAction(false));
-  $('btnAdbRebuild').addEventListener('click', () => adbAction(true));
-  $('btnConfigReload').addEventListener('click', () => {
-    if (state.configDirty && !confirm('编辑器中有未保存的修改，确认放弃并重新载入？')) {
+  function containsIdr(data) {
+    for (let i = 0; i < data.length - 4; i++) {
+      if (data[i] !== 0 || data[i + 1] !== 0) continue;
+      let header;
+      if (data[i + 2] === 1) header = i + 3;
+      else if (data[i + 2] === 0 && data[i + 3] === 1) header = i + 4;
+      else continue;
+      if ((data[header] & 0x1f) === 5) return true;
+    }
+    return false;
+  }
+
+  function onBinaryFrame(buffer) {
+    if (state.page !== 'screen') return;
+    const data = new Uint8Array(buffer);
+    h264.bytes += data.length;
+    const key = containsIdr(data);
+    if (h264.needKey && !key) return;
+    const decoder = ensureDecoder();
+    if (!decoder) return;
+    if (!key && decoder.decodeQueueSize > 12) { h264.needKey = true; return; }
+    try {
+      decoder.decode(new EncodedVideoChunk({
+        type: key ? 'key' : 'delta',
+        timestamp: (h264.timestamp += Math.round(1e6 / Math.max(1, state.videoFps))),
+        data: data
+      }));
+      if (key) h264.needKey = false;
+    } catch (e) {
+      h264.needKey = true;
+    }
+  }
+
+  function onScreenState(msg) {
+    if (msg.reason === 'encoder_unavailable' || msg.reason === 'encoder_error') {
+      state.streaming = false;
+      resetDecoder();
+      h264.error = msg.reason === 'encoder_unavailable'
+        ? '服务端未找到 ffmpeg，请检查 config.json 的 screen.ffmpegExecutable'
+        : 'H.264 编码器启动失败，详见服务端日志';
+    } else if (msg.reason === 'usb_required') {
+      state.streaming = false;
+      state.screenAllowed = false;
+      resetDecoder();
+    } else {
+      state.streaming = !!msg.streaming;
+      if (msg.streaming) {
+        h264.error = '';
+        resetDecoder();
+        if (msg.width > 0) state.videoWidth = msg.width;
+        if (msg.height > 0) state.videoHeight = msg.height;
+        if (msg.fps > 0) state.videoFps = msg.fps;
+      } else {
+        resetDecoder();
+      }
+    }
+    updateScreenUi();
+  }
+
+  function onScreenStats(msg) {
+    state.actualFps = msg.actualFps || 0;
+    state.kbps = msg.kbps || 0;
+    if (msg.width > 0) state.videoWidth = msg.width;
+    if (msg.height > 0) state.videoHeight = msg.height;
+    updateScreenUi();
+    renderTelemetryMeta();
+  }
+
+  function onScreenDevices(msg) {
+    state.monitors = Array.isArray(msg.devices) ? msg.devices : [];
+    state.monitor = Number.isInteger(msg.current) ? msg.current : -1;
+    const select = $('monitorSelect');
+    select.innerHTML = '';
+    const all = document.createElement('option');
+    all.value = '-1';
+    all.textContent = '整块桌面（所有显示器）';
+    select.appendChild(all);
+    state.monitors.forEach((device) => {
+      const option = document.createElement('option');
+      option.value = String(device.id);
+      option.textContent = device.name + ' · ' + device.width + '×' + device.height;
+      select.appendChild(option);
+    });
+    select.value = String(state.monitor);
+  }
+
+  function showFrameOnly() {
+    return state.streaming && h264.firstFrame && !h264.error;
+  }
+
+  function updateScreenUi() {
+    const btn = $('streamBtn');
+    const hint = $('screenHint');
+    const canvas = $('screenCanvas');
+    const ready = state.connected && state.screenAllowed && h264.supported;
+    btn.textContent = state.streaming ? '停止监视' : '开始监视';
+    btn.disabled = !ready && !state.streaming;
+    $('monitorSelect').disabled = !ready;
+    $('fullscreenBtn').style.display = showFrameOnly() ? 'block' : 'none';
+
+    const show = showFrameOnly();
+    canvas.style.display = show ? 'block' : 'none';
+    hint.style.display = show ? 'none' : 'block';
+
+    if (show) {
+      $('screenMeta').textContent = streamSummary();
       return;
     }
-    loadConfig(true);
+    if (!state.connected) {
+      hint.innerHTML = '尚未连接 PC 服务端。<br>请先在「设置」里确认地址与端口。';
+    } else if (!state.screenAllowed) {
+      hint.innerHTML = '服务端未开放屏幕推流。';
+    } else if (!h264.supported) {
+      hint.innerHTML = '当前浏览器无法解码 H.264。<br>WebCodecs 需要 Chrome / Edge，并通过 127.0.0.1 或 HTTPS 访问。';
+    } else if (h264.error) {
+      hint.innerHTML = escapeHtml(h264.error);
+    } else if (state.streaming) {
+      hint.innerHTML = '正在等待关键帧…';
+    } else {
+      hint.innerHTML = '通道就绪。点击「开始监视」查看实时画面。';
+    }
+    $('screenMeta').textContent = state.streaming ? '推流中' : '未推流';
+  }
+
+  function streamSummary() {
+    let text = state.videoWidth + '×' + state.videoHeight + ' · ' + state.videoFps + 'fps · H.264';
+    if (state.actualFps > 0) text += ' · 实际 ' + state.actualFps.toFixed(1) + ' fps';
+    if (state.kbps > 0) text += ' · ' + (state.kbps >= 1024 ? (state.kbps / 1024).toFixed(1) + ' MB/s' : state.kbps + ' KB/s');
+    return text;
+  }
+
+  function renderTelemetryMeta() {
+    $('mFps').textContent = state.streaming ? state.actualFps.toFixed(1) : '--';
+    const fpsCard = cardOf('fps');
+    if (fpsCard) {
+      paintCard(fpsCard, state.streaming ? Math.min(100, state.actualFps / 60 * 100) : 0,
+        state.streaming ? state.actualFps.toFixed(1) : '--', 'fps');
+    }
+  }
+
+  function startStream() {
+    if (!h264.supported) { updateScreenUi(); return; }
+    resetDecoder();
+    h264.error = '';
+    send({ type: 'screen_control', action: 'start', codec: 'h264', monitor: state.monitor });
+    $('screenMeta').textContent = '正在启动编码器…';
+  }
+
+  function stopStream() {
+    send({ type: 'screen_control', action: 'stop' });
+    state.streaming = false;
+    resetDecoder();
+    updateScreenUi();
+  }
+
+  $('streamBtn').addEventListener('click', () => { state.streaming ? stopStream() : startStream(); });
+  $('monitorSelect').addEventListener('change', () => {
+    state.monitor = parseInt($('monitorSelect').value, 10);
+    if (state.streaming) { stopStream(); startStream(); }
   });
-  $('btnConfigSave').addEventListener('click', saveConfig);
-  $('btnLogClear').addEventListener('click', clearLogs);
-  $('btnShutdown').addEventListener('click', shutdownService);
-
-  $('configEditor').addEventListener('input', () => {
-    state.configDirty = true;
-    $('configDirty').textContent = '未保存';
+  $('fullscreenBtn').addEventListener('click', () => {
+    const stage = $('screenStage');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (stage.requestFullscreen) stage.requestFullscreen();
   });
 
-  refreshStatus();
-  loadConfig(true);
-  refreshLogs();
+  /* ---------------- 设置 ---------------- */
+  $('hostInput').value = params.get('host') || localStorage.getItem('webHost') || location.hostname || '127.0.0.1';
+  $('portInput').value = params.get('port') || localStorage.getItem('webPort') || '8500';
 
-  setInterval(refreshStatus, 2000);
-  setInterval(refreshLogs, 1500);
+  $('reconnectBtn').addEventListener('click', () => {
+    const host = $('hostInput').value.trim();
+    const port = $('portInput').value.trim() || '8500';
+    if (!host) {
+      $('sessionInfo').textContent = '请先填写服务端地址';
+      return;
+    }
+    localStorage.setItem('webHost', host);
+    localStorage.setItem('webPort', port);
+    connect();
+  });
+
+  /* ---------------- 启动 ---------------- */
+  checkDecoder();
+  renderConn();
+  renderSession();
+  updateScreenUi();
+
+  // 支持 /#control、/#screen 等直达入口
+  const initialPage = (location.hash || '').replace('#', '');
+  if (PAGE_TITLES[initialPage]) switchPage(initialPage);
+
+  connect();
+
+  // 每秒刷新 FPS 卡片与顶栏，避免只在遥测时更新
+  state.fpsTimer = setInterval(renderTelemetryMeta, 1000);
 })();
 </script>
 </body>

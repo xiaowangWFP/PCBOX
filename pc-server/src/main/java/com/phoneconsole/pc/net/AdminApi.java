@@ -8,6 +8,7 @@ import com.phoneconsole.pc.runtime.LogBuffer;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,6 +35,8 @@ public final class AdminApi {
                     return post ? methodNotAllowed(path) : json(200, runtime.status());
                 case "/api/config":
                     return post ? saveConfig(body) : loadConfig();
+                case "/api/connect":
+                    return post ? methodNotAllowed(path) : connectInfo();
                 case "/api/adb":
                     return post ? methodNotAllowed(path) : adbStatus();
                 case "/api/adb/reverse":
@@ -67,6 +70,20 @@ public final class AdminApi {
         }
         Object result = runtime.saveConfig(body);
         return json(200, result);
+    }
+
+    /** 手机扫码用：返回本机局域网地址与 WebSocket 端口 */
+    private Response connectInfo() {
+        List<String> ips = LanAddresses.ordered();
+        String host = ips.isEmpty() ? "127.0.0.1" : ips.get(0);
+        int port = runtime.wsPort();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ok", true);
+        payload.put("host", host);
+        payload.put("port", port);
+        payload.put("ips", ips);
+        payload.put("uri", "ws://" + host + ":" + port);
+        return json(200, payload);
     }
 
     private Response adbStatus() {

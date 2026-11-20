@@ -28,7 +28,7 @@ import java.util.concurrent.CountDownLatch;
  * PC 服务端启动入口。
  * <p>
  * 启动顺序：加载配置 -> WebSocket 服务 -> 网页控制台 -> 遥测/窗口感知 -> ADB 守护 -> 托盘。
- * 启动后可在 http://127.0.0.1:8501/ 的「系统管理」页完成配置热重载、页面切换、ADB 映射与退出，
+ * 启动后可在 http://127.0.0.1:8501/ 的管理页完成配置热重载、ADB 映射与退出，
  * 日常使用不再需要回到命令行窗口。
  */
 public final class Main {
@@ -79,6 +79,8 @@ public final class Main {
         httpServer.start();
 
         TelemetryService telemetry = new TelemetryService(1000, wsServer::broadcast, engine.media());
+        // 新连接接入时立即补一帧遥测，页面不必等下一个 1 秒周期
+        wsServer.setTelemetrySource(telemetry::snapshotJson);
         telemetry.start();
 
         adb.start();

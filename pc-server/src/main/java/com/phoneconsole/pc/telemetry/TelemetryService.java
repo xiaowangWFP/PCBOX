@@ -94,6 +94,11 @@ public class TelemetryService {
         }
     }
 
+    /** 当前快照的 JSON：新连接建立时立即下发一帧，避免页面首秒无数据 */
+    public String snapshotJson() {
+        return gson.toJson(snapshot());
+    }
+
     public TelemetryMessage snapshot() {
         TelemetryMessage message = new TelemetryMessage();
         message.cpu = cpuUsage();

@@ -1,8 +1,11 @@
 package com.phoneconsole.client;
 
+import android.app.AlertDialog;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
+import android.text.InputType;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Surface;
@@ -16,12 +19,15 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -33,6 +39,7 @@ import com.phoneconsole.client.model.ScreenDevicesMessage;
 import com.phoneconsole.client.model.ScreenStateMessage;
 import com.phoneconsole.client.model.SessionMessage;
 import com.phoneconsole.client.model.TelemetryMessage;
+import com.phoneconsole.client.net.ChannelStore;
 import com.phoneconsole.client.net.ConnectionManager;
 import com.phoneconsole.client.screen.H264Decoder;
 import com.phoneconsole.client.ui.ControlWorkspaceController;
@@ -158,6 +165,14 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     // 设置页
     private EditText etServerHost;
     private EditText etServerPort;
+    private Spinner spinnerChannels;
+    private TextView btnAddChannel;
+    private TextView btnDeleteChannel;
+    private TextView btnScanQr;
+    private final List<ChannelStore.Channel> channels = new ArrayList<>();
+    private int channelIndex;
+    private boolean suppressChannelCallback;
+    private ActivityResultLauncher<Intent> scanLauncher;
     private TextView tvSessionDetail;
 
     private ConnectionManager connection;
@@ -188,6 +203,15 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
+
+        scanLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() != RESULT_OK || result.getData() == null) {
+                        return;
+                    }
+                    handleScannedEndpoint(result.getData().getStringExtra(ScanActivity.EXTRA_RESULT));
+                });
 
         bindViews();
         WindowInsetsHelper.attach(this, findViewById(R.id.rootContainer),
@@ -361,6 +385,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
         etServerHost = findViewById(R.id.etServerHost);
         etServerPort = findViewById(R.id.etServerPort);
+        spinnerChannels = findViewById(R.id.spinnerChannels);
+        btnAddChannel = findViewById(R.id.btnAddChannel);
+        btnDeleteChannel = findViewById(R.id.btnDeleteChannel);
+        btnScanQr = findViewById(R.id.btnScanQr);
         tvSessionDetail = findViewById(R.id.tvSessionDetail);
     }
 
@@ -566,18 +594,231 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     private void setupSettingsPage() {
-        findViewById(R.id.btnReconnect).setOnClickListener(v -> {
-            String host = etServerHost.getText().toString().trim();
-            String port = etServerPort.getText().toString().trim();
-            if (host.isEmpty()) {
-                Toast.makeText(this, "请填写服务端地址", Toast.LENGTH_SHORT).show();
-                return;
+        // 横竖屏布局各自独立维护，这里统一做空值保护，避免某个方向缺控件时直接崩溃
+        if (spinnerChannels == null || btnAddChannel == null || btnDeleteChannel == null
+                || btnScanQr == null || etServerHost == null || etServerPort == null) {
+            View reconnect = findViewById(R.id.btnReconnect);
+            if (reconnect != null) {
+                reconnect.setOnClickListener(v -> saveAndReconnect());
             }
-            connection.setLanEndpoint(normalizeEndpoint(
-                    host + (port.isEmpty() ? "" : ":" + port)));
-            connection.reconnect();
-            tvSessionDetail.setText("已保存并重新连接…");
+            return;
+        }
+
+        spinnerChannels.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (suppressChannelCallback || position < 0 || position >= channels.size()) {
+                    return;
+                }
+                channelIndex = position;
+                ChannelStore.Channel channel = channels.get(position);
+                etServerHost.setText(channel.host);
+                etServerPort.setText(String.valueOf(channel.port));
+                ChannelStore.save(MainActivity.this, channels, channelIndex);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
         });
+
+        btnAddChannel.setOnClickListener(v -> showAddChannelDialog());
+        btnDeleteChannel.setOnClickListener(v -> deleteCurrentChannel());
+        btnScanQr.setOnClickListener(v -> startScan());
+        findViewById(R.id.btnReconnect).setOnClickListener(v -> saveAndReconnect());
+
+        reloadChannels();
+    }
+
+    /** 读取本地通道；为空时用当前地址生成一个默认通道 */
+    private void reloadChannels() {
+        channels.clear();
+        channels.addAll(ChannelStore.load(this));
+        if (channels.isEmpty()) {
+            String host = "127.0.0.1";
+            int port = Integer.parseInt(DEFAULT_PORT);
+            String endpoint = connection == null ? null : connection.getLanEndpoint();
+            if (endpoint != null && !endpoint.isEmpty()) {
+                String body = endpoint.replaceFirst("^wss?://", "");
+                int idx = body.lastIndexOf(':');
+                if (idx > 0) {
+                    host = body.substring(0, idx);
+                    try {
+                        port = Integer.parseInt(body.substring(idx + 1));
+                    } catch (NumberFormatException ignored) {
+                        port = Integer.parseInt(DEFAULT_PORT);
+                    }
+                } else if (!body.isEmpty()) {
+                    host = body;
+                }
+            }
+            channels.add(new ChannelStore.Channel("默认通道", host, port));
+        }
+        channelIndex = Math.max(0, Math.min(ChannelStore.selected(this), channels.size() - 1));
+        ChannelStore.save(this, channels, channelIndex);
+        renderChannelSpinner();
+    }
+
+    private void renderChannelSpinner() {
+        if (channels.isEmpty()) {
+            return;
+        }
+        channelIndex = Math.max(0, Math.min(channelIndex, channels.size() - 1));
+        ChannelStore.Channel current = channels.get(channelIndex);
+        if (etServerHost != null) {
+            etServerHost.setText(current.host);
+        }
+        if (etServerPort != null) {
+            etServerPort.setText(String.valueOf(current.port));
+        }
+        if (spinnerChannels == null) {
+            return;
+        }
+        List<String> labels = new ArrayList<>();
+        for (ChannelStore.Channel channel : channels) {
+            labels.add(channel.label());
+        }
+        suppressChannelCallback = true;
+        spinnerChannels.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, labels));
+        spinnerChannels.setSelection(channelIndex);
+        suppressChannelCallback = false;
+    }
+
+    private void saveAndReconnect() {
+        String host = etServerHost.getText().toString().trim();
+        String portText = etServerPort.getText().toString().trim();
+        if (host.isEmpty()) {
+            Toast.makeText(this, "请填写服务端地址", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int port;
+        try {
+            port = portText.isEmpty() ? Integer.parseInt(DEFAULT_PORT) : Integer.parseInt(portText);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "端口需为数字", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ChannelStore.Channel channel = channels.get(channelIndex);
+        channel.host = host;
+        channel.port = port;
+        if (channel.name == null || channel.name.trim().isEmpty()) {
+            channel.name = host;
+        }
+        ChannelStore.save(this, channels, channelIndex);
+        renderChannelSpinner();
+        connection.setLanEndpoint(normalizeEndpoint(host + ":" + port));
+        connection.reconnect();
+        tvSessionDetail.setText("已保存并重新连接…");
+    }
+
+    private void showAddChannelDialog() {
+        float density = getResources().getDisplayMetrics().density;
+        int pad = (int) (20 * density);
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+
+        EditText nameInput = new EditText(this);
+        nameInput.setHint("名称（可留空）");
+        EditText hostInput = new EditText(this);
+        hostInput.setHint("地址，例如 192.168.1.10");
+        hostInput.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        EditText portInput = new EditText(this);
+        portInput.setHint("端口，默认 " + DEFAULT_PORT);
+        portInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+
+        box.addView(nameInput);
+        box.addView(hostInput);
+        box.addView(portInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle("添加通道")
+                .setView(box)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("保存", (dialog, which) -> {
+                    String host = hostInput.getText().toString().trim();
+                    if (host.isEmpty()) {
+                        Toast.makeText(this, "请填写地址", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    int port;
+                    try {
+                        String text = portInput.getText().toString().trim();
+                        port = text.isEmpty() ? Integer.parseInt(DEFAULT_PORT) : Integer.parseInt(text);
+                    } catch (NumberFormatException e) {
+                        port = Integer.parseInt(DEFAULT_PORT);
+                    }
+                    String name = nameInput.getText().toString().trim();
+                    channels.add(new ChannelStore.Channel(name.isEmpty() ? host : name, host, port));
+                    channelIndex = channels.size() - 1;
+                    ChannelStore.save(this, channels, channelIndex);
+                    renderChannelSpinner();
+                })
+                .show();
+    }
+
+    private void deleteCurrentChannel() {
+        if (channels.size() <= 1) {
+            Toast.makeText(this, "至少保留一个通道", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        channels.remove(channelIndex);
+        channelIndex = Math.max(0, channelIndex - 1);
+        ChannelStore.save(this, channels, channelIndex);
+        renderChannelSpinner();
+    }
+
+    private void startScan() {
+        if (scanLauncher == null) {
+            return;
+        }
+        scanLauncher.launch(new Intent(this, ScanActivity.class));
+    }
+
+    /** 解析扫码结果（支持 ws://host:port 或 host:port），保存为新通道并立即重连 */
+    private void handleScannedEndpoint(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            Toast.makeText(this, "二维码内容为空", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String body = raw.trim().replaceFirst("^wss?://", "");
+        int slash = body.indexOf('/');
+        if (slash > 0) {
+            body = body.substring(0, slash);
+        }
+        String host = body;
+        String portText = DEFAULT_PORT;
+        int idx = body.lastIndexOf(':');
+        if (idx > 0) {
+            host = body.substring(0, idx);
+            portText = body.substring(idx + 1);
+        }
+        if (host.isEmpty() || !portText.matches("\\d+")) {
+            Toast.makeText(this, "无法识别的二维码：" + raw, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int port = Integer.parseInt(portText);
+
+        int found = -1;
+        for (int i = 0; i < channels.size(); i++) {
+            ChannelStore.Channel channel = channels.get(i);
+            if (host.equals(channel.host) && port == channel.port) {
+                found = i;
+                break;
+            }
+        }
+        if (found >= 0) {
+            channelIndex = found;
+        } else {
+            channels.add(new ChannelStore.Channel("扫码 " + host, host, port));
+            channelIndex = channels.size() - 1;
+        }
+        ChannelStore.save(this, channels, channelIndex);
+        renderChannelSpinner();
+        connection.setLanEndpoint(normalizeEndpoint(host + ":" + port));
+        connection.reconnect();
+        tvSessionDetail.setText("已扫码并连接 " + host + ":" + port);
     }
 
     // ---------------- 页面切换 ----------------
@@ -1202,6 +1443,18 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         etServerHost.setText(host);
         etServerPort.setText(port);
+
+        if (!channels.isEmpty() && channelIndex >= 0 && channelIndex < channels.size()) {
+            ChannelStore.Channel channel = channels.get(channelIndex);
+            channel.host = host;
+            try {
+                channel.port = Integer.parseInt(port);
+            } catch (NumberFormatException ignored) {
+                // 端口非法时保持原值
+            }
+            ChannelStore.save(this, channels, channelIndex);
+            renderChannelSpinner();
+        }
     }
 
     private void renderSessionDetail() {
