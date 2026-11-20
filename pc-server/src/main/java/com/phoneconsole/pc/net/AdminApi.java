@@ -2,8 +2,6 @@ package com.phoneconsole.pc.net;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.phoneconsole.pc.runtime.ConsoleRuntime;
 import com.phoneconsole.pc.runtime.LogBuffer;
 
@@ -13,8 +11,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 网页控制台管理接口（HTTP/JSON）：
- * 服务状态、配置读写与热重载、页面切换、ADB 状态与重建、运行日志、退出服务。
+ * 服务端管理接口（HTTP/JSON）：
+ * 服务状态、配置读写与热重载、ADB 状态与重建、运行日志、退出服务。
  */
 public final class AdminApi {
 
@@ -36,8 +34,6 @@ public final class AdminApi {
                     return post ? methodNotAllowed(path) : json(200, runtime.status());
                 case "/api/config":
                     return post ? saveConfig(body) : loadConfig();
-                case "/api/page":
-                    return post ? switchPage(body) : methodNotAllowed(path);
                 case "/api/adb":
                     return post ? methodNotAllowed(path) : adbStatus();
                 case "/api/adb/reverse":
@@ -73,18 +69,6 @@ public final class AdminApi {
         return json(200, result);
     }
 
-    private Response switchPage(String body) {
-        JsonObject json = parseObject(body);
-        if (json == null || !json.has("pageId")) {
-            return error(400, "缺少 pageId");
-        }
-        String pageId = json.get("pageId").getAsString();
-        if (pageId.isBlank()) {
-            return error(400, "pageId 不能为空");
-        }
-        return json(200, runtime.switchPage(pageId));
-    }
-
     private Response adbStatus() {
         runtime.adb().probe();
         return json(200, adbPayload());
@@ -114,17 +98,6 @@ public final class AdminApi {
         payload.put("ok", true);
         payload.put("message", "服务端正在退出");
         return json(200, payload);
-    }
-
-    private JsonObject parseObject(String body) {
-        if (body == null || body.isBlank()) {
-            return null;
-        }
-        try {
-            return JsonParser.parseString(body).getAsJsonObject();
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     private long longParam(String query, String key, long fallback) {

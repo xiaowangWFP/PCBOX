@@ -140,7 +140,11 @@ public class ControlWebSocketServer extends WebSocketServer {
         }
     }
 
-    /** 在线连接数（手机端与网页端都计入） */
+    /**
+     * 在线手机端数量。
+     * 网页控制台是纯 HTTP 管理页，不再建立 WebSocket 连接，因此这里统计到的都是手机端，
+     * PC 自身不会出现在「在线设备」里。
+     */
     public int clientCount() {
         return getConnections().size();
     }

@@ -64,7 +64,7 @@ public final class ConsoleRuntime {
         return adb;
     }
 
-    /** 服务状态：端口、页面、在线数、配置路径、ADB 快照 */
+    /** 服务状态：端口、在线设备数、配置路径、ADB 快照 */
     public Map<String, Object> status() {
         AppConfig snapshot = config;
         Map<String, Object> status = new LinkedHashMap<>();
@@ -79,9 +79,7 @@ public final class ConsoleRuntime {
         status.put("configHttpPort", snapshot.network.httpPort);
         status.put("adbExecutable", snapshot.network.adbExecutable);
         status.put("reversePollMs", snapshot.network.reversePollMs);
-        status.put("pageId", wsServer.currentPageId());
         status.put("clients", wsServer.clientCount());
-        status.put("pages", pages(snapshot));
         status.put("adb", adb.statusMap());
         status.put("logCount", LogBuffer.get().size());
         status.put("shuttingDown", shuttingDown);
@@ -129,17 +127,6 @@ public final class ConsoleRuntime {
         return result;
     }
 
-    public Map<String, Object> switchPage(String pageId) {
-        AppConfig.PageConfig page = config.page(pageId);
-        if (page == null) {
-            return failure("页面不存在：" + pageId);
-        }
-        wsServer.broadcastLayout(pageId);
-        Map<String, Object> result = success("已切换到「" + page.title + "」");
-        result.put("pageId", pageId);
-        return result;
-    }
-
     public Map<String, Object> logs(long since, int limit) {
         List<LogBuffer.Entry> entries = LogBuffer.get().since(since, limit);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -174,20 +161,6 @@ public final class ConsoleRuntime {
         }, "web-shutdown");
         thread.setDaemon(true);
         thread.start();
-    }
-
-    private List<Map<String, Object>> pages(AppConfig snapshot) {
-        List<Map<String, Object>> list = new ArrayList<>();
-        for (AppConfig.PageConfig page : snapshot.pages) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", page.id);
-            item.put("title", page.title);
-            item.put("rows", page.grid == null ? 0 : page.grid.rows);
-            item.put("cols", page.grid == null ? 0 : page.grid.cols);
-            item.put("buttons", page.buttons == null ? 0 : page.buttons.size());
-            list.add(item);
-        }
-        return list;
     }
 
     private boolean networkChanged(AppConfig.Network before, AppConfig.Network after) {
