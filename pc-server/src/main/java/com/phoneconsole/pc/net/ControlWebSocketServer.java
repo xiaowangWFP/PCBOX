@@ -283,7 +283,7 @@ public class ControlWebSocketServer extends WebSocketServer {
         }
         currentPageId = pageId;
         log.info("切换页面 -> {}（{}）", layout.pageTitle, pageId);
-        LogBuffer.get().info("PAGE", "切换页面 -> " + layout.pageTitle + "（" + pageId + "）");
+        LogBuffer.get().info("PAGE", "下发面板 -> " + layout.pageTitle + "（" + pageId + "）");
         broadcast(gson.toJson(layout));
     }
 
