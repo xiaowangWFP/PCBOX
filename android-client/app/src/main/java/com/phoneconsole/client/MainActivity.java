@@ -171,8 +171,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     private int lastVolumeSent = -1;
     private long lastVolumeInputAt;
-    private long lastUnsupportedToastAt;
-    private String lastUnsupportedFeature = "";
+
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -400,12 +399,17 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
                     @Override
                     public void onDeckKeyDelete(String buttonId, String label) {
-                        notifyUnsupported("删除自定义按键");
+                        connection.sendDeleteCustomKey(currentPageId, buttonId);
                     }
 
                     @Override
                     public void onAddCustomKey(ControlWorkspaceController.CustomKeyDraft draft) {
-                        notifyUnsupported("新增自定义按键");
+                        connection.sendAddCustomKey(
+                                currentPageId,
+                                draft.label,
+                                draft.actionType,
+                                draft.target,
+                                draft.bgColorHex);
                     }
 
                     @Override
@@ -420,7 +424,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
                     @Override
                     public void onToggleMicMute() {
-                        notifyUnsupported("麦克风静音");
+                        connection.sendToggleMicMute();
                     }
 
                     @Override
@@ -439,28 +443,31 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                         if ("alt+tab".equals(combo)) {
                             connection.sendAction(DEFAULT_PAGE_ID, "btn_alt_tab", "click");
                         } else {
-                            notifyUnsupported("快捷键 " + combo);
+                            connection.sendQuickHotkey(combo);
                         }
                     }
 
                     @Override
                     public void onSendRemoteText(String text, boolean pressEnter) {
-                        notifyUnsupported("远程文本输入");
+                        if (text == null || text.isEmpty()) {
+                            return;
+                        }
+                        connection.sendRemoteText(text, pressEnter);
                     }
 
                     @Override
                     public void onTouchpadMove(int dx, int dy) {
-                        notifyUnsupported("触控板鼠标移动");
+                        connection.sendTouchpadMove(dx, dy);
                     }
 
                     @Override
                     public void onTouchpadClick(String mouseButton) {
-                        notifyUnsupported("触控板点击");
+                        connection.sendTouchpadClick(mouseButton);
                     }
 
                     @Override
                     public void onTouchpadScroll(int deltaY) {
-                        notifyUnsupported("触控板滚动");
+                        connection.sendTouchpadScroll(deltaY);
                     }
                 });
     }
@@ -770,7 +777,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         updateVramCard(telemetry.vram, telemetry.vramTotal);
 
         if (controlController != null) {
-            controlController.updateAudioTelemetry(volume, muted, false);
+            controlController.updateAudioTelemetry(volume, muted, telemetry.micMuted);
         }
         if (System.currentTimeMillis() - lastVolumeInputAt > 1500) {
             lastVolumeSent = volume;
@@ -1243,17 +1250,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             connection.sendAction(MEDIA_PAGE_ID, buttonId, "click");
         }
         lastVolumeSent = percent;
-    }
-
-    /** 服务端当前协议尚未提供的能力：明确提示而不是静默失败 */
-    private void notifyUnsupported(String feature) {
-        long now = System.currentTimeMillis();
-        if (feature.equals(lastUnsupportedFeature) && now - lastUnsupportedToastAt < 2500) {
-            return;
-        }
-        lastUnsupportedFeature = feature;
-        lastUnsupportedToastAt = now;
-        Toast.makeText(this, "PC 服务端暂不支持：" + feature, Toast.LENGTH_SHORT).show();
     }
 
     // ---------------- 其它 ----------------

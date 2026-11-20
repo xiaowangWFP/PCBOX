@@ -17,4 +17,6 @@ public class TelemetryMessage {
     public String netDown;
     public int volume;
     public boolean isMuted;
+    /** 麦克风是否静音 */
+    public boolean micMuted;
 }

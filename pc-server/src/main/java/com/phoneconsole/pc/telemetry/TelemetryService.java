@@ -106,6 +106,7 @@ public class TelemetryService {
         message.netDown = formatSpeed(speed[1]);
         message.volume = media.volume();
         message.isMuted = media.isMuted();
+        message.micMuted = media.isMicMuted();
         return message;
     }
 

@@ -1,14 +1,27 @@
 package com.phoneconsole.pc.core;
 
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.awt.Robot;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Transferable;
 import java.awt.event.KeyEvent;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 基于 java.awt.Robot 的系统级按键模拟。
- * 支持修饰键组合（如 ctrl+shift+esc）与单键。
+ * 支持修饰键组合（如 ctrl+shift+esc）与单键，以及远程文本粘贴输入。
  */
 public final class KeySimulator {
+
+    private static final Logger log = LoggerFactory.getLogger(KeySimulator.class);
 
     private static Robot robot;
 
@@ -29,6 +42,78 @@ public final class KeySimulator {
         }
         for (int i = codes.length - 1; i >= 0; i--) {
             r.keyRelease(codes[i]);
+        }
+    }
+
+    /**
+     * 执行形如 "win+shift+s"、"ctrl+c"、"win+l" 的快捷组合键。
+     * 未知键位只记日志，不向上抛出，避免打断 WebSocket 消息处理线程。
+     */
+    public static synchronized void pressCombo(String combo) {
+        if (combo == null || combo.isBlank()) {
+            return;
+        }
+        String normalized = combo.trim().toLowerCase(Locale.ROOT);
+        if ("win+l".equals(normalized)) {
+            lockWorkstation();
+            return;
+        }
+        List<String> keys = Arrays.stream(normalized.split("\\+"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        if (keys.isEmpty()) {
+            return;
+        }
+        try {
+            press(keys);
+        } catch (RuntimeException e) {
+            log.warn("快捷组合键执行失败（{}）：{}", combo, e.getMessage());
+        }
+    }
+
+    private static void lockWorkstation() {
+        try {
+            new ProcessBuilder("rundll32.exe", "user32.dll,LockWorkStation").start();
+            log.info("已调用系统锁屏");
+        } catch (Exception e) {
+            log.error("锁定屏幕失败", e);
+        }
+    }
+
+    /**
+     * 将远程文本输入到当前活动窗口（经剪贴板粘贴，兼容中文与 Unicode）。
+     */
+    public static synchronized void typeText(String text, boolean pressEnter) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        try {
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            String previousText = null;
+            try {
+                Transferable prev = clipboard.getContents(null);
+                if (prev != null && prev.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+                    previousText = (String) prev.getTransferData(DataFlavor.stringFlavor);
+                }
+            } catch (Exception ignored) {
+                // 读取原剪贴板失败不影响本次输入
+            }
+
+            clipboard.setContents(new StringSelection(text), null);
+            press(List.of("ctrl", "v"));
+
+            if (pressEnter) {
+                Thread.sleep(30);
+                press(List.of("enter"));
+            }
+
+            if (previousText != null) {
+                Thread.sleep(80);
+                clipboard.setContents(new StringSelection(previousText), null);
+            }
+        } catch (Exception e) {
+            log.error("远程文本输入失败", e);
         }
     }
 
