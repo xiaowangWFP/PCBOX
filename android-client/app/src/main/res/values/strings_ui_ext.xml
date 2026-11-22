@@ -18,16 +18,16 @@
     <string name="touchpad_volume_hint">仅在本页生效；开启后音量键不再调节系统音量，改作上下滚动。</string>
 
     <string name="touchpad_pad_visible">显示悬浮按键</string>
-    <string name="touchpad_pad_layout">按键布局</string>
-    <string name="touchpad_pad_column">竖排</string>
-    <string name="touchpad_pad_grid">双列</string>
-    <string name="touchpad_pad_row">横排</string>
     <string name="touchpad_pad_size">按键大小</string>
     <string name="touchpad_pad_small">小</string>
     <string name="touchpad_pad_normal">标准</string>
     <string name="touchpad_pad_large">大</string>
-    <string name="touchpad_pad_reset">重置悬浮位置</string>
-    <string name="touchpad_pad_drag_hint">按住按键可拖动整组</string>
+    <string name="touchpad_pad_reset">重置全部按键</string>
+    <string name="touchpad_adjust_keys">调整按键</string>
+    <string name="touchpad_adjust_done">完成调整</string>
+    <string name="touchpad_adjust_hint">拖动任意按键调整位置，点按选中后可在设置里改大小</string>
+    <string name="touchpad_current_key">当前按键</string>
+    <string name="touchpad_key_none">未选择（点按某个按键）</string>
 
     <string name="ctrl_manage_keys">管理按键</string>
     <string name="ctrl_finish_manage">完成编辑</string>

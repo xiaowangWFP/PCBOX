@@ -11,15 +11,30 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- 悬浮按键组：按住任意按键可拖动整组 -->
-    <com.phoneconsole.client.ui.DraggablePadLayout
-        android:id="@+id/tpPadContainer"
+    <!-- 悬浮按键层：每个按键由代码单独添加、单独定位 -->
+    <FrameLayout
+        android:id="@+id/tpPadLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 调整模式提示条 -->
+    <TextView
+        android:id="@+id/tpAdjustHint"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|start"
-        android:clipChildren="false"
-        android:orientation="vertical"
-        android:padding="4dp" />
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginStart="64dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="64dp"
+        android:background="@drawable/bg_card"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp"
+        android:text="@string/touchpad_adjust_hint"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        android:visibility="gone" />
 
     <!-- 右上角设置入口 -->
     <ImageView
@@ -40,7 +55,7 @@
     <androidx.core.widget.NestedScrollView
         android:id="@+id/tpSettingsPanel"
         android:layout_width="300dp"
-        android:layout_height="320dp"
+        android:layout_height="360dp"
         android:layout_gravity="top|end"
         android:layout_marginTop="60dp"
         android:layout_marginEnd="12dp"
@@ -86,59 +101,39 @@
             </LinearLayout>
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/touchpad_pad_layout"
-                android:textColor="@color/text_secondary"
-                android:textSize="12.5sp" />
+                android:id="@+id/tpAdjustButton"
+                style="@style/ConsolePrimaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="8dp"
+                android:minHeight="40dp"
+                android:text="@string/touchpad_adjust_keys"
+                android:textSize="13sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tpLayoutColumn"
-                    style="@style/ConsoleGhostButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:minHeight="36dp"
-                    android:text="@string/touchpad_pad_column"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/touchpad_current_key"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12.5sp" />
 
                 <TextView
-                    android:id="@+id/tpLayoutGrid"
-                    style="@style/ConsoleGhostButton"
+                    android:id="@+id/tpCurrentKey"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="6dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
-                    android:minHeight="36dp"
-                    android:text="@string/touchpad_pad_grid"
-                    android:textSize="12.5sp" />
-
-                <TextView
-                    android:id="@+id/tpLayoutRow"
-                    style="@style/ConsoleGhostButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="1"
-                    android:minHeight="36dp"
-                    android:text="@string/touchpad_pad_row"
+                    android:text="@string/touchpad_key_none"
+                    android:textColor="@color/accent_bright"
                     android:textSize="12.5sp" />
             </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/touchpad_pad_size"
-                android:textColor="@color/text_secondary"
-                android:textSize="12.5sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
