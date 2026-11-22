@@ -139,39 +139,64 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <SeekBar
+                    android:id="@+id/tpSizeSeek"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="170"
+                    android:progress="70" />
+
+                <TextView
+                    android:id="@+id/tpSizeValue"
+                    android:layout_width="56dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="100%"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tpSizeSmall"
-                    style="@style/ConsoleGhostButton"
+                    android:id="@+id/tpRenameKey"
+                    style="@style/ConsoleMiniButton"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:minHeight="36dp"
-                    android:text="@string/touchpad_pad_small"
-                    android:textSize="12.5sp" />
+                    android:minHeight="34dp"
+                    android:text="@string/touchpad_rename_key"
+                    android:textSize="12sp" />
 
                 <TextView
-                    android:id="@+id/tpSizeNormal"
-                    style="@style/ConsoleGhostButton"
+                    android:id="@+id/tpDeleteKey"
+                    style="@style/ConsoleMiniButton"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:minHeight="36dp"
-                    android:text="@string/touchpad_pad_normal"
-                    android:textSize="12.5sp" />
+                    android:minHeight="34dp"
+                    android:text="@string/touchpad_delete_key"
+                    android:textSize="12sp" />
 
                 <TextView
-                    android:id="@+id/tpSizeLarge"
-                    style="@style/ConsoleGhostButton"
+                    android:id="@+id/tpAddKey"
+                    style="@style/ConsolePrimaryButton"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_weight="1"
-                    android:minHeight="36dp"
-                    android:text="@string/touchpad_pad_large"
-                    android:textSize="12.5sp" />
+                    android:minHeight="34dp"
+                    android:text="@string/touchpad_add_key"
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <View
@@ -179,6 +204,63 @@
                 android:layout_height="1dp"
                 android:layout_marginTop="12dp"
                 android:background="@color/divider_line" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/touchpad_haptics"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/tpHapticsSwitch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minHeight="36dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/touchpad_gestures"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tpGestureHelp"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_ghost_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="?"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/tpGestureSwitch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minHeight="36dp" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -210,20 +292,29 @@
                 android:orientation="horizontal">
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/sensitivity_label"
+                    android:text="@string/touchpad_dpi"
                     android:textColor="@color/text_secondary"
                     android:textSize="12.5sp" />
 
-                <Spinner
-                    android:id="@+id/tpSensitivity"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_input"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp" />
+                <SeekBar
+                    android:id="@+id/tpDpiSeek"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:max="2000"
+                    android:progress="800" />
+
+                <TextView
+                    android:id="@+id/tpDpiValue"
+                    android:layout_width="76dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="1200 DPI"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12.5sp" />
             </LinearLayout>
 
             <TextView
@@ -231,6 +322,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="@string/touchpad_volume_hint"
+                android:textColor="@color/text_muted"
+                android:textSize="11.5sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/touchpad_gestures_hint"
                 android:textColor="@color/text_muted"
                 android:textSize="11.5sp" />
 
@@ -273,18 +372,28 @@
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="78dp"
         android:background="@drawable/bg_voice_panel"
+        android:clickable="true"
+        android:focusable="true"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="10dp"
         android:visibility="gone">
 
-        <TextView
+        <EditText
             android:id="@+id/tpVoiceText"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:background="@null"
+            android:gravity="center_vertical|start"
+            android:hint="@string/touchpad_voice_edit_hint"
+            android:inputType="textMultiLine|textCapSentences"
             android:maxLines="3"
+            android:minHeight="34dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
             android:textSize="13.5sp" />
 
         <TextView

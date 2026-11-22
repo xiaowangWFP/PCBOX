@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,6 +16,8 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -21,6 +25,8 @@ import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
 import com.phoneconsole.client.R;
+
+import android.graphics.Rect;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -49,7 +55,7 @@ public final class VoiceInputController {
     private TextView button;
     private TextView hint;
     private View resultPanel;
-    private TextView resultText;
+    private EditText resultText;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private SpeechRecognizer recognizer;
@@ -58,7 +64,6 @@ public final class VoiceInputController {
     private boolean cancelled;
     private boolean cancelArmed;
     private long recordStartMs;
-    private String pendingText;
 
     private final Runnable ticker = new Runnable() {
         @Override
@@ -152,20 +157,45 @@ public final class VoiceInputController {
         }
         View send = root.findViewById(R.id.tpVoiceSend);
         View close = root.findViewById(R.id.tpVoiceClose);
-        View.OnClickListener sendListener = v -> sendPendingText();
-
-        resultPanel.setOnClickListener(sendListener);
-        if (resultText != null) {
-            resultText.setOnClickListener(sendListener);
-        }
         if (send != null) {
-            send.setOnClickListener(sendListener);
+            send.setOnClickListener(v -> sendPendingText());
         }
         if (close != null) {
             close.setOnClickListener(v -> {
-                pendingText = null;
+                if (resultText != null) {
+                    resultText.setText("");
+                }
+                hideKeyboard();
+                resultPanel.setTranslationY(0f);
                 resultPanel.setVisibility(View.GONE);
             });
+        }
+        setupKeyboardAvoidance(root);
+    }
+
+    /** 键盘弹出时把结果条抬到键盘上方，避免编辑时被遮住 */
+    private void setupKeyboardAvoidance(View root) {
+        final View rootView = root.getRootView();
+        rootView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            if (resultPanel == null || resultPanel.getVisibility() != View.VISIBLE) {
+                return;
+            }
+            Rect rect = new Rect();
+            rootView.getWindowVisibleDisplayFrame(rect);
+            int hidden = rootView.getHeight() - rect.bottom;
+            float target = hidden > dp(120) ? -(hidden - dp(12)) : 0f;
+            resultPanel.setTranslationY(target);
+        });
+    }
+
+    private void hideKeyboard() {
+        if (resultText == null) {
+            return;
+        }
+        InputMethodManager imm = (InputMethodManager)
+                context.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(resultText.getWindowToken(), 0);
         }
     }
 
@@ -176,10 +206,15 @@ public final class VoiceInputController {
             toast(R.string.touchpad_voice_unavailable);
             return;
         }
+        // 当前设备的小米语音服务为在线识别（useLocal=false），无网时提前说明原因；
+        // 若后续接入离线引擎，可放宽这里的网络检查。
+        if (!hasNetwork()) {
+            toast(R.string.touchpad_voice_need_network);
+            return;
+        }
         destroyRecognizer();
         cancelled = false;
         cancelArmed = false;
-        pendingText = null;
         recordStartMs = SystemClock.elapsedRealtime();
 
         recognizer = SpeechRecognizer.createSpeechRecognizer(context);
@@ -231,6 +266,8 @@ public final class VoiceInputController {
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag());
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        // 优先使用设备本地识别，避免没网时直接报网络错误
+        intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L);
@@ -308,17 +345,19 @@ public final class VoiceInputController {
             }
             return;
         }
-        pendingText = trimmed;
         hint.setVisibility(View.GONE);
         if (resultText != null) {
             resultText.setText(trimmed);
+            resultText.setSelection(trimmed.length());
         }
         if (resultPanel != null) {
+            resultPanel.setTranslationY(0f);
             resultPanel.setVisibility(View.VISIBLE);
         }
     }
 
     private void handleError(int error) {
+        android.util.Log.w("VOICE", "onError=" + error);
         if (cancelled) {
             return;
         }
@@ -329,23 +368,49 @@ public final class VoiceInputController {
         destroyRecognizer();
         resetVoiceUi();
         hint.setVisibility(View.GONE);
-        if (error == SpeechRecognizer.ERROR_NO_MATCH
-                || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-            toast(R.string.touchpad_voice_empty);
-        } else if (error != SpeechRecognizer.ERROR_CLIENT) {
-            toast(R.string.touchpad_voice_empty);
+
+        switch (error) {
+            case SpeechRecognizer.ERROR_NETWORK:
+            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
+                toast(R.string.touchpad_voice_need_network);
+                break;
+            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                toast(R.string.touchpad_voice_permission);
+                break;
+            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
+                toast(R.string.touchpad_voice_busy);
+                break;
+            case SpeechRecognizer.ERROR_SERVER:
+                toast(R.string.touchpad_voice_server_error);
+                break;
+            case SpeechRecognizer.ERROR_NO_MATCH:
+            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                toast(R.string.touchpad_voice_empty);
+                break;
+            case SpeechRecognizer.ERROR_CLIENT:
+                // 用户取消或识别器主动断开，不打扰
+                break;
+            default:
+                Toast.makeText(context,
+                        context.getString(R.string.touchpad_voice_failed, error),
+                        Toast.LENGTH_SHORT).show();
+                break;
         }
     }
 
     private void sendPendingText() {
-        if (pendingText == null || pendingText.isEmpty()) {
+        if (resultText == null) {
             return;
         }
-        host.onVoiceText(pendingText);
-        pendingText = null;
-        if (resultPanel != null) {
-            resultPanel.setVisibility(View.GONE);
+        String text = resultText.getText().toString().trim();
+        if (text.isEmpty()) {
+            toast(R.string.touchpad_voice_empty_text);
+            return;
         }
+        host.onVoiceText(text);
+        hideKeyboard();
+        resultPanel.setTranslationY(0f);
+        resultPanel.setVisibility(View.GONE);
         toast(R.string.touchpad_voice_sent);
     }
 
@@ -384,6 +449,16 @@ public final class VoiceInputController {
     private boolean hasPermission() {
         return ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasNetwork() {
+        ConnectivityManager manager = (ConnectivityManager)
+                context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (manager == null) {
+            return true;
+        }
+        NetworkInfo info = manager.getActiveNetworkInfo();
+        return info != null && info.isConnected();
     }
 
     private void destroyRecognizer() {

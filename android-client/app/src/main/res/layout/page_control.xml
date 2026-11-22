@@ -244,236 +244,50 @@
             android:nestedScrollingEnabled="false"
             android:overScrollMode="never" />
 
-        <!-- 远程实用工具舱（快捷输入 / 触控板 / 历史） -->
         <LinearLayout
-            android:id="@+id/companionCard"
-            style="@style/ConsoleCard"
+            android:id="@+id/cardCamera"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/section_gap"
-            android:orientation="vertical">
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="14dp">
 
-            <FrameLayout
-                android:id="@+id/companionTabWrap"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_segmented"
-                android:padding="4dp">
-
-                <View
-                    android:id="@+id/companionTabThumb"
-                    android:layout_width="96dp"
-                    android:layout_height="34dp"
-                    android:background="@drawable/bg_segmented_thumb" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/companionTabInput"
-                        style="@style/ConsoleSegmentedTab"
-                        android:layout_width="0dp"
-                        android:layout_height="34dp"
-                        android:layout_weight="1"
-                        android:text="@string/companion_tab_input"
-                        android:textColor="@color/text_on_accent" />
-
-
-                    <TextView
-                        android:id="@+id/companionTabHistory"
-                        style="@style/ConsoleSegmentedTab"
-                        android:layout_width="0dp"
-                        android:layout_height="34dp"
-                        android:layout_weight="1"
-                        android:text="@string/companion_tab_history" />
-                </LinearLayout>
-            </FrameLayout>
-
-            <!-- 子面板 1：快捷输入与常用组合键 -->
             <LinearLayout
-                android:id="@+id/paneQuickInput"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_weight="1"
                 android:orientation="vertical">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/companion_input_label"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
-
-                <EditText
-                    android:id="@+id/etRemoteText"
-                    style="@style/ConsoleInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:hint="@string/companion_input_hint"
-                    android:imeOptions="actionSend"
-                    android:inputType="text"
-                    android:maxLines="1" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/btnSendTextOnly"
-                        style="@style/ConsoleGhostButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/companion_send_only" />
-
-                    <TextView
-                        android:id="@+id/btnSendTextEnter"
-                        style="@style/ConsolePrimaryButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1.35"
-                        android:text="@string/companion_send_enter" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="12dp"
-                    android:layout_marginBottom="10dp"
-                    android:background="@color/divider_line" />
+                    android:text="@string/camera_card_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/companion_hotkeys_title"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/camera_card_subtitle"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/btnHotkeyCopy"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="复制 · Ctrl+C"
-                        android:textColor="@color/text_primary" />
-
-                    <TextView
-                        android:id="@+id/btnHotkeyPaste"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:text="粘贴 · Ctrl+V"
-                        android:textColor="@color/text_primary" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/btnHotkeyUndo"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="撤销 · Ctrl+Z"
-                        android:textColor="@color/text_primary" />
-
-                    <TextView
-                        android:id="@+id/btnHotkeySelectAll"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:text="全选 · Ctrl+A"
-                        android:textColor="@color/text_primary" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/btnHotkeyAltTab"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="切窗口 · Alt+Tab"
-                        android:textColor="@color/text_primary" />
-
-                    <TextView
-                        android:id="@+id/btnHotkeyClose"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:text="关窗口 · Alt+F4"
-                        android:textColor="@color/text_primary" />
-                </LinearLayout>
             </LinearLayout>
 
-
-            <!-- 子面板 3：操作历史 -->
-            <LinearLayout
-                android:id="@+id/paneHistory"
-                android:layout_width="match_parent"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/history_title"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
-
-                    <TextView
-                        android:id="@+id/btnClearHistory"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="32dp"
-                        android:minHeight="32dp"
-                        android:text="@string/history_clear" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/historyContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="vertical" />
-            </LinearLayout>
+                android:layout_marginStart="10dp"
+                android:text="@string/camera_card_open"
+                android:textColor="@color/accent_bright"
+                android:textSize="12.5sp" />
         </LinearLayout>
+
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

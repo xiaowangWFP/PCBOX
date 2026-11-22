@@ -428,7 +428,22 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         updateFpsCard();
     }
 
+    /** 打开已安装的 VCamdroid；未安装时提示安装包位置 */
+    private void openVcamdroid() {
+        android.content.Intent intent = getPackageManager()
+                .getLaunchIntentForPackage("com.darusc.vcamdroid");
+        if (intent != null) {
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, R.string.camera_install_hint, Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void setupControlPage() {
+        View cardCamera = pageControl.findViewById(R.id.cardCamera);
+        if (cardCamera != null) {
+            cardCamera.setOnClickListener(v -> openVcamdroid());
+        }
         controlController = new ControlWorkspaceController(pageControl,
                 new ControlWorkspaceController.ControlActionDispatcher() {
                     @Override
@@ -868,6 +883,13 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                     public void onSendText(@NonNull String text) {
                         if (connection != null) {
                             connection.sendRemoteText(text, false);
+                        }
+                    }
+
+                    @Override
+                    public void onHotkey(@NonNull String combo) {
+                        if (connection != null) {
+                            connection.sendQuickHotkey(combo);
                         }
                     }
                 });

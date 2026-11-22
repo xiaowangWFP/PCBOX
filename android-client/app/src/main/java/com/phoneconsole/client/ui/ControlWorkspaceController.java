@@ -10,7 +10,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.os.SystemClock;
 import android.view.Window;
-import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -28,10 +27,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.phoneconsole.client.R;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 
@@ -102,26 +98,10 @@ public class ControlWorkspaceController {
         void onTouchpadScroll(int deltaY);
     }
 
-    private static final class HistoryEntry {
-        final String title;
-        final String subtitle;
-        final Runnable replayAction;
-
-        HistoryEntry(String title, String subtitle, Runnable replayAction) {
-            this.title = title;
-            this.subtitle = subtitle;
-            this.replayAction = replayAction;
-        }
-    }
-
-    private static final int MAX_HISTORY = 16;
-
     private final Context context;
     private final View root;
     private final ControlActionDispatcher dispatcher;
     private final TactileDeckAdapter deckAdapter = new TactileDeckAdapter();
-    private final LinkedList<HistoryEntry> historyEntries = new LinkedList<>();
-    private final SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
     private TextView tvDeckTitle;
     private TextView tvDeckMeta;
@@ -145,17 +125,8 @@ public class ControlWorkspaceController {
         }
     };
 
-    private TextView tabInput;
-    private TextView tabHistory;
-    private View companionTabThumb;
-    private View paneQuickInput;
-    private View paneHistory;
-    private EditText etRemoteText;
-    private LinearLayout historyContainer;
-
     private boolean userDraggingVolume = false;
     private String activeDeckId = "";
-    private int activeCompanionIndex = 0;
 
     public ControlWorkspaceController(
             @NonNull View pageControlRoot,
@@ -166,7 +137,6 @@ public class ControlWorkspaceController {
         this.dispatcher = dispatcher;
         bindViews();
         wireInteractions();
-        renderHistory();
     }
 
     private void bindViews() {
@@ -180,14 +150,6 @@ public class ControlWorkspaceController {
         seekVolume = root.findViewById(R.id.seekVolume);
         tvVolumeValue = root.findViewById(R.id.tvVolumeValue);
         rvDeckButtons = root.findViewById(R.id.rvDeckButtons);
-
-        tabInput = root.findViewById(R.id.companionTabInput);
-        tabHistory = root.findViewById(R.id.companionTabHistory);
-        companionTabThumb = root.findViewById(R.id.companionTabThumb);
-        paneQuickInput = root.findViewById(R.id.paneQuickInput);
-        paneHistory = root.findViewById(R.id.paneHistory);
-        etRemoteText = root.findViewById(R.id.etRemoteText);
-        historyContainer = root.findViewById(R.id.historyContainer);
 
         int defaultCols = context.getResources().getInteger(R.integer.deck_default_columns);
         rvDeckButtons.setLayoutManager(new GridLayoutManager(context, defaultCols));
@@ -267,40 +229,6 @@ public class ControlWorkspaceController {
         bindQuickHotkey(R.id.btnQuickShot, "win+shift+s", "区域截图");
         bindQuickHotkey(R.id.btnQuickDesktop, "win+d", "显示桌面");
 
-        // 工具舱切换
-        tabInput.setOnClickListener(v -> selectCompanionTab(0, true));
-        tabHistory.setOnClickListener(v -> selectCompanionTab(1, true));
-        selectCompanionTab(0, false);
-
-        // 快捷文本输入
-        View btnSendOnly = root.findViewById(R.id.btnSendTextOnly);
-        View btnSendEnter = root.findViewById(R.id.btnSendTextEnter);
-        if (btnSendOnly != null) btnSendOnly.setOnClickListener(v -> submitRemoteText(false));
-        if (btnSendEnter != null) btnSendEnter.setOnClickListener(v -> submitRemoteText(true));
-        if (etRemoteText != null) {
-            etRemoteText.setOnEditorActionListener((v, actionId, event) -> {
-                if (actionId == EditorInfo.IME_ACTION_SEND) {
-                    submitRemoteText(true);
-                    return true;
-                }
-                return false;
-            });
-        }
-
-        bindQuickHotkey(R.id.btnHotkeyCopy, "ctrl+c", "复制");
-        bindQuickHotkey(R.id.btnHotkeyPaste, "ctrl+v", "粘贴");
-        bindQuickHotkey(R.id.btnHotkeyUndo, "ctrl+z", "撤销");
-        bindQuickHotkey(R.id.btnHotkeySelectAll, "ctrl+a", "全选");
-        bindQuickHotkey(R.id.btnHotkeyAltTab, "alt+tab", "切换窗口");
-        bindQuickHotkey(R.id.btnHotkeyClose, "alt+f4", "关闭窗口");
-
-        View btnClearHistory = root.findViewById(R.id.btnClearHistory);
-        if (btnClearHistory != null) {
-            btnClearHistory.setOnClickListener(v -> {
-                historyEntries.clear();
-                renderHistory();
-            });
-        }
     }
 
     public void updateDeckPages(@NonNull List<DeckPageMeta> pages, @NonNull String currentPageId) {
@@ -380,9 +308,6 @@ public class ControlWorkspaceController {
     }
 
     public void resyncIndicators() {
-        View activeComp = activeCompanionIndex == 0 ? tabInput : tabHistory;
-        UiMotionHelper.animateHorizontalIndicator(companionTabThumb, activeComp, 0, false);
-
         for (int i = 0; i < deckTabContainer.getChildCount(); i++) {
             View child = deckTabContainer.getChildAt(i);
             if (child instanceof TextView && ((TextView) child).getCurrentTextColor()
@@ -393,43 +318,8 @@ public class ControlWorkspaceController {
         }
     }
 
-    private void selectCompanionTab(int index, boolean animate) {
-        activeCompanionIndex = index;
-        paneQuickInput.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
-        paneHistory.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
 
-        TextView[] tabs = new TextView[]{tabInput, tabHistory};
-        for (int i = 0; i < tabs.length; i++) {
-            tabs[i].setTextColor(ContextCompat.getColor(
-                    context,
-                    i == index ? R.color.text_on_accent : R.color.text_secondary
-            ));
-        }
-        UiMotionHelper.animateHorizontalIndicator(companionTabThumb, tabs[index], 0, animate);
-    }
 
-    private void submitRemoteText(boolean pressEnter) {
-        if (etRemoteText == null) return;
-        String text = etRemoteText.getText().toString().trim();
-        if (text.isEmpty()) return;
-        dispatcher.onSendRemoteText(text, pressEnter);
-        etRemoteText.setText("");
-        recordHistory(
-                pressEnter ? "输入并回车" : "远程输入",
-                text,
-                () -> dispatcher.onSendRemoteText(text, pressEnter)
-        );
-    }
-
-    private void bindQuickMedia(int viewId, @NonNull String cmd, @NonNull String label) {
-        View v = root.findViewById(viewId);
-        if (v != null) {
-            v.setOnClickListener(btn -> {
-                dispatcher.onQuickMediaCommand(cmd);
-                recordHistory(label, "媒体控制", () -> dispatcher.onQuickMediaCommand(cmd));
-            });
-        }
-    }
 
     private void bindQuickHotkey(int viewId, @NonNull String combo, @NonNull String label) {
         View v = root.findViewById(viewId);
@@ -474,79 +364,10 @@ public class ControlWorkspaceController {
     }
 
 
+    /** 操作历史已移除；保留空实现，避免散落的调用点再次改动 */
     private void recordHistory(@NonNull String title, @NonNull String subtitle, @NonNull Runnable replay) {
-        String stamp = timeFmt.format(new Date());
-        historyEntries.addFirst(new HistoryEntry(title, stamp + " · " + subtitle, replay));
-        while (historyEntries.size() > MAX_HISTORY) {
-            historyEntries.removeLast();
-        }
-        renderHistory();
     }
 
-    private void renderHistory() {
-        if (historyContainer == null) return;
-        historyContainer.removeAllViews();
-        float d = context.getResources().getDisplayMetrics().density;
-
-        if (historyEntries.isEmpty()) {
-            TextView empty = new TextView(context);
-            empty.setText(R.string.history_empty);
-            empty.setTextColor(ContextCompat.getColor(context, R.color.text_muted));
-            empty.setTextSize(12f);
-            empty.setPadding(Math.round(10 * d), Math.round(14 * d), Math.round(10 * d), Math.round(14 * d));
-            empty.setGravity(Gravity.CENTER);
-            empty.setBackgroundResource(R.drawable.bg_input);
-            historyContainer.addView(empty);
-            return;
-        }
-
-        for (HistoryEntry entry : historyEntries) {
-            LinearLayout row = new LinearLayout(context);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setBackgroundResource(R.drawable.bg_input);
-            int pH = Math.round(10 * d);
-            int pV = Math.round(8 * d);
-            row.setPadding(pH, pV, pH, pV);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-            lp.bottomMargin = Math.round(6 * d);
-            row.setLayoutParams(lp);
-
-            LinearLayout info = new LinearLayout(context);
-            info.setOrientation(LinearLayout.VERTICAL);
-            info.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-            TextView tvTitle = new TextView(context);
-            tvTitle.setText(entry.title);
-            tvTitle.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
-            tvTitle.setTextSize(12.5f);
-            tvTitle.setMaxLines(1);
-
-            TextView tvSub = new TextView(context);
-            tvSub.setText(entry.subtitle);
-            tvSub.setTextColor(ContextCompat.getColor(context, R.color.text_muted));
-            tvSub.setTextSize(11f);
-            tvSub.setMaxLines(1);
-
-            info.addView(tvTitle);
-            info.addView(tvSub);
-
-            TextView btnReplay = new TextView(context);
-            btnReplay.setText(R.string.history_replay);
-            btnReplay.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
-            btnReplay.setTextSize(11.5f);
-            btnReplay.setBackgroundResource(R.drawable.bg_ghost_button);
-            btnReplay.setPadding(Math.round(10 * d), Math.round(5 * d), Math.round(10 * d), Math.round(5 * d));
-            btnReplay.setOnClickListener(v -> entry.replayAction.run());
-
-            row.addView(info);
-            row.addView(btnReplay);
-            historyContainer.addView(row);
-        }
-    }
 
     private void showAddCustomKeyDialog() {
         Dialog dialog = new Dialog(context);
