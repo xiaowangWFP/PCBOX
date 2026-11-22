@@ -841,7 +841,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (pageTouchpad == null) {
             return;
         }
-        touchpadController = new TouchpadPageController(this, pageTouchpad,
+        touchpadController = new TouchpadPageController(this, this, pageTouchpad,
                 new TouchpadPageController.ActionSink() {
                     @Override
                     public void onMove(int dx, int dy) {
@@ -861,6 +861,13 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                     public void onScroll(int deltaY) {
                         if (connection != null) {
                             connection.sendTouchpadScroll(deltaY);
+                        }
+                    }
+
+                    @Override
+                    public void onSendText(@NonNull String text) {
+                        if (connection != null) {
+                            connection.sendRemoteText(text, false);
                         }
                     }
                 });
@@ -887,6 +894,19 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         return super.dispatchKeyEvent(event);
     }
 
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == TouchpadPageController.REQ_RECORD_AUDIO) {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            if (touchpadController != null) {
+                touchpadController.onRecordPermissionResult(granted);
+            }
+        }
+    }
     // ---------------- 页面切换 ----------------
 
     private String pageOrDefault(String page) {

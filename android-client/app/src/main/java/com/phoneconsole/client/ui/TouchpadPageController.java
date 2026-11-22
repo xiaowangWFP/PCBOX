@@ -1,5 +1,7 @@
 package com.phoneconsole.client.ui;
 
+import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.Gravity;
@@ -16,6 +18,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.SwitchCompat;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.phoneconsole.client.R;
@@ -40,7 +43,12 @@ public final class TouchpadPageController {
         void onClick(@NonNull String mouseButton);
 
         void onScroll(int deltaY);
+
+        void onSendText(@NonNull String text);
     }
+
+    /** 录音权限请求码，MainActivity 转发结果 */
+    public static final int REQ_RECORD_AUDIO = 2002;
 
     private static final String PREFS = "touchpad_prefs";
     private static final String KEY_VOLUME_SCROLL = "volume_scroll";
@@ -75,11 +83,13 @@ public final class TouchpadPageController {
     private final TextView[] sizeButtons;
 
     private final Map<String, KeyView> keys = new LinkedHashMap<>();
+    private final VoiceInputController voiceInput;
     private boolean volumeScrollEnabled;
     private boolean adjustMode;
     private String selectedKey;
 
-    public TouchpadPageController(@NonNull Context context, @NonNull View root, @NonNull ActionSink sink) {
+    public TouchpadPageController(@NonNull Context context, @NonNull Activity activity,
+                                  @NonNull View root, @NonNull ActionSink sink) {
         this.context = context;
         this.sink = sink;
         this.prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -105,6 +115,18 @@ public final class TouchpadPageController {
         bindTouchpad();
         bindSettingsButton(root);
         bindSettingsPanel(root);
+        voiceInput = new VoiceInputController(context, root, new VoiceInputController.Host() {
+            @Override
+            public void onVoiceText(@NonNull String text) {
+                sink.onSendText(text);
+            }
+
+            @Override
+            public void onRequestRecordPermission() {
+                ActivityCompat.requestPermissions(activity,
+                        new String[]{Manifest.permission.RECORD_AUDIO}, REQ_RECORD_AUDIO);
+            }
+        });
         buildKeys();
         restorePadVisibility();
     }
@@ -520,5 +542,10 @@ public final class TouchpadPageController {
             this.view = view;
             this.sizeMode = sizeMode;
         }
+    }
+
+    /** 录音权限结果转发给语音输入控制器 */
+    public void onRecordPermissionResult(boolean granted) {
+        voiceInput.onRecordPermissionResult(granted);
     }
 }
