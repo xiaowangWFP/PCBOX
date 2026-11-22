@@ -2,7 +2,6 @@ package com.phoneconsole.client;
 
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
@@ -32,7 +31,6 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.ContextCompat;
 
 import com.phoneconsole.client.model.ButtonItem;
@@ -43,7 +41,7 @@ import com.phoneconsole.client.model.ScreenStateMessage;
 import com.phoneconsole.client.model.SessionMessage;
 import com.phoneconsole.client.model.TelemetryMessage;
 import com.phoneconsole.client.net.ChannelStore;
-import com.phoneconsole.client.ui.TouchpadView;
+import com.phoneconsole.client.ui.TouchpadPageController;
 import com.phoneconsole.client.net.ConnectionManager;
 import com.phoneconsole.client.screen.H264Decoder;
 import com.phoneconsole.client.ui.ControlWorkspaceController;
@@ -79,10 +77,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     /** 服务端默认页（媒体快捷指令已并入该页，不再单独维护媒体面板） */
     private static final String DEFAULT_PAGE_ID = "default_page";
 
-    /** 触控板页偏好：灵敏度档位与音量键滚动开关 */
-    private static final String PREFS_TOUCHPAD = "touchpad_prefs";
-    private static final String KEY_TOUCHPAD_SENS = "sensitivity";
-    private static final String KEY_TOUCHPAD_VOLUME_SCROLL = "volume_scroll";
     private static final String DEFAULT_PORT = "8500";
 
     /** 快捷指令 → 通用控制页按键 id 的映射 */
@@ -127,9 +121,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private View pageSettings;
 
     // 触控板页
-    private TouchpadView tpTouchpadView;
-    private SwitchCompat tpVolumeScrollSwitch;
-    private boolean volumeScrollOnTouchpad;
+    private TouchpadPageController touchpadController;
 
     // 性能页
     private TextView tvCpuValue;
@@ -372,8 +364,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         pageTouchpad = findViewById(R.id.pageTouchpad);
         pageScreen = findViewById(R.id.pageScreen);
         pageSettings = findViewById(R.id.pageSettings);
-        tpTouchpadView = findViewById(R.id.tpTouchpadView);
-        tpVolumeScrollSwitch = findViewById(R.id.tpVolumeScrollSwitch);
 
         tvCpuValue = findViewById(R.id.tvCpuValue);
         tvMemValue = findViewById(R.id.tvMemValue);
@@ -846,75 +836,34 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
 
-    /** 触控板独立页：拖动/轻点、鼠标键、滚轮、灵敏度与音量键滚动选项 */
+    /** 触控板独立页：整页触摸区 + 可拖动悬浮键组 + 右上角设置面板 */
     private void setupTouchpadPage() {
-        if (tpTouchpadView == null) {
+        if (pageTouchpad == null) {
             return;
         }
-        SharedPreferences prefs = getSharedPreferences(PREFS_TOUCHPAD, MODE_PRIVATE);
+        touchpadController = new TouchpadPageController(this, pageTouchpad,
+                new TouchpadPageController.ActionSink() {
+                    @Override
+                    public void onMove(int dx, int dy) {
+                        if (connection != null) {
+                            connection.sendTouchpadMove(dx, dy);
+                        }
+                    }
 
-        tpTouchpadView.setOnTouchpadEventListener(new TouchpadView.OnTouchpadEventListener() {
-            @Override
-            public void onMove(int dx, int dy) {
-                connection.sendTouchpadMove(dx, dy);
-            }
+                    @Override
+                    public void onClick(@NonNull String mouseButton) {
+                        if (connection != null) {
+                            connection.sendTouchpadClick(mouseButton);
+                        }
+                    }
 
-            @Override
-            public void onTapClick() {
-                connection.sendTouchpadClick("left");
-            }
-        });
-
-        bindTouchpadClick(R.id.tpMouseLeft, "left");
-        bindTouchpadClick(R.id.tpMouseMiddle, "middle");
-        bindTouchpadClick(R.id.tpMouseRight, "right");
-
-        View scrollUp = findViewById(R.id.tpScrollUp);
-        View scrollDown = findViewById(R.id.tpScrollDown);
-        if (scrollUp != null) {
-            scrollUp.setOnClickListener(v -> connection.sendTouchpadScroll(3));
-        }
-        if (scrollDown != null) {
-            scrollDown.setOnClickListener(v -> connection.sendTouchpadScroll(-3));
-        }
-
-        Spinner sensSpinner = findViewById(R.id.tpSensitivity);
-        if (sensSpinner != null) {
-            ArrayAdapter<String> sensAdapter = new ArrayAdapter<>(this,
-                    android.R.layout.simple_spinner_item,
-                    new String[]{"慢速", "标准", "快速"});
-            sensAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            sensSpinner.setAdapter(sensAdapter);
-            int saved = prefs.getInt(KEY_TOUCHPAD_SENS, 1);
-            sensSpinner.setSelection(Math.max(0, Math.min(2, saved)));
-            sensSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    tpTouchpadView.setSensitivity(position == 0 ? 0.75f : (position == 2 ? 1.85f : 1.2f));
-                    prefs.edit().putInt(KEY_TOUCHPAD_SENS, position).apply();
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                }
-            });
-        }
-
-        volumeScrollOnTouchpad = prefs.getBoolean(KEY_TOUCHPAD_VOLUME_SCROLL, false);
-        if (tpVolumeScrollSwitch != null) {
-            tpVolumeScrollSwitch.setChecked(volumeScrollOnTouchpad);
-            tpVolumeScrollSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                volumeScrollOnTouchpad = isChecked;
-                prefs.edit().putBoolean(KEY_TOUCHPAD_VOLUME_SCROLL, isChecked).apply();
-            });
-        }
-    }
-
-    private void bindTouchpadClick(int viewId, String mouseButton) {
-        View view = findViewById(viewId);
-        if (view != null) {
-            view.setOnClickListener(v -> connection.sendTouchpadClick(mouseButton));
-        }
+                    @Override
+                    public void onScroll(int deltaY) {
+                        if (connection != null) {
+                            connection.sendTouchpadScroll(deltaY);
+                        }
+                    }
+                });
     }
 
     /**
@@ -925,7 +874,11 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     public boolean dispatchKeyEvent(KeyEvent event) {
         int code = event.getKeyCode();
         boolean isVolumeKey = code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN;
-        if (PAGE_TOUCHPAD.equals(currentPage) && volumeScrollOnTouchpad && isVolumeKey && connection != null) {
+        if (PAGE_TOUCHPAD.equals(currentPage)
+                && touchpadController != null
+                && touchpadController.isVolumeScrollEnabled()
+                && isVolumeKey
+                && connection != null) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 connection.sendTouchpadScroll(code == KeyEvent.KEYCODE_VOLUME_UP ? 1 : -1);
             }
