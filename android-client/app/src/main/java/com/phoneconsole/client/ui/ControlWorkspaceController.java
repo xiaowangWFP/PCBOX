@@ -146,14 +146,11 @@ public class ControlWorkspaceController {
     };
 
     private TextView tabInput;
-    private TextView tabTouchpad;
     private TextView tabHistory;
     private View companionTabThumb;
     private View paneQuickInput;
-    private View paneTouchpad;
     private View paneHistory;
     private EditText etRemoteText;
-    private TouchpadView touchpadView;
     private LinearLayout historyContainer;
 
     private boolean userDraggingVolume = false;
@@ -185,14 +182,11 @@ public class ControlWorkspaceController {
         rvDeckButtons = root.findViewById(R.id.rvDeckButtons);
 
         tabInput = root.findViewById(R.id.companionTabInput);
-        tabTouchpad = root.findViewById(R.id.companionTabTouchpad);
         tabHistory = root.findViewById(R.id.companionTabHistory);
         companionTabThumb = root.findViewById(R.id.companionTabThumb);
         paneQuickInput = root.findViewById(R.id.paneQuickInput);
-        paneTouchpad = root.findViewById(R.id.paneTouchpad);
         paneHistory = root.findViewById(R.id.paneHistory);
         etRemoteText = root.findViewById(R.id.etRemoteText);
-        touchpadView = root.findViewById(R.id.touchpadView);
         historyContainer = root.findViewById(R.id.historyContainer);
 
         int defaultCols = context.getResources().getInteger(R.integer.deck_default_columns);
@@ -275,8 +269,7 @@ public class ControlWorkspaceController {
 
         // 工具舱切换
         tabInput.setOnClickListener(v -> selectCompanionTab(0, true));
-        tabTouchpad.setOnClickListener(v -> selectCompanionTab(1, true));
-        tabHistory.setOnClickListener(v -> selectCompanionTab(2, true));
+        tabHistory.setOnClickListener(v -> selectCompanionTab(1, true));
         selectCompanionTab(0, false);
 
         // 快捷文本输入
@@ -300,54 +293,6 @@ public class ControlWorkspaceController {
         bindQuickHotkey(R.id.btnHotkeySelectAll, "ctrl+a", "全选");
         bindQuickHotkey(R.id.btnHotkeyAltTab, "alt+tab", "切换窗口");
         bindQuickHotkey(R.id.btnHotkeyClose, "alt+f4", "关闭窗口");
-
-        // 无线触控板
-        touchpadView.setOnTouchpadEventListener(new TouchpadView.OnTouchpadEventListener() {
-            @Override
-            public void onMove(int dx, int dy) {
-                dispatcher.onTouchpadMove(dx, dy);
-            }
-
-            @Override
-            public void onTapClick() {
-                dispatcher.onTouchpadClick("left");
-            }
-        });
-
-        bindMouseClick(R.id.btnMouseLeft, "left", "鼠标左键");
-        bindMouseClick(R.id.btnMouseMiddle, "middle", "鼠标中键");
-        bindMouseClick(R.id.btnMouseRight, "right", "鼠标右键");
-
-        View btnScrollUp = root.findViewById(R.id.btnScrollUp);
-        View btnScrollDown = root.findViewById(R.id.btnScrollDown);
-        if (btnScrollUp != null) btnScrollUp.setOnClickListener(v -> dispatcher.onTouchpadScroll(3));
-        if (btnScrollDown != null) btnScrollDown.setOnClickListener(v -> dispatcher.onTouchpadScroll(-3));
-
-        Spinner sensSpinner = root.findViewById(R.id.spinnerTouchpadSens);
-        if (sensSpinner != null) {
-            ArrayAdapter<String> sensAdapter = new ArrayAdapter<>(
-                    context,
-                    android.R.layout.simple_spinner_item,
-                    new String[]{"慢速", "标准", "快速"}
-            );
-            sensAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            sensSpinner.setAdapter(sensAdapter);
-            sensSpinner.setSelection(1);
-            sensSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                    if (view instanceof TextView) {
-                        ((TextView) view).setTextColor(ContextCompat.getColor(context, R.color.text_primary));
-                        ((TextView) view).setTextSize(12f);
-                    }
-                    touchpadView.setSensitivity(pos == 0 ? 0.75f : (pos == 2 ? 1.85f : 1.2f));
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                }
-            });
-        }
 
         View btnClearHistory = root.findViewById(R.id.btnClearHistory);
         if (btnClearHistory != null) {
@@ -435,8 +380,7 @@ public class ControlWorkspaceController {
     }
 
     public void resyncIndicators() {
-        View activeComp = activeCompanionIndex == 0 ? tabInput
-                : (activeCompanionIndex == 1 ? tabTouchpad : tabHistory);
+        View activeComp = activeCompanionIndex == 0 ? tabInput : tabHistory;
         UiMotionHelper.animateHorizontalIndicator(companionTabThumb, activeComp, 0, false);
 
         for (int i = 0; i < deckTabContainer.getChildCount(); i++) {
@@ -452,10 +396,9 @@ public class ControlWorkspaceController {
     private void selectCompanionTab(int index, boolean animate) {
         activeCompanionIndex = index;
         paneQuickInput.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
-        paneTouchpad.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
-        paneHistory.setVisibility(index == 2 ? View.VISIBLE : View.GONE);
+        paneHistory.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
 
-        TextView[] tabs = new TextView[]{tabInput, tabTouchpad, tabHistory};
+        TextView[] tabs = new TextView[]{tabInput, tabHistory};
         for (int i = 0; i < tabs.length; i++) {
             tabs[i].setTextColor(ContextCompat.getColor(
                     context,
@@ -530,15 +473,6 @@ public class ControlWorkspaceController {
         });
     }
 
-    private void bindMouseClick(int viewId, @NonNull String mouseButton, @NonNull String label) {
-        View v = root.findViewById(viewId);
-        if (v != null) {
-            v.setOnClickListener(btn -> {
-                dispatcher.onTouchpadClick(mouseButton);
-                recordHistory(label, "触控板", () -> dispatcher.onTouchpadClick(mouseButton));
-            });
-        }
-    }
 
     private void recordHistory(@NonNull String title, @NonNull String subtitle, @NonNull Runnable replay) {
         String stamp = timeFmt.format(new Date());

@@ -280,13 +280,6 @@
                         android:text="@string/companion_tab_input"
                         android:textColor="@color/text_on_accent" />
 
-                    <TextView
-                        android:id="@+id/companionTabTouchpad"
-                        style="@style/ConsoleSegmentedTab"
-                        android:layout_width="0dp"
-                        android:layout_height="34dp"
-                        android:layout_weight="1"
-                        android:text="@string/companion_tab_touchpad" />
 
                     <TextView
                         android:id="@+id/companionTabHistory"
@@ -441,101 +434,6 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- 子面板 2：无线触控板 -->
-            <LinearLayout
-                android:id="@+id/paneTouchpad"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <com.phoneconsole.client.ui.TouchpadView
-                    android:id="@+id/touchpadView"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/touchpad_height" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/btnMouseLeft"
-                        style="@style/ConsoleGhostButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1.2"
-                        android:text="@string/mouse_left" />
-
-                    <TextView
-                        android:id="@+id/btnMouseMiddle"
-                        style="@style/ConsoleGhostButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="0.85"
-                        android:text="@string/mouse_middle" />
-
-                    <TextView
-                        android:id="@+id/btnMouseRight"
-                        style="@style/ConsoleGhostButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1.2"
-                        android:text="@string/mouse_right" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/btnScrollUp"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="12dp"
-                        android:text="@string/scroll_up" />
-
-                    <TextView
-                        android:id="@+id/btnScrollDown"
-                        style="@style/ConsoleMiniButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="12dp"
-                        android:text="@string/scroll_down" />
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:text="@string/sensitivity_label"
-                        android:textColor="@color/text_muted"
-                        android:textSize="12sp" />
-
-                    <Spinner
-                        android:id="@+id/spinnerTouchpadSens"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:background="@drawable/bg_input"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="10dp" />
-                </LinearLayout>
-            </LinearLayout>
 
             <!-- 子面板 3：操作历史 -->
             <LinearLayout

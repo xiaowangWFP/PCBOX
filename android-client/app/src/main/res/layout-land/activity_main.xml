@@ -89,6 +89,20 @@
                     </FrameLayout>
 
                     <FrameLayout
+                        android:id="@+id/navTouchpad"
+                        style="@style/ConsoleNavRailItem"
+                        android:contentDescription="@string/nav_touchpad_full">
+
+                        <ImageView
+                            android:id="@+id/ivNavTouchpad"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_nav_touchpad" />
+                    </FrameLayout>
+
+                    <FrameLayout
                         android:id="@+id/navScreen"
                         style="@style/ConsoleNavRailItem"
                         android:contentDescription="@string/nav_screen_full">
@@ -269,6 +283,13 @@
             <include
                 android:id="@+id/pageControl"
                 layout="@layout/page_control"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
+            <include
+                android:id="@+id/pageTouchpad"
+                layout="@layout/page_touchpad"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:visibility="gone" />
