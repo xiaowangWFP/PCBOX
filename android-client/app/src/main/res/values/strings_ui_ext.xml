@@ -3,13 +3,72 @@
     <!-- 增量新增 UI 字符串（独立文件，避免覆盖原 strings.xml 中的已有键名） -->
     <string name="nav_perf_short">性能</string>
     <string name="nav_ctrl_short">控制</string>
+    <string name="nav_touchpad_short">触控</string>
     <string name="nav_screen_short">屏幕</string>
     <string name="nav_settings_short">连接</string>
 
     <string name="nav_perf_full">性能监视</string>
     <string name="nav_ctrl_full">功能控制</string>
+    <string name="nav_touchpad_full">触控板</string>
     <string name="nav_screen_full">屏幕监视</string>
     <string name="nav_settings_full">连接设置</string>
+
+    <string name="touchpad_settings">触控板设置</string>
+    <string name="touchpad_volume_scroll">音量键 ↑ / ↓ 滚动</string>
+    <string name="touchpad_volume_hint">仅在本页生效；开启后音量键不再调节系统音量，改作上下滚动。</string>
+
+    <string name="touchpad_pad_visible">显示悬浮按键</string>
+    <string name="touchpad_pad_size">按键大小</string>
+    <string name="touchpad_pad_small">小</string>
+    <string name="touchpad_pad_normal">标准</string>
+    <string name="touchpad_pad_large">大</string>
+    <string name="touchpad_pad_reset">重置全部按键</string>
+    <string name="touchpad_adjust_keys">调整按键</string>
+    <string name="touchpad_adjust_done">完成调整</string>
+    <string name="touchpad_adjust_hint">拖动任意按键调整位置，点按选中后可在设置里改大小</string>
+    <string name="touchpad_current_key">当前按键</string>
+    <string name="touchpad_key_none">未选择（点按某个按键）</string>
+
+    <string name="touchpad_voice_hold">按住 说话</string>
+    <string name="touchpad_voice_release">松开 结束</string>
+    <string name="touchpad_voice_cancel_hint">手指上滑，取消发送</string>
+    <string name="touchpad_voice_release_cancel">松开手指，取消发送</string>
+    <string name="touchpad_voice_recognizing">识别中…</string>
+    <string name="touchpad_voice_send">发送</string>
+    <string name="touchpad_voice_close">关闭</string>
+    <string name="touchpad_voice_empty">没听清，请再说一次</string>
+    <string name="touchpad_voice_unavailable">当前设备没有可用的语音识别服务</string>
+    <string name="touchpad_voice_sent">已发送到 PC</string>
+    <string name="touchpad_voice_too_short">说话时间太短</string>
+    <string name="touchpad_voice_permission">需要麦克风权限才能语音输入</string>
+    <string name="touchpad_voice_permission_ok">麦克风已授权，按住即可说话</string>
+    <string name="touchpad_voice_need_network">语音识别需要网络，请先连接 Wi-Fi 或移动数据</string>
+    <string name="touchpad_voice_busy">识别器忙，请稍后再试</string>
+    <string name="touchpad_voice_server_error">语音服务暂不可用，请稍后再试</string>
+    <string name="touchpad_voice_failed">识别失败（错误码 %1$d）</string>
+    <string name="touchpad_voice_edit_hint">点击可编辑识别结果</string>
+    <string name="touchpad_voice_empty_text">内容为空</string>
+    <string name="touchpad_rename_key">重命名</string>
+    <string name="touchpad_delete_key">删除此键</string>
+    <string name="touchpad_add_key">添加按键</string>
+    <string name="touchpad_haptics">按键震动</string>
+    <string name="touchpad_key_name">按键名称</string>
+    <string name="touchpad_key_combo">组合键</string>
+    <string name="touchpad_key_combo_hint">例如 ctrl+c、alt+tab、f5</string>
+    <string name="touchpad_dpi">灵敏度</string>
+    <string name="touchpad_size_value">大小</string>
+    <string name="touchpad_key_picker_empty">请选择按键（可多选，组合键）</string>
+    <string name="touchpad_key_picker_empty_toast">请至少选择一个按键</string>
+    <string name="touchpad_gestures">手势导航</string>
+    <string name="touchpad_gestures_hint">双指滚动 · 三指上下/左右切换 · 四指切换虚拟桌面</string>
+    <string name="touchpad_gesture_help">手势说明</string>
+    <string name="touchpad_gesture_help_ok">知道了</string>
+    <string name="touchpad_gesture_detail">双指上下滑动：滚动\n\n三指上滑：任务视图（Win + Tab）\n三指下滑：显示桌面（Win + D）\n三指右滑：下一个窗口（Alt + Tab）\n三指左滑：上一个窗口（Alt + Shift + Tab）\n\n四指右滑：下一个虚拟桌面（Ctrl + Win + →）\n四指左滑：上一个虚拟桌面（Ctrl + Win + ←）\n\n从触控板中间开始滑动，位移超过约 60dp 触发；三指/四指请尽量同时落下。</string>
+
+    <string name="camera_card_title">VCamdroid 摄像头</string>
+    <string name="camera_card_subtitle">前后摄像头 → Windows 虚拟摄像头</string>
+    <string name="camera_card_open">打开</string>
+    <string name="camera_install_hint">请先安装 tools/vcamdroid/apk 下的 VCamdroid APK</string>
 
     <string name="ctrl_manage_keys">管理按键</string>
     <string name="ctrl_finish_manage">完成编辑</string>

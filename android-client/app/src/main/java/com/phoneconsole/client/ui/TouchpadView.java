@@ -7,6 +7,7 @@ import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewParent;
@@ -30,6 +31,20 @@ public class TouchpadView extends View {
 
         void onTapClick();
     }
+
+    /** 多指手势：双指滚动、三/四指滑动 */
+    public interface OnGestureListener {
+        /** 正数向上滚，负数向下滚 */
+        void onTwoFingerScroll(int deltaY);
+
+        /** fingers 为 3 或 4；direction：0 上、1 下、2 左、3 右 */
+        void onMultiFingerSwipe(int fingers, int direction);
+    }
+
+    public static final int SWIPE_UP = 0;
+    public static final int SWIPE_DOWN = 1;
+    public static final int SWIPE_LEFT = 2;
+    public static final int SWIPE_RIGHT = 3;
 
     private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -57,6 +72,21 @@ public class TouchpadView extends View {
 
     @Nullable
     private OnTouchpadEventListener listener;
+    @Nullable
+    private OnGestureListener gestureListener;
+
+    private boolean gestureEnabled = true;
+    private boolean multiTouch;
+    private float gestureStartX;
+    private float gestureStartY;
+    private float lastMultiX;
+    private float lastMultiY;
+    private float scrollAccum;
+    private boolean swipeTriggered;
+    /** 三指被系统吃掉一指后，用剩余两指继续判定三指手势 */
+    private boolean threeFingerDropped;
+    private float threeDropX;
+    private float threeDropY;
 
     public TouchpadView(@NonNull Context context) {
         super(context);
@@ -107,6 +137,14 @@ public class TouchpadView extends View {
 
     public void setOnTouchpadEventListener(@Nullable OnTouchpadEventListener listener) {
         this.listener = listener;
+    }
+
+    public void setGestureEnabled(boolean enabled) {
+        this.gestureEnabled = enabled;
+    }
+
+    public void setOnGestureListener(@Nullable OnGestureListener listener) {
+        this.gestureListener = listener;
     }
 
     @Override
@@ -161,9 +199,17 @@ public class TouchpadView extends View {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
+                Log.d("TP-GESTURE", "down n=" + event.getPointerCount());
                 touching = true;
+                multiTouch = false;
+                swipeTriggered = false;
+                scrollAccum = 0f;
                 lastX = event.getX();
                 lastY = event.getY();
+                gestureStartX = lastX;
+                gestureStartY = lastY;
+                lastMultiX = lastX;
+                lastMultiY = lastY;
                 touchX = lastX;
                 touchY = lastY;
                 accumDx = 0f;
@@ -173,7 +219,101 @@ public class TouchpadView extends View {
                 invalidate();
                 return true;
 
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
+                Log.d("TP-GESTURE", "pointerDown n=" + event.getPointerCount());
+                multiTouch = true;
+                swipeTriggered = false;
+                threeFingerDropped = false;
+                scrollAccum = 0f;
+                gestureStartX = averageX(event);
+                gestureStartY = averageY(event);
+                lastMultiX = gestureStartX;
+                lastMultiY = gestureStartY;
+                touchX = gestureStartX;
+                touchY = gestureStartY;
+                invalidate();
+                return true;
+
             case MotionEvent.ACTION_MOVE:
+                int count = event.getPointerCount();
+                if (count >= 2) {
+                    if (!gestureEnabled) {
+                        // 关闭手势时不移动光标，避免多指拖动导致指针乱跳
+                        return true;
+                    }
+                    // 兼容多指同时落下时 POINTER_DOWN 丢失的情况：在 MOVE 中补做初始化
+                    if (!multiTouch) {
+                        multiTouch = true;
+                        gestureStartX = averageX(event);
+                        gestureStartY = averageY(event);
+                        lastMultiX = gestureStartX;
+                        lastMultiY = gestureStartY;
+                        swipeTriggered = false;
+                        scrollAccum = 0f;
+                        Log.d("TP-GESTURE", "multiMove init n=" + count);
+                    }
+                    float avgX = averageX(event);
+                    float avgY = averageY(event);
+                    if (count >= 3) {
+                        if (!swipeTriggered) {
+                            float dx = avgX - gestureStartX;
+                            float dy = avgY - gestureStartY;
+                            float threshold = dp(60);
+                            if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                                int direction;
+                                if (Math.abs(dx) > Math.abs(dy) * 1.2f) {
+                                    direction = dx > 0 ? SWIPE_RIGHT : SWIPE_LEFT;
+                                } else {
+                                    direction = dy > 0 ? SWIPE_DOWN : SWIPE_UP;
+                                }
+                                swipeTriggered = true;
+                                Log.d("TP-GESTURE", "swipe fingers=" + count + " dir=" + direction);
+                                if (gestureListener != null) {
+                                    gestureListener.onMultiFingerSwipe(count, direction);
+                                }
+                            }
+                        }
+                    } else if (threeFingerDropped && !swipeTriggered) {
+                        float dx = avgX - threeDropX;
+                        float dy = avgY - threeDropY;
+                        float threshold = dp(60);
+                        if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                            int direction;
+                            if (Math.abs(dx) > Math.abs(dy) * 1.2f) {
+                                direction = dx > 0 ? SWIPE_RIGHT : SWIPE_LEFT;
+                            } else {
+                                direction = dy > 0 ? SWIPE_DOWN : SWIPE_UP;
+                            }
+                            swipeTriggered = true;
+                            threeFingerDropped = false;
+                            Log.d("TP-GESTURE", "dropSwipe dir=" + direction);
+                            if (gestureListener != null) {
+                                gestureListener.onMultiFingerSwipe(3, direction);
+                            }
+                        }
+                    } else {
+                        float dy = avgY - lastMultiY;
+                        scrollAccum += dy;
+                        float threshold = dp(24);
+                        int steps = (int) (scrollAccum / threshold);
+                        if (steps != 0) {
+                            scrollAccum -= steps * threshold;
+                            int delta = Math.max(-3, Math.min(3, -steps));
+                            if (gestureListener != null) {
+                                gestureListener.onTwoFingerScroll(delta);
+                            }
+                        }
+                    }
+                    lastMultiX = avgX;
+                    lastMultiY = avgY;
+                    touchX = avgX;
+                    touchY = avgY;
+                    invalidate();
+                    return true;
+                }
+
+                // 单指移动
                 float rawDx = event.getX() - lastX;
                 float rawDy = event.getY() - lastY;
                 lastX = event.getX();
@@ -199,12 +339,48 @@ public class TouchpadView extends View {
                 invalidate();
                 return true;
 
+            case MotionEvent.ACTION_POINTER_UP:
+                // 剩余手指重新作为基准，避免跳变
+                int index = event.getActionIndex();
+                float sumX = 0f;
+                float sumY = 0f;
+                int remain = 0;
+                for (int i = 0; i < event.getPointerCount(); i++) {
+                    if (i == index) {
+                        continue;
+                    }
+                    sumX += event.getX(i);
+                    sumY += event.getY(i);
+                    remain++;
+                }
+                if (remain > 0) {
+                    lastMultiX = sumX / remain;
+                    lastMultiY = sumY / remain;
+                    lastX = lastMultiX;
+                    lastY = lastMultiY;
+                    gestureStartX = lastMultiX;
+                    gestureStartY = lastMultiY;
+                    touchX = lastMultiX;
+                    touchY = lastMultiY;
+                }
+                Log.d("TP-GESTURE", "pointerUp before=" + event.getPointerCount() + " remain=" + remain);
+                if (remain == 2 && !swipeTriggered) {
+                    // 三指中有一指被系统手势吃掉：用剩余两指继续判定三指滑动
+                    threeFingerDropped = true;
+                    threeDropX = lastMultiX;
+                    threeDropY = lastMultiY;
+                    Log.d("TP-GESTURE", "three->two watch");
+                }
+                scrollAccum = 0f;
+                return true;
+
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
                 touching = false;
                 long elapsed = System.currentTimeMillis() - downTimeMs;
                 if (event.getActionMasked() == MotionEvent.ACTION_UP
+                        && !multiTouch
                         && totalMoveDist < 14f
                         && elapsed < 240L) {
                     readoutText = "左键点击";
@@ -215,12 +391,34 @@ public class TouchpadView extends View {
                 } else {
                     readoutText = "拖动移动光标 · 轻点左键";
                 }
+                multiTouch = false;
+                threeFingerDropped = false;
                 invalidate();
                 return true;
 
             default:
                 return super.onTouchEvent(event);
         }
+    }
+
+    private float averageX(MotionEvent event) {
+        float sum = 0f;
+        for (int i = 0; i < event.getPointerCount(); i++) {
+            sum += event.getX(i);
+        }
+        return sum / Math.max(1, event.getPointerCount());
+    }
+
+    private float averageY(MotionEvent event) {
+        float sum = 0f;
+        for (int i = 0; i < event.getPointerCount(); i++) {
+            sum += event.getY(i);
+        }
+        return sum / Math.max(1, event.getPointerCount());
+    }
+
+    private float dp(int value) {
+        return value * getResources().getDisplayMetrics().density;
     }
 
     @Override

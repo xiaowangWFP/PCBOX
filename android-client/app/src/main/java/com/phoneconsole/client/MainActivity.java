@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -40,6 +41,7 @@ import com.phoneconsole.client.model.ScreenStateMessage;
 import com.phoneconsole.client.model.SessionMessage;
 import com.phoneconsole.client.model.TelemetryMessage;
 import com.phoneconsole.client.net.ChannelStore;
+import com.phoneconsole.client.ui.TouchpadPageController;
 import com.phoneconsole.client.net.ConnectionManager;
 import com.phoneconsole.client.screen.H264Decoder;
 import com.phoneconsole.client.ui.ControlWorkspaceController;
@@ -63,6 +65,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     private static final String PAGE_PERFORMANCE = "performance";
     private static final String PAGE_CONTROL = "control";
+    private static final String PAGE_TOUCHPAD = "touchpad";
     private static final String PAGE_SCREEN = "screen";
     private static final String PAGE_SETTINGS = "settings";
 
@@ -73,6 +76,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
     /** 服务端默认页（媒体快捷指令已并入该页，不再单独维护媒体面板） */
     private static final String DEFAULT_PAGE_ID = "default_page";
+
     private static final String DEFAULT_PORT = "8500";
 
     /** 快捷指令 → 通用控制页按键 id 的映射 */
@@ -91,6 +95,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private View sideNavRail;
     private View navPerf;
     private View navControl;
+    private View navTouchpad;
     private View navScreen;
     private View navSettings;
     private TextView tvPageTitle;
@@ -111,8 +116,12 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     // 页面
     private View pagePerformance;
     private View pageControl;
+    private View pageTouchpad;
     private View pageScreen;
     private View pageSettings;
+
+    // 触控板页
+    private TouchpadPageController touchpadController;
 
     // 性能页
     private TextView tvCpuValue;
@@ -220,6 +229,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         setupNavigation();
         setupPerformancePage();
         setupControlPage();
+        setupTouchpadPage();
         setupScreenPage();
         setupSettingsPage();
 
@@ -270,6 +280,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         setupNavigation();
         setupPerformancePage();
         setupControlPage();
+        setupTouchpadPage();
         setupScreenPage();
         setupSettingsPage();
 
@@ -333,6 +344,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         sideNavRail = findViewById(R.id.sideNavRail);
         navPerf = findViewById(R.id.navPerf);
         navControl = findViewById(R.id.navControl);
+        navTouchpad = findViewById(R.id.navTouchpad);
         navScreen = findViewById(R.id.navScreen);
         navSettings = findViewById(R.id.navSettings);
         tvPageTitle = findViewById(R.id.tvPageTitle);
@@ -349,6 +361,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
         pagePerformance = findViewById(R.id.pagePerformance);
         pageControl = findViewById(R.id.pageControl);
+        pageTouchpad = findViewById(R.id.pageTouchpad);
         pageScreen = findViewById(R.id.pageScreen);
         pageSettings = findViewById(R.id.pageSettings);
 
@@ -395,6 +408,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private void setupNavigation() {
         navPerf.setOnClickListener(v -> selectPage(PAGE_PERFORMANCE));
         navControl.setOnClickListener(v -> selectPage(PAGE_CONTROL));
+        navTouchpad.setOnClickListener(v -> selectPage(PAGE_TOUCHPAD));
         navScreen.setOnClickListener(v -> selectPage(PAGE_SCREEN));
         navSettings.setOnClickListener(v -> selectPage(PAGE_SETTINGS));
     }
@@ -414,7 +428,22 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         updateFpsCard();
     }
 
+    /** 打开已安装的 VCamdroid；未安装时提示安装包位置 */
+    private void openVcamdroid() {
+        android.content.Intent intent = getPackageManager()
+                .getLaunchIntentForPackage("com.darusc.vcamdroid");
+        if (intent != null) {
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, R.string.camera_install_hint, Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void setupControlPage() {
+        View cardCamera = pageControl.findViewById(R.id.cardCamera);
+        if (cardCamera != null) {
+            cardCamera.setOnClickListener(v -> openVcamdroid());
+        }
         controlController = new ControlWorkspaceController(pageControl,
                 new ControlWorkspaceController.ControlActionDispatcher() {
                     @Override
@@ -821,10 +850,90 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         tvSessionDetail.setText("已扫码并连接 " + host + ":" + port);
     }
 
+
+    /** 触控板独立页：整页触摸区 + 可拖动悬浮键组 + 右上角设置面板 */
+    private void setupTouchpadPage() {
+        if (pageTouchpad == null) {
+            return;
+        }
+        touchpadController = new TouchpadPageController(this, this, pageTouchpad,
+                new TouchpadPageController.ActionSink() {
+                    @Override
+                    public void onMove(int dx, int dy) {
+                        if (connection != null) {
+                            connection.sendTouchpadMove(dx, dy);
+                        }
+                    }
+
+                    @Override
+                    public void onClick(@NonNull String mouseButton) {
+                        if (connection != null) {
+                            connection.sendTouchpadClick(mouseButton);
+                        }
+                    }
+
+                    @Override
+                    public void onScroll(int deltaY) {
+                        if (connection != null) {
+                            connection.sendTouchpadScroll(deltaY);
+                        }
+                    }
+
+                    @Override
+                    public void onSendText(@NonNull String text) {
+                        if (connection != null) {
+                            connection.sendRemoteText(text, false);
+                        }
+                    }
+
+                    @Override
+                    public void onHotkey(@NonNull String combo) {
+                        if (connection != null) {
+                            connection.sendQuickHotkey(combo);
+                        }
+                    }
+                });
+    }
+
+    /**
+     * 触控板页开启「音量键滚动」后，把音量加/减键转成滚轮事件并拦截系统音量调节；
+     * 其余页面或开关关闭时保持系统默认行为。
+     */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int code = event.getKeyCode();
+        boolean isVolumeKey = code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN;
+        if (PAGE_TOUCHPAD.equals(currentPage)
+                && touchpadController != null
+                && touchpadController.isVolumeScrollEnabled()
+                && isVolumeKey
+                && connection != null) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                connection.sendTouchpadScroll(code == KeyEvent.KEYCODE_VOLUME_UP ? 1 : -1);
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == TouchpadPageController.REQ_RECORD_AUDIO) {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            if (touchpadController != null) {
+                touchpadController.onRecordPermissionResult(granted);
+            }
+        }
+    }
     // ---------------- 页面切换 ----------------
 
     private String pageOrDefault(String page) {
-        if (PAGE_CONTROL.equals(page) || PAGE_SCREEN.equals(page) || PAGE_SETTINGS.equals(page)) {
+        if (PAGE_CONTROL.equals(page) || PAGE_TOUCHPAD.equals(page)
+                || PAGE_SCREEN.equals(page) || PAGE_SETTINGS.equals(page)) {
             return page;
         }
         return PAGE_PERFORMANCE;
@@ -833,6 +942,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private View pageViewOf(String page) {
         if (PAGE_CONTROL.equals(page)) {
             return pageControl;
+        }
+        if (PAGE_TOUCHPAD.equals(page)) {
+            return pageTouchpad;
         }
         if (PAGE_SCREEN.equals(page)) {
             return pageScreen;
@@ -847,11 +959,14 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (PAGE_CONTROL.equals(page)) {
             return 1;
         }
-        if (PAGE_SCREEN.equals(page)) {
+        if (PAGE_TOUCHPAD.equals(page)) {
             return 2;
         }
-        if (PAGE_SETTINGS.equals(page)) {
+        if (PAGE_SCREEN.equals(page)) {
             return 3;
+        }
+        if (PAGE_SETTINGS.equals(page)) {
+            return 4;
         }
         return 0;
     }
@@ -870,7 +985,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         currentPage = page;
 
         UiMotionHelper.switchPageWithMotion(previous, next, forward);
-        for (String each : new String[]{PAGE_PERFORMANCE, PAGE_CONTROL, PAGE_SCREEN, PAGE_SETTINGS}) {
+        for (String each : new String[]{PAGE_PERFORMANCE, PAGE_CONTROL, PAGE_TOUCHPAD, PAGE_SCREEN, PAGE_SETTINGS}) {
             View view = pageViewOf(each);
             if (view != null && view != next) {
                 view.setVisibility(View.GONE);
@@ -901,6 +1016,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (PAGE_CONTROL.equals(page)) {
             return getString(R.string.nav_ctrl_full);
         }
+        if (PAGE_TOUCHPAD.equals(page)) {
+            return getString(R.string.nav_touchpad_full);
+        }
         if (PAGE_SCREEN.equals(page)) {
             return getString(R.string.nav_screen_full);
         }
@@ -911,10 +1029,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     private void applyNavSelection(String page) {
-        View[] items = new View[]{navPerf, navControl, navScreen, navSettings};
-        int[] icons = new int[]{R.id.ivNavPerf, R.id.ivNavControl, R.id.ivNavScreen, R.id.ivNavSettings};
-        int[] labels = new int[]{R.id.tvNavPerf, R.id.tvNavControl, R.id.tvNavScreen, R.id.tvNavSettings};
-        String[] pages = new String[]{PAGE_PERFORMANCE, PAGE_CONTROL, PAGE_SCREEN, PAGE_SETTINGS};
+        View[] items = new View[]{navPerf, navControl, navTouchpad, navScreen, navSettings};
+        int[] icons = new int[]{R.id.ivNavPerf, R.id.ivNavControl, R.id.ivNavTouchpad, R.id.ivNavScreen, R.id.ivNavSettings};
+        int[] labels = new int[]{R.id.tvNavPerf, R.id.tvNavControl, R.id.tvNavTouchpad, R.id.tvNavScreen, R.id.tvNavSettings};
+        String[] pages = new String[]{PAGE_PERFORMANCE, PAGE_CONTROL, PAGE_TOUCHPAD, PAGE_SCREEN, PAGE_SETTINGS};
 
         int accent = ContextCompat.getColor(this, R.color.accent_bright);
         int muted = ContextCompat.getColor(this, R.color.text_muted);

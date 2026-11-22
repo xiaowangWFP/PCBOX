@@ -150,6 +150,13 @@
             android:visibility="gone" />
 
         <include
+            android:id="@+id/pageTouchpad"
+            layout="@layout/page_touchpad"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+        <include
             android:id="@+id/pageScreen"
             layout="@layout/page_screen"
             android:layout_width="match_parent"
@@ -246,6 +253,35 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
                     android:text="@string/nav_ctrl_short"
+                    android:textColor="@color/text_muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/navTouchpad"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_nav_item"
+                android:clickable="true"
+                android:contentDescription="@string/nav_touchpad_full"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/ivNavTouchpad"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_nav_touchpad" />
+
+                <TextView
+                    android:id="@+id/tvNavTouchpad"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/nav_touchpad_short"
                     android:textColor="@color/text_muted"
                     android:textSize="11sp" />
             </LinearLayout>

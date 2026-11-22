@@ -13,15 +13,17 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 /**
- * 静态资源服务：向手机端提供 PWA 页面、图标与调试接口。
- * 使用 JDK 内置 HttpServer，不引入额外 Web 框架。
+ * 静态资源服务：按访问地址提供两个界面，使用 JDK 内置 HttpServer，不引入额外 Web 框架。
  * <p>
- * /api/* 统一转交 {@link AdminApi}（网页控制台使用），/api/layout 为兼容旧客户端的只读配置接口。
+ * 根路径（含 /index.html、/admin.html 等别名）统一分流：PC 本机回环地址打开服务端管理页，
+ * 局域网 IP 打开手机控制端；不提供额外的切换入口。
+ * /api/* 统一转交 {@link AdminApi}，/api/layout 为兼容旧客户端的只读配置接口。
  */
 public class StaticHttpServer {
 
@@ -59,12 +61,14 @@ public class StaticHttpServer {
     private void handle(HttpExchange exchange) throws IOException {
         try {
             String path = exchange.getRequestURI().getPath();
-            if (path == null || path.isEmpty() || "/".equals(path)) {
-                path = "/index.html";
+            if (path == null || path.isEmpty()) {
+                path = "/";
             }
-            // 服务端管理页放在独立路径，根路径保留给手机控制端
-            if ("/admin".equals(path) || "/admin/".equals(path)) {
-                path = "/admin.html";
+            // 单一入口按访问地址分流：PC 本机（127.0.0.1 / localhost）打开服务端管理页，
+            // 手机等通过局域网 IP 打开控制端。所有入口路径都归一到同一判断，不提供旁路。
+            if ("/".equals(path) || "/index.html".equals(path) || "/admin.html".equals(path)
+                    || "/admin".equals(path) || "/admin/".equals(path)) {
+                path = isLocalRequest(exchange) ? "/admin.html" : "/index.html";
             }
             if ("/api/layout".equals(path)) {
                 writeJson(exchange, 200, gson.toJson(config.get()));
@@ -87,6 +91,29 @@ public class StaticHttpServer {
         } finally {
             exchange.close();
         }
+    }
+
+    /**
+     * Host 头指向回环地址时视为 PC 本机浏览器，其余（局域网 IP）视为手机等移动设备。
+     * 支持 "127.0.0.1:8501"、"localhost:8501"、"[::1]:8501" 等写法。
+     */
+    private boolean isLocalRequest(HttpExchange exchange) {
+        String host = exchange.getRequestHeaders().getFirst("Host");
+        if (host == null || host.isBlank()) {
+            return true;
+        }
+        String value = host.trim().toLowerCase(Locale.ROOT);
+        if (value.startsWith("[")) {
+            int end = value.indexOf(']');
+            value = end > 1 ? value.substring(1, end) : value;
+        } else {
+            int colon = value.lastIndexOf(':');
+            if (colon > 0) {
+                value = value.substring(0, colon);
+            }
+        }
+        return "localhost".equals(value) || "::1".equals(value)
+                || value.startsWith("127.") || value.endsWith(".localhost");
     }
 
     private void handleApi(HttpExchange exchange, String path) throws IOException {

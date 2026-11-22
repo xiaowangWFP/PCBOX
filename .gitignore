@@ -28,3 +28,6 @@ config.json
 
 # 基准测试二进制产物（脚本与采样数据保留）
 bench/artifacts/*.jar
+
+# 本地测试临时文件（截图、脚本、日志）：一律放在工作区内，且不进仓库
+bench/tmp/
