@@ -7,8 +7,6 @@
 <sub>Stream Deck 快捷甲板 · 多指触控板 · 硬件监控屏 · 无线扩展副屏 · 虚拟摄像头</sub>
 
 <p>
-<a href="https://github.com/xiaowangWFP/phone-connect-pc/stargazers"><img src="https://img.shields.io/github/stars/xiaowangWFP/phone-connect-pc?style=flat-square&logo=github&color=18181B" alt="Stars" /></a>
-<a href="https://github.com/xiaowangWFP/phone-connect-pc/commits"><img src="https://img.shields.io/github/last-commit/xiaowangWFP/phone-connect-pc?style=flat-square&color=0EA5E9" alt="Last Commit" /></a>
 <img src="https://img.shields.io/badge/Windows-PC%20Server-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows" />
 <img src="https://img.shields.io/badge/Android-5.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android 5.0+" />
 <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+" />
