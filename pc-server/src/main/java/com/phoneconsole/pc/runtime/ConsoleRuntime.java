@@ -1,5 +1,7 @@
 package com.phoneconsole.pc.runtime;
 
+import com.google.gson.JsonObject;
+import com.phoneconsole.pc.camera.CameraBridgeService;
 import com.phoneconsole.pc.config.AppConfig;
 import com.phoneconsole.pc.config.ConfigStore;
 import com.phoneconsole.pc.core.ActionEngine;
@@ -28,6 +30,7 @@ public final class ConsoleRuntime {
     private final ControlWebSocketServer wsServer;
     private final AdbPortForwarder adb;
     private final WindowWatcher watcher;
+    private final CameraBridgeService cameraBridge;
     private final long startedAt = System.currentTimeMillis();
     /** 实际监听的端口，配置里改端口需重启才会变化 */
     private final int boundWsPort;
@@ -37,17 +40,19 @@ public final class ConsoleRuntime {
     private volatile boolean shuttingDown;
 
     public ConsoleRuntime(Path configPath,
-                          AppConfig config,
-                          ActionEngine engine,
-                          ControlWebSocketServer wsServer,
-                          AdbPortForwarder adb,
-                          WindowWatcher watcher) {
+            AppConfig config,
+            ActionEngine engine,
+            ControlWebSocketServer wsServer,
+            AdbPortForwarder adb,
+            WindowWatcher watcher,
+            CameraBridgeService cameraBridge) {
         this.configPath = configPath;
         this.config = config;
         this.engine = engine;
         this.wsServer = wsServer;
         this.adb = adb;
         this.watcher = watcher;
+        this.cameraBridge = cameraBridge;
         this.boundWsPort = config.network.wsPort;
         this.boundHttpPort = config.network.httpPort;
     }
@@ -87,9 +92,24 @@ public final class ConsoleRuntime {
         status.put("clients", wsServer.clientCount());
         status.put("webClients", wsServer.webClientCount());
         status.put("adb", adb.statusMap());
+        status.put("camera", cameraBridge != null ? cameraBridge.statusMap() : Map.of("enabled", false));
         status.put("logCount", LogBuffer.get().size());
         status.put("shuttingDown", shuttingDown);
         return status;
+    }
+
+    public Map<String, Object> cameraStatus() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ok", true);
+        payload.put("camera", cameraBridge != null ? cameraBridge.statusMap() : Map.of("enabled", false));
+        return payload;
+    }
+
+    public Map<String, Object> cameraControl(String action, JsonObject params) {
+        if (cameraBridge == null) {
+            return failure("虚拟摄像头服务未初始化");
+        }
+        return cameraBridge.handleWebCommand(action, params);
     }
 
     public String configContent() {
@@ -119,6 +139,10 @@ public final class ConsoleRuntime {
         wsServer.setConfig(parsed);
         watcher.setConfig(parsed);
         adb.setNetwork(parsed.network);
+        adb.setForwardPort(parsed.camera != null && parsed.camera.enabled ? parsed.camera.rtspPort : 0);
+        if (cameraBridge != null) {
+            cameraBridge.onConfigReloaded(parsed);
+        }
         wsServer.reloadLayout();
 
         List<String> warnings = new ArrayList<>();

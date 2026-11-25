@@ -10,7 +10,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.os.SystemClock;
 import android.view.Window;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -20,16 +19,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.phoneconsole.client.R;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * 功能控制工作台控制器：
@@ -85,17 +81,7 @@ public class ControlWorkspaceController {
 
         void onToggleMicMute();
 
-        void onQuickMediaCommand(@NonNull String command);
-
         void onQuickHotkey(@NonNull String combo);
-
-        void onSendRemoteText(@NonNull String text, boolean pressEnter);
-
-        void onTouchpadMove(int dx, int dy);
-
-        void onTouchpadClick(@NonNull String mouseButton);
-
-        void onTouchpadScroll(int deltaY);
     }
 
     private final Context context;
@@ -126,7 +112,6 @@ public class ControlWorkspaceController {
     };
 
     private boolean userDraggingVolume = false;
-    private String activeDeckId = "";
 
     public ControlWorkspaceController(
             @NonNull View pageControlRoot,
@@ -161,7 +146,6 @@ public class ControlWorkspaceController {
             @Override
             public void onKeyClick(@NonNull TactileDeckAdapter.DeckKeyItem item) {
                 dispatcher.onDeckKeyClick(item.id);
-                recordHistory(item.label, item.hint, () -> dispatcher.onDeckKeyClick(item.id));
             }
 
             @Override
@@ -207,32 +191,23 @@ public class ControlWorkspaceController {
             @Override
             public void onStopTrackingTouch(SeekBar bar) {
                 userDraggingVolume = false;
-                int v = bar.getProgress();
-                dispatcher.onSetVolume(v);
-                recordHistory("音量 " + v + "%", "音量滑块", () -> dispatcher.onSetVolume(v));
+                dispatcher.onSetVolume(bar.getProgress());
             }
         });
 
-        btnSpeakerMute.setOnClickListener(v -> {
-            dispatcher.onToggleSpeakerMute();
-            recordHistory("切换扬声器静音", "音频控制", dispatcher::onToggleSpeakerMute);
-        });
+        btnSpeakerMute.setOnClickListener(v -> dispatcher.onToggleSpeakerMute());
 
-        btnMicMute.setOnClickListener(v -> {
-            dispatcher.onToggleMicMute();
-            recordHistory("切换麦克风静音", "音频控制", dispatcher::onToggleMicMute);
-        });
+        btnMicMute.setOnClickListener(v -> dispatcher.onToggleMicMute());
 
         bindQuickConfirm(R.id.btnQuickSleep, "sleep", "睡眠");
         bindQuickConfirm(R.id.btnQuickLock, "win+l", "锁定屏幕");
 
-        bindQuickHotkey(R.id.btnQuickShot, "win+shift+s", "区域截图");
-        bindQuickHotkey(R.id.btnQuickDesktop, "win+d", "显示桌面");
+        bindQuickHotkey(R.id.btnQuickShot, "win+shift+s");
+        bindQuickHotkey(R.id.btnQuickDesktop, "win+d");
 
     }
 
     public void updateDeckPages(@NonNull List<DeckPageMeta> pages, @NonNull String currentPageId) {
-        this.activeDeckId = currentPageId;
         deckTabContainer.removeAllViews();
         View activeTab = null;
 
@@ -321,13 +296,10 @@ public class ControlWorkspaceController {
 
 
 
-    private void bindQuickHotkey(int viewId, @NonNull String combo, @NonNull String label) {
+    private void bindQuickHotkey(int viewId, @NonNull String combo) {
         View v = root.findViewById(viewId);
         if (v != null) {
-            v.setOnClickListener(btn -> {
-                dispatcher.onQuickHotkey(combo);
-                recordHistory(label, combo.toUpperCase(Locale.ROOT), () -> dispatcher.onQuickHotkey(combo));
-            });
+            v.setOnClickListener(btn -> dispatcher.onQuickHotkey(combo));
         }
     }
 
@@ -359,13 +331,7 @@ public class ControlWorkspaceController {
             v.setAlpha(1f);
             armedView = null;
             dispatcher.onQuickHotkey(combo);
-            recordHistory(label, combo.toUpperCase(Locale.ROOT), () -> dispatcher.onQuickHotkey(combo));
         });
-    }
-
-
-    /** 操作历史已移除；保留空实现，避免散落的调用点再次改动 */
-    private void recordHistory(@NonNull String title, @NonNull String subtitle, @NonNull Runnable replay) {
     }
 
 
@@ -439,9 +405,5 @@ public class ControlWorkspaceController {
         });
 
         dialog.show();
-    }
-
-    public String getActiveDeckId() {
-        return activeDeckId;
     }
 }

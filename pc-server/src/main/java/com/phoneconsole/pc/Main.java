@@ -1,5 +1,6 @@
 package com.phoneconsole.pc;
 
+import com.phoneconsole.pc.camera.CameraBridgeService;
 import com.phoneconsole.pc.config.AppConfig;
 import com.phoneconsole.pc.config.ConfigStore;
 import com.phoneconsole.pc.core.ActionEngine;
@@ -40,13 +41,13 @@ public final class Main {
 
     public static void main(String[] args) {
         try {
-            run(args);
+            run();
         } catch (Throwable t) {
             fatal("服务端启动失败：" + t);
         }
     }
 
-    private static void run(String[] args) throws Exception {
+    private static void run() throws Exception {
         Path configPath = Path.of(System.getProperty("config", "config.json"));
         AppConfig config = ConfigStore.loadOrCreate(configPath);
         ensurePortAvailable(config.network.wsPort, "WebSocket");
@@ -70,9 +71,25 @@ public final class Main {
         wsServer.start();
         log.info("手机端连接地址：ws://<PC-IP>:{}", config.network.wsPort);
 
-        AdbPortForwarder adb = new AdbPortForwarder(config.network, config.network.wsPort);
+        int camForwardPort = (config.camera != null && config.camera.enabled) ? config.camera.rtspPort : 0;
+        AdbPortForwarder adb = new AdbPortForwarder(config.network, config.network.wsPort, camForwardPort);
         WindowWatcher watcher = new WindowWatcher(config, wsServer);
-        ConsoleRuntime runtime = new ConsoleRuntime(configPath, config, engine, wsServer, adb, watcher);
+        CameraBridgeService cameraBridge = new CameraBridgeService(
+                wsServer::currentConfig,
+                new CameraBridgeService.Sink() {
+                    @Override
+                    public void sendControlToPhones(com.google.gson.JsonObject payload) {
+                        wsServer.sendToPhones(payload);
+                    }
+
+                    @Override
+                    public void broadcastCameraStatus(java.util.Map<String, Object> status) {
+                        wsServer.broadcastCameraStatus(status);
+                    }
+                });
+        wsServer.setCameraBridge(cameraBridge);
+        ConsoleRuntime runtime = new ConsoleRuntime(
+                configPath, config, engine, wsServer, adb, watcher, cameraBridge);
 
         StaticHttpServer httpServer = new StaticHttpServer(
                 config.network.httpPort, runtime::config, new AdminApi(runtime));
@@ -85,6 +102,7 @@ public final class Main {
 
         adb.start();
         watcher.start();
+        cameraBridge.start();
 
         String debugUrl = "http://127.0.0.1:" + config.network.httpPort + "/";
         TrayManager tray = TrayManager.install(debugUrl);
@@ -94,7 +112,7 @@ public final class Main {
             if (tray != null) {
                 tray.remove();
             }
-            shutdown(wsServer, httpServer, telemetry, adb, watcher, engine);
+            shutdown(wsServer, httpServer, telemetry, adb, watcher, cameraBridge, engine);
         }, "shutdown-hook"));
 
         log.info("PC 服务端已就绪（调试页面：{}），按 Ctrl+C 退出", debugUrl);
@@ -107,7 +125,9 @@ public final class Main {
                                  TelemetryService telemetry,
                                  AdbPortForwarder adb,
                                  WindowWatcher watcher,
+                                 CameraBridgeService cameraBridge,
                                  ActionEngine engine) {
+        stopQuietly("虚拟摄像头", cameraBridge::shutdown);
         stopQuietly("WebSocket 服务", () -> wsServer.stop(1000));
         stopQuietly("静态资源服务", httpServer::stop);
         stopQuietly("遥测线程", telemetry::stop);

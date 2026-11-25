@@ -199,7 +199,7 @@
     background: var(--elevated); border: 1px solid var(--line); border-radius: 12px;
     padding: 14px 8px; text-align: center; font-size: 12.5px; cursor: pointer;
     min-height: 54px; display: flex; align-items: center; justify-content: center;
-    word-break: break-all;
+    word-break: break-all; touch-action: none;
   }
   .deck-key:active, .deck-key.pressed { background: var(--hover); transform: scale(.98); }
   .deck-key.toggled { border-color: var(--accent); color: var(--accent-bright); }
@@ -409,7 +409,6 @@
     pages: [],
     streaming: false,
     screenAllowed: false,
-    monitors: [],
     monitor: -1,
     actualFps: 0,
     kbps: 0,
@@ -420,7 +419,6 @@
     vramTotal: -1,
     volume: 0,
     muted: false,
-    latencyTimer: null,
     retryTimer: null,
     fpsTimer: null
   };
@@ -453,9 +451,11 @@
   }
 
   function connect() {
+    clearTimeout(state.retryTimer);
     if (state.socket) {
-      try { state.socket.close(); } catch (e) { /* 忽略 */ }
+      const prev = state.socket;
       state.socket = null;
+      try { prev.close(); } catch (e) { /* 忽略 */ }
     }
     let socket;
     try {
@@ -467,6 +467,7 @@
     state.socket = socket;
 
     socket.onopen = () => {
+      if (state.socket !== socket) return;
       state.connected = true;
       socket.send(JSON.stringify({ type: 'client_hello', client: 'web' }));
       renderConn();
@@ -474,6 +475,7 @@
     };
 
     socket.onclose = () => {
+      if (state.socket !== socket) return;
       state.connected = false;
       state.streaming = false;
       resetDecoder();
@@ -485,6 +487,7 @@
     socket.onerror = () => { /* onclose 会接管重连 */ };
 
     socket.onmessage = (event) => {
+      if (state.socket !== socket) return;
       if (typeof event.data !== 'string') {
         onBinaryFrame(event.data);
         return;
@@ -569,9 +572,10 @@
     paintCard(cardOf('mem'), msg.mem, pctText(msg.mem), '%');
     paintCard(cardOf('gpu'), msg.gpu, pctText(msg.gpu), '%');
 
-    const vramPercent = (msg.vram >= 0 && msg.vramTotal > 0) ? msg.vram / msg.vramTotal * 100 : 0;
+    const hasVram = typeof msg.vram === 'number' && msg.vram >= 0;
+    const vramPercent = (hasVram && msg.vramTotal > 0) ? msg.vram / msg.vramTotal * 100 : 0;
     paintCard(cardOf('vram'), vramPercent,
-      msg.vram >= 0 ? (msg.vram / 1024).toFixed(1) : '--', 'G');
+      hasVram ? (msg.vram / 1024).toFixed(1) : '--', 'G');
 
     const volume = msg.isMuted ? 0 : msg.volume;
     paintCard(cardOf('vol'), volume, String(volume), '%');
@@ -582,7 +586,7 @@
     $('mCpu').textContent = pctText(msg.cpu) + '%';
     $('mGpu').textContent = pctText(msg.gpu) + '%';
     $('mMem').textContent = pctText(msg.mem) + '%';
-    $('mVram').textContent = msg.vram >= 0 ? (msg.vram / 1024).toFixed(1) + 'G' : '--';
+    $('mVram').textContent = hasVram ? (msg.vram / 1024).toFixed(1) + 'G' : '--';
     $('mFps').textContent = state.streaming ? state.actualFps.toFixed(1) : '--';
 
     $('volumeText').textContent = msg.isMuted ? '静音' : msg.volume + '%';
@@ -618,7 +622,7 @@
     deck.innerHTML = '';
     (msg.buttons || []).forEach((item) => {
       const el = document.createElement('div');
-      el.className = 'deck-key';
+      el.className = 'deck-key' + (item.state && item.state !== 'normal' ? ' toggled' : '');
       el.dataset.id = item.id;
       el.textContent = item.label || '';
       if (item.bgColor) el.style.background = item.bgColor;
@@ -638,7 +642,11 @@
   }
 
   function renderButtonState(msg) {
-    const el = $('deck').querySelector('[data-id="' + msg.buttonId + '"]');
+    const children = $('deck').children;
+    let el = null;
+    for (let i = 0; i < children.length; i++) {
+      if (children[i].dataset.id === msg.buttonId) { el = children[i]; break; }
+    }
     if (!el) return;
     if (msg.label) el.textContent = msg.label;
     if (msg.bgColor) el.style.background = msg.bgColor;
@@ -652,7 +660,13 @@
   function bindGesture(el, buttonId) {
     let timer = null;
     let longPressed = false;
-    el.addEventListener('pointerdown', () => {
+    const cancelPress = () => {
+      el.classList.remove('pressed');
+      clearTimeout(timer);
+      if (longPressed) { longPressed = false; sendAction(buttonId, 'long_press_cancel'); }
+    };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button && e.button !== 0) return;
       longPressed = false;
       el.classList.add('pressed');
       timer = setTimeout(() => { longPressed = true; sendAction(buttonId, 'long_press_start'); }, 400);
@@ -664,11 +678,9 @@
       longPressed = false;
       sendAction(buttonId, was ? 'long_press_end' : 'click');
     });
-    el.addEventListener('pointerleave', () => {
-      el.classList.remove('pressed');
-      clearTimeout(timer);
-      if (longPressed) { longPressed = false; sendAction(buttonId, 'long_press_cancel'); }
-    });
+    el.addEventListener('pointerleave', cancelPress);
+    el.addEventListener('pointercancel', cancelPress);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   // 音量走通用控制页的既有按键
@@ -684,7 +696,7 @@
   }
 
   // 睡眠 / 锁屏需要连点两次
-  function bindDanger(id, combo, label) {
+  function bindDanger(id, combo) {
     const el = $(id);
     let armedAt = 0;
     el.addEventListener('click', () => {
@@ -857,7 +869,7 @@
   }
 
   function onScreenDevices(msg) {
-    state.monitors = Array.isArray(msg.devices) ? msg.devices : [];
+    const monitors = Array.isArray(msg.devices) ? msg.devices : [];
     state.monitor = Number.isInteger(msg.current) ? msg.current : -1;
     const select = $('monitorSelect');
     select.innerHTML = '';
@@ -865,7 +877,7 @@
     all.value = '-1';
     all.textContent = '整块桌面（所有显示器）';
     select.appendChild(all);
-    state.monitors.forEach((device) => {
+    monitors.forEach((device) => {
       const option = document.createElement('option');
       option.value = String(device.id);
       option.textContent = device.name + ' · ' + device.width + '×' + device.height;

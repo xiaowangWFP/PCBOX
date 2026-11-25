@@ -1,12 +1,10 @@
 package com.phoneconsole.client.ui;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,6 +14,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -25,8 +24,6 @@ import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
 import com.phoneconsole.client.R;
-
-import android.graphics.Rect;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -59,6 +56,8 @@ public final class VoiceInputController {
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private SpeechRecognizer recognizer;
+    private View rootView;
+    private ViewTreeObserver.OnGlobalLayoutListener layoutListener;
     private boolean recording;
     private boolean awaitingResult;
     private boolean cancelled;
@@ -106,6 +105,22 @@ public final class VoiceInputController {
 
     public void onRecordPermissionResult(boolean granted) {
         toast(granted ? R.string.touchpad_voice_permission_ok : R.string.touchpad_voice_permission);
+    }
+
+    /** 释放全局布局监听、定时器与语音识别器，防止横竖屏重建时泄漏 */
+    public void destroy() {
+        handler.removeCallbacksAndMessages(null);
+        recording = false;
+        awaitingResult = false;
+        destroyRecognizer();
+        if (rootView != null && layoutListener != null) {
+            ViewTreeObserver observer = rootView.getViewTreeObserver();
+            if (observer.isAlive()) {
+                observer.removeOnGlobalLayoutListener(layoutListener);
+            }
+            layoutListener = null;
+            rootView = null;
+        }
     }
 
     // ---------------- 按住 / 上滑 ----------------
@@ -175,9 +190,9 @@ public final class VoiceInputController {
 
     /** 键盘弹出时把结果条抬到键盘上方，避免编辑时被遮住 */
     private void setupKeyboardAvoidance(View root) {
-        final View rootView = root.getRootView();
-        rootView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-            if (resultPanel == null || resultPanel.getVisibility() != View.VISIBLE) {
+        rootView = root.getRootView();
+        layoutListener = () -> {
+            if (resultPanel == null || resultPanel.getVisibility() != View.VISIBLE || rootView == null) {
                 return;
             }
             Rect rect = new Rect();
@@ -185,7 +200,8 @@ public final class VoiceInputController {
             int hidden = rootView.getHeight() - rect.bottom;
             float target = hidden > dp(120) ? -(hidden - dp(12)) : 0f;
             resultPanel.setTranslationY(target);
-        });
+        };
+        rootView.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
     }
 
     private void hideKeyboard() {
@@ -204,12 +220,6 @@ public final class VoiceInputController {
     private void startRecording() {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             toast(R.string.touchpad_voice_unavailable);
-            return;
-        }
-        // 当前设备的小米语音服务为在线识别（useLocal=false），无网时提前说明原因；
-        // 若后续接入离线引擎，可放宽这里的网络检查。
-        if (!hasNetwork()) {
-            toast(R.string.touchpad_voice_need_network);
             return;
         }
         destroyRecognizer();
@@ -271,7 +281,13 @@ public final class VoiceInputController {
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L);
-        recognizer.startListening(intent);
+        try {
+            recognizer.startListening(intent);
+        } catch (Exception e) {
+            destroyRecognizer();
+            toast(R.string.touchpad_voice_unavailable);
+            return;
+        }
 
         recording = true;
         awaitingResult = false;
@@ -449,16 +465,6 @@ public final class VoiceInputController {
     private boolean hasPermission() {
         return ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private boolean hasNetwork() {
-        ConnectivityManager manager = (ConnectivityManager)
-                context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (manager == null) {
-            return true;
-        }
-        NetworkInfo info = manager.getActiveNetworkInfo();
-        return info != null && info.isConnected();
     }
 
     private void destroyRecognizer() {

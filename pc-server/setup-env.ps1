@@ -262,8 +262,12 @@ if (Test-Path $cache) {
     Remove-Item $cache -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-if ($installed.Count -gt 0) {
-    Write-Manifest -Items $installed
+$allPresent = @()
+foreach ($item in $targets) {
+    if (Test-Path (Join-Path $item.Dir $item.Marker)) { $allPresent += $item }
+}
+if ($allPresent.Count -gt 0 -and (Test-Path $deps)) {
+    Write-Manifest -Items $allPresent
 }
 
 Write-Host ""

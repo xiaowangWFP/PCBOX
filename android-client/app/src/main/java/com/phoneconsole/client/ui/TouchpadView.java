@@ -2,12 +2,12 @@ package com.phoneconsole.client.ui;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewParent;
@@ -57,6 +57,8 @@ public class TouchpadView extends View {
     private float cornerRadiusPx;
     private float dotSpacingPx;
     private float glowRadiusPx;
+    private RadialGradient glowShader;
+    private final Matrix glowMatrix = new Matrix();
 
     private float sensitivity = 1.2f;
     private float lastX;
@@ -108,6 +110,12 @@ public class TouchpadView extends View {
         cornerRadiusPx = 12f * density;
         dotSpacingPx = 18f * density;
         glowRadiusPx = 42f * density;
+        glowShader = new RadialGradient(
+                0f, 0f, glowRadiusPx,
+                ContextCompat.getColor(context, R.color.touchpad_glow),
+                0x003B82F6,
+                Shader.TileMode.CLAMP);
+        glowPaint.setShader(glowShader);
 
         bgPaint.setStyle(Paint.Style.FILL);
         bgPaint.setColor(ContextCompat.getColor(context, R.color.bg_obsidian));
@@ -168,15 +176,9 @@ public class TouchpadView extends View {
         }
 
         // 触控光晕
-        if (touching) {
-            glowPaint.setShader(new RadialGradient(
-                    touchX,
-                    touchY,
-                    glowRadiusPx,
-                    ContextCompat.getColor(getContext(), R.color.touchpad_glow),
-                    0x003B82F6,
-                    Shader.TileMode.CLAMP
-            ));
+        if (touching && glowShader != null) {
+            glowMatrix.setTranslate(touchX, touchY);
+            glowShader.setLocalMatrix(glowMatrix);
             canvas.drawCircle(touchX, touchY, glowRadiusPx, glowPaint);
         }
 
@@ -199,7 +201,6 @@ public class TouchpadView extends View {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
-                Log.d("TP-GESTURE", "down n=" + event.getPointerCount());
                 touching = true;
                 multiTouch = false;
                 swipeTriggered = false;
@@ -221,7 +222,6 @@ public class TouchpadView extends View {
 
             case MotionEvent.ACTION_POINTER_DOWN:
                 if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
-                Log.d("TP-GESTURE", "pointerDown n=" + event.getPointerCount());
                 multiTouch = true;
                 swipeTriggered = false;
                 threeFingerDropped = false;
@@ -251,7 +251,6 @@ public class TouchpadView extends View {
                         lastMultiY = gestureStartY;
                         swipeTriggered = false;
                         scrollAccum = 0f;
-                        Log.d("TP-GESTURE", "multiMove init n=" + count);
                     }
                     float avgX = averageX(event);
                     float avgY = averageY(event);
@@ -268,7 +267,6 @@ public class TouchpadView extends View {
                                     direction = dy > 0 ? SWIPE_DOWN : SWIPE_UP;
                                 }
                                 swipeTriggered = true;
-                                Log.d("TP-GESTURE", "swipe fingers=" + count + " dir=" + direction);
                                 if (gestureListener != null) {
                                     gestureListener.onMultiFingerSwipe(count, direction);
                                 }
@@ -287,7 +285,6 @@ public class TouchpadView extends View {
                             }
                             swipeTriggered = true;
                             threeFingerDropped = false;
-                            Log.d("TP-GESTURE", "dropSwipe dir=" + direction);
                             if (gestureListener != null) {
                                 gestureListener.onMultiFingerSwipe(3, direction);
                             }
@@ -363,13 +360,11 @@ public class TouchpadView extends View {
                     touchX = lastMultiX;
                     touchY = lastMultiY;
                 }
-                Log.d("TP-GESTURE", "pointerUp before=" + event.getPointerCount() + " remain=" + remain);
                 if (remain == 2 && !swipeTriggered) {
                     // 三指中有一指被系统手势吃掉：用剩余两指继续判定三指滑动
                     threeFingerDropped = true;
                     threeDropX = lastMultiX;
                     threeDropY = lastMultiY;
-                    Log.d("TP-GESTURE", "three->two watch");
                 }
                 scrollAccum = 0f;
                 return true;
@@ -381,7 +376,7 @@ public class TouchpadView extends View {
                 long elapsed = System.currentTimeMillis() - downTimeMs;
                 if (event.getActionMasked() == MotionEvent.ACTION_UP
                         && !multiTouch
-                        && totalMoveDist < 14f
+                        && totalMoveDist < dp(8)
                         && elapsed < 240L) {
                     readoutText = "左键点击";
                     performClick();

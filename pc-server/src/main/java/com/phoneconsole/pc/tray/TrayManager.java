@@ -71,8 +71,16 @@ public final class TrayManager {
     }
 
     private static void openBrowser(String url) {
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            try {
+                Desktop.getDesktop().browse(URI.create(url));
+                return;
+            } catch (Exception e) {
+                log.warn("Desktop.browse 打开失败，改用 rundll32：{}", e.getMessage());
+            }
+        }
         try {
-            Desktop.getDesktop().browse(URI.create(url));
+            new ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", url).start();
         } catch (Exception e) {
             log.warn("打开浏览器失败：{}", e.getMessage());
         }

@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -44,6 +47,12 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.PhoneConsole" />
+
+        <!-- 虚拟摄像头前台推流服务：切回控制台或桌面按钮时保持摄像头推流不断线 -->
+        <service
+            android:name=".camera.CameraStreamService"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
 
         <!-- 插上 USB 线自动拉起应用 -->
         <receiver

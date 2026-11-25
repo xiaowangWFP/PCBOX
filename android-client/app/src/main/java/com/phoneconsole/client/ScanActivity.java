@@ -45,11 +45,12 @@ public class ScanActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private TextView tvScanHint;
 
     private Camera camera;
-    private boolean decoding;
+    private volatile boolean decoding;
     private final ExecutorService decoder = Executors.newSingleThreadExecutor();
     private final MultiFormatReader reader = new MultiFormatReader();
     private final Handler main = new Handler(Looper.getMainLooper());
-    private boolean finished;
+    private volatile boolean finished;
+    private boolean surfaceReady;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,14 +79,21 @@ public class ScanActivity extends AppCompatActivity implements SurfaceHolder.Cal
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_CAMERA && (grantResults.length == 0
-                || grantResults[0] != PackageManager.PERMISSION_GRANTED)) {
+        if (requestCode != REQ_CAMERA) {
+            return;
+        }
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (surfaceReady) {
+                startPreview(surfacePreview.getHolder());
+            }
+        } else {
             tvScanHint.setText("未授予相机权限，无法扫码");
         }
     }
 
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
+        surfaceReady = true;
         startPreview(holder);
     }
 
@@ -99,6 +107,7 @@ public class ScanActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+        surfaceReady = false;
         releaseCamera();
     }
 
@@ -112,6 +121,11 @@ public class ScanActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (camera == null) {
                 camera = Camera.open();
             }
+            if (camera == null) {
+                tvScanHint.setText("未检测到可用相机");
+                return;
+            }
+            camera.setPreviewCallbackWithBuffer(null);
             Camera.Parameters params = camera.getParameters();
             params.setPreviewFormat(ImageFormat.NV21);
             Camera.Size size = pickPreviewSize(params);
@@ -126,16 +140,23 @@ public class ScanActivity extends AppCompatActivity implements SurfaceHolder.Cal
             camera.setDisplayOrientation(90);
             camera.setPreviewDisplay(holder);
 
-            int bufferSize = size == null ? 1280 * 720 * 3 / 2
-                    : size.width * size.height * ImageFormat.getBitsPerPixel(ImageFormat.NV21) / 8;
+            Camera.Size activeSize = size != null ? size : camera.getParameters().getPreviewSize();
+            final int frameW = activeSize != null ? activeSize.width : 1280;
+            final int frameH = activeSize != null ? activeSize.height : 720;
+            int bits = ImageFormat.getBitsPerPixel(ImageFormat.NV21);
+            int bufferSize = frameW * frameH * (bits > 0 ? bits : 12) / 8;
             camera.addCallbackBuffer(new byte[bufferSize]);
             camera.addCallbackBuffer(new byte[bufferSize]);
             camera.setPreviewCallbackWithBuffer((data, cam) -> {
                 if (!decoding && !finished) {
                     decoding = true;
-                    decoder.execute(() -> decodeFrame(data, cam));
+                    decoder.execute(() -> decodeFrame(data, cam, frameW, frameH));
                 } else {
-                    cam.addCallbackBuffer(data);
+                    try {
+                        cam.addCallbackBuffer(data);
+                    } catch (Exception ignored) {
+                        // 相机释放时忽略
+                    }
                 }
             });
             camera.startPreview();
@@ -157,23 +178,27 @@ public class ScanActivity extends AppCompatActivity implements SurfaceHolder.Cal
         return best;
     }
 
-    private void decodeFrame(byte[] data, Camera cam) {
-        Camera.Size size = cam.getParameters().getPreviewSize();
+    private void decodeFrame(byte[] data, Camera cam, int width, int height) {
         try {
             PlanarYUVLuminanceSource source = new PlanarYUVLuminanceSource(
-                    data, size.width, size.height, 0, 0, size.width, size.height, false);
+                    data, width, height, 0, 0, width, height, false);
             BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
             Result result = reader.decodeWithState(bitmap);
             if (result != null && result.getText() != null) {
                 deliver(result.getText());
-                return;
             }
         } catch (Exception ignored) {
             // 没扫到属正常情况，继续下一帧
         } finally {
             reader.reset();
             decoding = false;
-            cam.addCallbackBuffer(data);
+            if (!finished && camera == cam) {
+                try {
+                    cam.addCallbackBuffer(data);
+                } catch (Exception ignored) {
+                    // 相机可能已被释放
+                }
+            }
         }
     }
 

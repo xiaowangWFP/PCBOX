@@ -11,6 +11,7 @@ public class AppConfig {
 
     public Network network = new Network();
     public Screen screen = new Screen();
+    public Camera camera = new Camera();
     public String defaultPageId = "default_page";
     public List<PageConfig> pages = new ArrayList<>();
     public List<AppBinding> appBindings = new ArrayList<>();
@@ -46,6 +47,26 @@ public class AppConfig {
         public String x264Preset = "ultrafast";
         /** 编码线程数；0 = 交给 ffmpeg 自动分配，建议 2~4 防止抢占前台 */
         public int x264Threads = 0;
+    }
+
+    /** 手机虚拟摄像头参数（输出到 Windows DirectShow Softcam，供微信 / 会议软件调用） */
+    public static class Camera {
+        public boolean enabled = true;
+        public int rtspPort = 8554;
+        /** 输出分辨率，softcam 要求宽高为 4 的倍数；默认 1280x720 适配微信与会议软件 */
+        public int width = 1280;
+        public int height = 720;
+        public int fps = 30;
+        public int bitrateKbps = 4000;
+        /** 按需自动启停：开启时仅在微信/会议软件打开摄像头时唤醒手机推流 */
+        public boolean autoDemand = true;
+        /** 默认镜头：front | back */
+        public String facing = "front";
+        /** 画面旋转角度：0 | 90 | 180 | 270 */
+        public int rotation = 0;
+        /** 水平镜像 / 垂直翻转 */
+        public boolean mirrorHorizontal = false;
+        public boolean mirrorVertical = false;
     }
 
     /** 一个手机端页面（一屏按钮） */

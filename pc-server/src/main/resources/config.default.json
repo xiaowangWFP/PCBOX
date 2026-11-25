@@ -17,6 +17,19 @@
     "x264Preset": "ultrafast",
     "x264Threads": 0
   },
+  "camera": {
+    "enabled": true,
+    "rtspPort": 8554,
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "bitrateKbps": 4000,
+    "autoDemand": true,
+    "facing": "front",
+    "rotation": 0,
+    "mirrorHorizontal": false,
+    "mirrorVertical": false
+  },
   "defaultPageId": "default_page",
   "pages": [
     {

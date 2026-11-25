@@ -1,6 +1,2 @@
+# 模块特有产物；config.json、*.log、.idea 等通用规则见根 .gitignore
 target/
-config.json
-*.log
-.idea/
-*.iml
-.vscode/

@@ -4,12 +4,10 @@
     <color name="bg_obsidian">#0B0D11</color>
     <color name="surface_panel">#12151C</color>
     <color name="surface_elevated">#181C25</color>
-    <color name="surface_hover">#1E2330</color>
     <color name="surface_nav_bar">#EB12151C</color>
 
     <!-- 触控键帽材质 -->
     <color name="keycap_bg">#171B24</color>
-    <color name="keycap_pressed">#202634</color>
     <color name="keycap_border">#14FFFFFF</color>
     <color name="divider_line">#12FFFFFF</color>
     <color name="divider_strong">#21FFFFFF</color>

@@ -35,6 +35,7 @@ public final class H264Decoder {
     private final LinkedBlockingQueue<byte[]> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
 
     private volatile boolean running;
+    private volatile boolean waitForKeyframe = true;
     private volatile int generation;
     private Thread worker;
 
@@ -55,6 +56,7 @@ public final class H264Decoder {
         int resolvedHeight = height > 0 ? height : DEFAULT_HEIGHT;
         int resolvedFps = fps > 0 ? Math.min(120, fps) : DEFAULT_FPS;
         queue.clear();
+        waitForKeyframe = true;
         running = true;
         int gen = ++generation;
         worker = new Thread(() -> loop(gen, surface, resolvedWidth, resolvedHeight, resolvedFps),
@@ -92,13 +94,14 @@ public final class H264Decoder {
         }
     }
 
-    /** 由 WebSocket 线程调用；队列满时丢弃最旧一帧 */
+    /** 由 WebSocket 线程调用；队列满时丢弃最旧一帧并等待下一个关键帧重新同步 */
     public void feed(byte[] data) {
         if (!running || data == null || data.length == 0) {
             return;
         }
         if (!queue.offer(data)) {
             queue.poll();
+            waitForKeyframe = true;
             queue.offer(data);
         }
     }
@@ -146,6 +149,13 @@ public final class H264Decoder {
                 if (pending == null) {
                     pending = queue.poll(30, TimeUnit.MILLISECONDS);
                 }
+                if (pending != null && waitForKeyframe) {
+                    if (containsIdr(pending)) {
+                        waitForKeyframe = false;
+                    } else {
+                        pending = null;
+                    }
+                }
                 if (pending != null) {
                     int index = codec.dequeueInputBuffer(10_000);
                     if (index >= 0) {
@@ -157,8 +167,10 @@ public final class H264Decoder {
                             ptsUs += frameIntervalUs;
                             pending = null;
                         } else {
-                            // 缓冲不足：连同空帧一起回填，保留 pending 下一轮重试
+                            // 帧尺寸超过输入缓冲上限：归还空缓冲并丢弃该帧，等待下一关键帧
                             codec.queueInputBuffer(index, 0, 0, ptsUs, 0);
+                            pending = null;
+                            waitForKeyframe = true;
                         }
                     }
                 }
@@ -197,5 +209,25 @@ public final class H264Decoder {
                 }
             }
         }
+    }
+
+    private static boolean containsIdr(byte[] data) {
+        for (int i = 0; i < data.length - 4; i++) {
+            if (data[i] != 0 || data[i + 1] != 0) {
+                continue;
+            }
+            int header;
+            if (data[i + 2] == 1) {
+                header = i + 3;
+            } else if (data[i + 2] == 0 && data[i + 3] == 1) {
+                header = i + 4;
+            } else {
+                continue;
+            }
+            if ((data[header] & 0x1f) == 5) {
+                return true;
+            }
+        }
+        return false;
     }
 }

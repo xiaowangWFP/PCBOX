@@ -3,7 +3,9 @@ package com.phoneconsole.pc.net;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.phoneconsole.pc.camera.CameraBridgeService;
 import com.phoneconsole.pc.config.AppConfig;
+import com.phoneconsole.pc.config.ConfigStore;
 import com.phoneconsole.pc.core.ActionEngine;
 import com.phoneconsole.pc.core.KeySimulator;
 import com.phoneconsole.pc.core.MouseController;
@@ -24,8 +26,10 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -51,10 +55,20 @@ public class ControlWebSocketServer extends WebSocketServer {
     private final Map<WebSocket, String> clientKinds = new ConcurrentHashMap<>();
     /** 遥测快照提供方：连接建立时立即给新客户端一帧 */
     private volatile java.util.function.Supplier<String> telemetrySource;
+    private volatile CameraBridgeService cameraBridge;
 
     public void setTelemetrySource(java.util.function.Supplier<String> source) {
         this.telemetrySource = source;
     }
+
+    public void setCameraBridge(CameraBridgeService cameraBridge) {
+        this.cameraBridge = cameraBridge;
+    }
+
+    public AppConfig currentConfig() {
+        return config;
+    }
+
     /** 通道帧率上限来自 config.json（screen.usbFps / screen.lanFps），改动后对后续订阅生效 */
     private static final int USB_FPS_FALLBACK = 30;
     private static final int LAN_FPS_FALLBACK = 24;
@@ -70,6 +84,7 @@ public class ControlWebSocketServer extends WebSocketServer {
     /** 同一（屏 + 帧率）的多个客户端共享一个 ffmpeg 进程 */
     private final Map<String, H264ScreenStreamer> streamers = new ConcurrentHashMap<>();
     private final ScreenTargets targets = new ScreenTargets();
+    private final Object configLock = new Object();
     /** 新客户端的默认采集目标：-1 = 整块桌面 */
     private volatile int selectedMonitor;
 
@@ -97,8 +112,11 @@ public class ControlWebSocketServer extends WebSocketServer {
         if (config == null) {
             return;
         }
-        AppConfig.Screen previousScreen = this.config == null ? null : this.config.screen;
-        this.config = config;
+        AppConfig.Screen previousScreen;
+        synchronized (configLock) {
+            previousScreen = this.config == null ? null : this.config.screen;
+            this.config = config;
+        }
         if (screenChanged(previousScreen, config.screen)) {
             // 分辨率/缩放/预设/码率变更：重启编码进程让新参数立即生效
             for (H264ScreenStreamer streamer : streamers.values()) {
@@ -219,12 +237,14 @@ public class ControlWebSocketServer extends WebSocketServer {
             }
         }
 
-        String pageId = currentPageId != null ? currentPageId : config.defaultPageId;
+        AppConfig snapshot = config;
+        String pageId = currentPageId != null ? currentPageId : (snapshot == null ? null : snapshot.defaultPageId);
         LayoutMessage layout = buildLayout(pageId);
         if (layout != null) {
             conn.send(gson.toJson(layout));
         }
         sendScreenDevices(conn);
+        syncPhoneEndpointToCamera();
     }
 
     @Override
@@ -236,7 +256,7 @@ public class ControlWebSocketServer extends WebSocketServer {
             log.warn("无法解析消息：{}", message);
             return;
         }
-        String type = json.has("type") ? json.get("type").getAsString() : "";
+        String type = strOf(json, "type", "");
         switch (type) {
             case "action" -> {
                 ActionMessage action = gson.fromJson(json, ActionMessage.class);
@@ -246,40 +266,26 @@ public class ControlWebSocketServer extends WebSocketServer {
             }
             case "screen_control" -> handleScreenControl(conn, json);
             case "client_hello" -> {
-                String kind = json.has("client") ? json.get("client").getAsString() : "";
+                String kind = strOf(json, "client", "");
                 if (CLIENT_WEB.equalsIgnoreCase(kind)) {
                     clientKinds.put(conn, CLIENT_WEB);
                     log.info("网页控制端接入：{}", conn.getRemoteSocketAddress());
+                    syncPhoneEndpointToCamera();
                 }
             }
+            case "camera_state" -> handleCameraState(conn, json);
+            case "camera_request" -> handleCameraRequest(json);
             case "layout_request" -> {
-                String pageId = json.has("pageId") ? json.get("pageId").getAsString() : null;
+                String pageId = strOf(json, "pageId", null);
                 if (pageId != null && !pageId.isBlank()) {
                     broadcastLayout(pageId);
                 }
             }
-            case "hotkey" -> {
-                String combo = json.has("combo") ? json.get("combo").getAsString() : "";
-                KeySimulator.pressCombo(combo);
-            }
-            case "remote_text" -> {
-                String text = json.has("text") ? json.get("text").getAsString() : "";
-                boolean pressEnter = json.has("pressEnter") && json.get("pressEnter").getAsBoolean();
-                KeySimulator.typeText(text, pressEnter);
-            }
-            case "touchpad_move" -> {
-                int dx = json.has("dx") ? json.get("dx").getAsInt() : 0;
-                int dy = json.has("dy") ? json.get("dy").getAsInt() : 0;
-                MouseController.moveBy(dx, dy);
-            }
-            case "touchpad_click" -> {
-                String button = json.has("button") ? json.get("button").getAsString() : "left";
-                MouseController.click(button);
-            }
-            case "touchpad_scroll" -> {
-                int deltaY = json.has("deltaY") ? json.get("deltaY").getAsInt() : 0;
-                MouseController.scroll(deltaY);
-            }
+            case "hotkey" -> KeySimulator.pressCombo(strOf(json, "combo", ""));
+            case "remote_text" -> KeySimulator.typeText(strOf(json, "text", ""), boolOf(json, "pressEnter", false));
+            case "touchpad_move" -> MouseController.moveBy(intOf(json, "dx", 0), intOf(json, "dy", 0));
+            case "touchpad_click" -> MouseController.click(strOf(json, "button", "left"));
+            case "touchpad_scroll" -> MouseController.scroll(intOf(json, "deltaY", 0));
             case "mic_mute" -> engine.toggleMicMute();
             case "deck_key_add" -> handleDeckKeyAdd(json);
             case "deck_key_delete" -> handleDeckKeyDelete(json);
@@ -294,6 +300,7 @@ public class ControlWebSocketServer extends WebSocketServer {
         LogBuffer.get().info("WS", "客户端断开：code=" + code + (reason == null || reason.isBlank() ? "" : " " + reason));
         engine.stopAllRepeats(conn);
         stopStreamer(conn);
+        syncPhoneEndpointToCamera();
     }
 
     @Override
@@ -302,6 +309,7 @@ public class ControlWebSocketServer extends WebSocketServer {
         if (conn != null) {
             engine.stopAllRepeats(conn);
             stopStreamer(conn);
+            syncPhoneEndpointToCamera();
         }
     }
 
@@ -319,6 +327,111 @@ public class ControlWebSocketServer extends WebSocketServer {
         }
     }
 
+    /** 向所有在线手机端发送控制文本帧（过滤掉网页控制端） */
+    public void sendToPhones(JsonObject payload) {
+        if (payload == null) {
+            return;
+        }
+        String text = gson.toJson(payload);
+        for (WebSocket conn : getConnections()) {
+            if (CLIENT_WEB.equals(clientKinds.get(conn))) {
+                continue;
+            }
+            try {
+                if (conn.isOpen()) {
+                    conn.send(text);
+                }
+            } catch (Exception e) {
+                log.debug("下发手机端指令失败：{}", e.getMessage());
+            }
+        }
+    }
+
+    public void broadcastCameraStatus(Map<String, Object> status) {
+        if (status == null) {
+            return;
+        }
+        JsonObject msg = gson.toJsonTree(status).getAsJsonObject();
+        msg.addProperty("type", "camera_status");
+        String payload = gson.toJson(msg);
+        for (WebSocket conn : getConnections()) {
+            if (!CLIENT_WEB.equals(clientKinds.get(conn))) {
+                continue;
+            }
+            try {
+                if (conn.isOpen()) {
+                    conn.send(payload);
+                }
+            } catch (Exception ignored) {
+                // ignore
+            }
+        }
+    }
+
+    private void handleCameraState(WebSocket conn, JsonObject json) {
+        clientKinds.put(conn, CLIENT_PHONE);
+        CameraBridgeService bridge = cameraBridge;
+        if (bridge == null) {
+            return;
+        }
+        syncPhoneEndpointToCamera();
+        bridge.onPhoneCameraState(
+                boolOf(json, "available", true),
+                boolOf(json, "permissionGranted", true),
+                boolOf(json, "streaming", false),
+                intOf(json, "rtspPort", 8554),
+                intOf(json, "width", 0),
+                intOf(json, "height", 0),
+                strOf(json, "facing", "front"),
+                intOf(json, "rotation", 0),
+                boolOf(json, "mirrorHorizontal", false),
+                boolOf(json, "mirrorVertical", false),
+                boolOf(json, "flash", false),
+                strOf(json, "error", ""));
+    }
+
+    private void handleCameraRequest(JsonObject json) {
+        CameraBridgeService bridge = cameraBridge;
+        if (bridge == null) {
+            return;
+        }
+        bridge.handleWebCommand(strOf(json, "action", ""), json);
+    }
+
+    private void syncPhoneEndpointToCamera() {
+        CameraBridgeService bridge = cameraBridge;
+        if (bridge == null) {
+            return;
+        }
+        WebSocket selected = null;
+        for (WebSocket conn : getConnections()) {
+            if (!conn.isOpen() || CLIENT_WEB.equals(clientKinds.get(conn))) {
+                continue;
+            }
+            if (isUsbChannel(conn)) {
+                selected = conn;
+                break;
+            }
+            if (selected == null) {
+                selected = conn;
+            }
+        }
+        if (selected == null) {
+            bridge.onPhoneDisconnected(false);
+            return;
+        }
+        boolean usb = isUsbChannel(selected);
+        String host = "127.0.0.1";
+        if (!usb) {
+            try {
+                host = selected.getRemoteSocketAddress().getAddress().getHostAddress();
+            } catch (Exception ignored) {
+                host = "127.0.0.1";
+            }
+        }
+        bridge.onPhoneConnected(usb, host);
+    }
+
     /** 切换页面并广播页面配置 */
     public void broadcastLayout(String pageId) {
         LayoutMessage layout = buildLayout(pageId);
@@ -326,14 +439,10 @@ public class ControlWebSocketServer extends WebSocketServer {
             log.warn("页面不存在：{}", pageId);
             return;
         }
-        currentPageId = pageId;
-        log.info("切换页面 -> {}（{}）", layout.pageTitle, pageId);
-        LogBuffer.get().info("PAGE", "下发面板 -> " + layout.pageTitle + "（" + pageId + "）");
+        currentPageId = layout.pageId;
+        log.info("切换页面 -> {}（{}）", layout.pageTitle, layout.pageId);
+        LogBuffer.get().info("PAGE", "下发面板 -> " + layout.pageTitle + "（" + layout.pageId + "）");
         broadcast(gson.toJson(layout));
-    }
-
-    public String currentPageId() {
-        return currentPageId;
     }
 
     /** adb reverse 下手机以回环地址接入，即 USB 高速通道 */
@@ -346,7 +455,7 @@ public class ControlWebSocketServer extends WebSocketServer {
     }
 
     private void handleScreenControl(WebSocket conn, JsonObject json) {
-        String action = json.has("action") ? json.get("action").getAsString() : "";
+        String action = strOf(json, "action", "");
         if ("list".equals(action)) {
             sendScreenDevices(conn);
             return;
@@ -406,6 +515,7 @@ public class ControlWebSocketServer extends WebSocketServer {
 
     private void startH264(WebSocket conn, int monitor) {
         int fps = isUsbChannel(conn) ? usbFps() : lanFps();
+        final Subscription subscription = new Subscription(monitor, fps);
         final H264ScreenStreamer streamer = streamerFor(monitor, fps);
         H264ScreenStreamer.Sink sink = new H264ScreenStreamer.Sink() {
             @Override
@@ -430,13 +540,19 @@ public class ControlWebSocketServer extends WebSocketServer {
             @Override
             public void onClosed(String reason) {
                 connMonitors.remove(conn);
+                if (streamer.subscriberCount() == 0) {
+                    streamers.remove(subscription.key(), streamer);
+                }
                 sendScreenState(conn, false, 0, 0, 0, reason);
             }
         };
 
-        connMonitors.put(conn, new Subscription(monitor, fps));
+        connMonitors.put(conn, subscription);
         if (!streamer.subscribe(conn, sink)) {
             connMonitors.remove(conn);
+            if (streamer.subscriberCount() == 0) {
+                streamers.remove(subscription.key(), streamer);
+            }
             sendScreenState(conn, false, 0, 0, 0, "encoder_unavailable");
             LogBuffer.get().error("SCREEN", "H.264 编码器不可用，检查 config.json 的 screen.ffmpegExecutable");
             return;
@@ -448,7 +564,7 @@ public class ControlWebSocketServer extends WebSocketServer {
     }
 
     private void sendScreenStats(WebSocket conn, int fps, int width, int height,
-                                 double actualFps, int kbps) {
+            double actualFps, int kbps) {
         if (!conn.isOpen()) {
             return;
         }
@@ -482,7 +598,7 @@ public class ControlWebSocketServer extends WebSocketServer {
     }
 
     private void sendScreenState(WebSocket conn, boolean streaming, int fps, int width,
-                                 int height, String reason) {
+            int height, String reason) {
         ScreenStateMessage state = new ScreenStateMessage();
         state.streaming = streaming;
         state.fps = fps;
@@ -500,7 +616,23 @@ public class ControlWebSocketServer extends WebSocketServer {
 
     private int intOf(JsonObject json, String key, int fallback) {
         try {
-            return json.has(key) ? json.get(key).getAsInt() : fallback;
+            return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsInt() : fallback;
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    private String strOf(JsonObject json, String key, String fallback) {
+        try {
+            return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : fallback;
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    private boolean boolOf(JsonObject json, String key, boolean fallback) {
+        try {
+            return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsBoolean() : fallback;
         } catch (Exception e) {
             return fallback;
         }
@@ -527,31 +659,39 @@ public class ControlWebSocketServer extends WebSocketServer {
     }
 
     /** 新增自定义按键：写入配置并广播最新布局 */
-    private synchronized void handleDeckKeyAdd(JsonObject json) {
-        String pageId = json.has("pageId") ? json.get("pageId").getAsString() : config.defaultPageId;
-        String label = json.has("label") ? json.get("label").getAsString().trim() : "";
-        String actionType = json.has("actionType") ? json.get("actionType").getAsString().trim() : "";
-        String target = json.has("target") ? json.get("target").getAsString().trim() : "";
-        String bgColorHex = json.has("bgColorHex") ? json.get("bgColorHex").getAsString().trim() : "#1E293B";
+    private void handleDeckKeyAdd(JsonObject json) {
+        String label = strOf(json, "label", "").trim();
+        String actionType = strOf(json, "actionType", "").trim().toLowerCase();
+        String target = strOf(json, "target", "").trim();
+        String bgColorHex = strOf(json, "bgColorHex", "#1E293B").trim();
 
         if (label.isEmpty() || actionType.isEmpty() || target.isEmpty()) {
             log.warn("忽略新增按键：参数不完整（label={} type={} target={}）", label, actionType, target);
-            return;
-        }
-        AppConfig.PageConfig page = findPage(pageId);
-        if (page == null) {
-            log.warn("新增按键失败：页面不存在 {}", pageId);
             return;
         }
 
         AppConfig.ActionConfig action = new AppConfig.ActionConfig();
         action.type = actionType;
         switch (actionType) {
-            case "hotkey" -> action.keys = Arrays.stream(target.toLowerCase().split("\\+"))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .toList();
-            case "media" -> action.command = target.toLowerCase();
+            case "hotkey" -> {
+                var keys = Arrays.stream(target.toLowerCase().split("\\+"))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .toList();
+                if (keys.isEmpty()) {
+                    log.warn("忽略新增按键：hotkey 缺少有效按键 {}", target);
+                    return;
+                }
+                action.keys = keys;
+            }
+            case "media" -> {
+                String cmd = target.toLowerCase();
+                if (!ConfigStore.isSupportedMediaCommand(cmd)) {
+                    log.warn("忽略新增按键：不支持的媒体指令 {}", target);
+                    return;
+                }
+                action.command = cmd;
+            }
             case "launch", "url", "script" -> action.target = target;
             default -> {
                 log.warn("忽略新增按键：不支持的动作类型 {}", actionType);
@@ -559,87 +699,114 @@ public class ControlWebSocketServer extends WebSocketServer {
             }
         }
 
-        AppConfig.ButtonConfig button = new AppConfig.ButtonConfig();
-        button.id = "custom_" + UUID.randomUUID().toString().substring(0, 8);
-        button.label = label;
-        button.bgColor = bgColorHex.isEmpty() ? "#1E293B" : bgColorHex;
-        button.state = "normal";
-        button.action = action;
+        String updatedPageId;
+        synchronized (configLock) {
+            AppConfig snapshot = config;
+            String pageId = strOf(json, "pageId", snapshot == null ? null : snapshot.defaultPageId);
+            AppConfig.PageConfig page = findPage(snapshot, pageId);
+            if (page == null) {
+                log.warn("新增按键失败：页面不存在 {}", pageId);
+                return;
+            }
+            AppConfig.ButtonConfig button = new AppConfig.ButtonConfig();
+            button.id = "custom_" + UUID.randomUUID().toString().substring(0, 8);
+            button.label = label;
+            button.bgColor = bgColorHex.isEmpty() ? "#1E293B" : bgColorHex;
+            button.state = "normal";
+            button.action = action;
 
-        page.buttons.add(button);
-        persistConfig();
-        log.info("新增自定义按键：{}（{} -> {}）", button.label, actionType, target);
-        LogBuffer.get().info("DECK", "新增自定义按键：" + button.label);
-        broadcastLayout(page.id);
+            List<AppConfig.ButtonConfig> nextButtons = new ArrayList<>(page.buttons);
+            nextButtons.add(button);
+            page.buttons = nextButtons;
+            persistConfig(snapshot);
+            updatedPageId = page.id;
+        }
+        log.info("新增自定义按键：{}（{} -> {}）", label, actionType, target);
+        LogBuffer.get().info("DECK", "新增自定义按键：" + label);
+        broadcastLayout(updatedPageId);
     }
 
     /** 删除自定义按键：写入配置并广播最新布局 */
-    private synchronized void handleDeckKeyDelete(JsonObject json) {
-        String pageId = json.has("pageId") ? json.get("pageId").getAsString() : config.defaultPageId;
-        String buttonId = json.has("buttonId") ? json.get("buttonId").getAsString().trim() : "";
+    private void handleDeckKeyDelete(JsonObject json) {
+        String buttonId = strOf(json, "buttonId", "").trim();
         if (buttonId.isEmpty()) {
             return;
         }
-        AppConfig.PageConfig page = findPage(pageId);
-        if (page == null) {
-            return;
-        }
-        boolean removed = page.buttons.removeIf(b -> buttonId.equals(b.id));
-        if (removed) {
-            persistConfig();
-            log.info("删除自定义按键：{}", buttonId);
-            LogBuffer.get().info("DECK", "删除自定义按键：" + buttonId);
-            broadcastLayout(page.id);
-        }
-    }
-
-    private AppConfig.PageConfig findPage(String pageId) {
-        if (config == null || config.pages == null) {
-            return null;
-        }
-        for (AppConfig.PageConfig page : config.pages) {
-            if (page.id != null && page.id.equals(pageId)) {
-                return page;
+        String updatedPageId = null;
+        boolean removed;
+        synchronized (configLock) {
+            AppConfig snapshot = config;
+            String pageId = strOf(json, "pageId", snapshot == null ? null : snapshot.defaultPageId);
+            AppConfig.PageConfig page = findPage(snapshot, pageId);
+            if (page == null) {
+                return;
+            }
+            List<AppConfig.ButtonConfig> nextButtons = new ArrayList<>(page.buttons);
+            removed = nextButtons.removeIf(b -> buttonId.equals(b.id));
+            if (removed) {
+                page.buttons = nextButtons;
+                persistConfig(snapshot);
+                updatedPageId = page.id;
             }
         }
-        return config.pages.isEmpty() ? null : config.pages.get(0);
+        if (removed) {
+            log.info("删除自定义按键：{}", buttonId);
+            LogBuffer.get().info("DECK", "删除自定义按键：" + buttonId);
+            broadcastLayout(updatedPageId);
+        }
     }
 
-    private void persistConfig() {
+    private AppConfig.PageConfig findPage(AppConfig snapshot, String pageId) {
+        if (snapshot == null || snapshot.pages == null || snapshot.pages.isEmpty()) {
+            return null;
+        }
+        if (pageId == null || pageId.isBlank()) {
+            return snapshot.defaultPage();
+        }
+        return snapshot.page(pageId);
+    }
+
+    private void persistConfig(AppConfig snapshot) {
         Consumer<AppConfig> persister = configPersister;
-        if (persister != null) {
-            persister.accept(config);
+        if (persister != null && snapshot != null) {
+            persister.accept(snapshot);
         }
     }
 
     private LayoutMessage buildLayout(String pageId) {
-        AppConfig.PageConfig page = config.page(pageId);
-        if (page == null) {
-            page = config.defaultPage();
+        synchronized (configLock) {
+            AppConfig snapshot = config;
+            if (snapshot == null) {
+                return null;
+            }
+            AppConfig.PageConfig page = snapshot.page(pageId);
+            if (page == null) {
+                page = snapshot.defaultPage();
+            }
+            if (page == null) {
+                return null;
+            }
+            LayoutMessage message = new LayoutMessage();
+            message.pageId = page.id;
+            message.pageTitle = page.title;
+            message.grid.rows = page.grid.rows;
+            message.grid.cols = page.grid.cols;
+            for (AppConfig.ButtonConfig button : page.buttons) {
+                LayoutMessage.Button item = new LayoutMessage.Button();
+                item.id = button.id;
+                item.label = button.label;
+                item.icon = button.icon;
+                item.bgColor = button.bgColor;
+                item.state = engine.buttonState(page.id, button);
+                message.buttons.add(item);
+            }
+            for (AppConfig.PageConfig each : snapshot.pages) {
+                LayoutMessage.Page ref = new LayoutMessage.Page();
+                ref.id = each.id;
+                ref.title = each.title;
+                message.pages.add(ref);
+            }
+            return message;
         }
-        if (page == null) {
-            return null;
-        }
-        LayoutMessage message = new LayoutMessage();
-        message.pageId = page.id;
-        message.pageTitle = page.title;
-        message.grid.rows = page.grid.rows;
-        message.grid.cols = page.grid.cols;
-        for (AppConfig.ButtonConfig button : page.buttons) {
-            LayoutMessage.Button item = new LayoutMessage.Button();
-            item.id = button.id;
-            item.label = button.label;
-            item.icon = button.icon;
-            item.bgColor = button.bgColor;
-            item.state = button.state;
-            message.buttons.add(item);
-        }
-        for (AppConfig.PageConfig each : config.pages) {
-            LayoutMessage.Page ref = new LayoutMessage.Page();
-            ref.id = each.id;
-            ref.title = each.title;
-            message.pages.add(ref);
-        }
-        return message;
     }
 }

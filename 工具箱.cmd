@@ -24,6 +24,10 @@ echo   -- 虚拟屏幕 --
 echo   [2]  安装驱动              (需管理员)
 echo   [3]  绑定/刷新驱动         (需管理员)
 echo.
+echo   -- 虚拟摄像头 --
+echo   [12] 注册虚拟摄像头驱动    (需管理员)
+echo   [13] 卸载虚拟摄像头驱动    (需管理员)
+echo.
 echo   -- 安卓端 --
 echo   [4]  构建 Debug APK
 echo   [5]  构建 Release APK
@@ -40,7 +44,7 @@ echo   [11] 打包为 zip
 echo   [0]  退出
 echo  ==========================================================
 set "CH="
-set /p "CH=请选择 [0-11]: "
+set /p "CH=请选择 [0-13]: "
 
 if "!CH!"=="0" exit /b 0
 if "!CH!"=="1" goto ENV
@@ -54,6 +58,8 @@ if "!CH!"=="8" goto SRV_BUILD
 if "!CH!"=="9" goto SRV_RUN
 if "!CH!"=="10" goto OPEN_DIST
 if "!CH!"=="11" goto PACKAGE
+if "!CH!"=="12" goto SOFTCAM_INSTALL
+if "!CH!"=="13" goto SOFTCAM_UNINSTALL
 goto MENU
 
 :ENV
@@ -109,6 +115,34 @@ if errorlevel 1 (
     powershell -NoProfile -Command "Start-Process powershell.exe -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-File','%DRV%\bind-vdd.ps1'"
 ) else (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%DRV%\bind-vdd.ps1"
+    pause
+)
+goto MENU
+
+:SOFTCAM_INSTALL
+cls
+echo  ---- 注册虚拟摄像头驱动（需管理员）----
+echo.
+net session >nul 2>&1
+if errorlevel 1 (
+    echo 当前非管理员，正在弹出 UAC 提权窗口...
+    powershell -NoProfile -Command "Start-Process powershell.exe -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-File','%DRV%\install-softcam.ps1'"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%DRV%\install-softcam.ps1"
+    pause
+)
+goto MENU
+
+:SOFTCAM_UNINSTALL
+cls
+echo  ---- 卸载虚拟摄像头驱动（需管理员）----
+echo.
+net session >nul 2>&1
+if errorlevel 1 (
+    echo 当前非管理员，正在弹出 UAC 提权窗口...
+    powershell -NoProfile -Command "Start-Process powershell.exe -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-File','%DRV%\uninstall-softcam.ps1'"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%DRV%\uninstall-softcam.ps1"
     pause
 )
 goto MENU
@@ -219,7 +253,7 @@ cls
 echo  ---- 打包分享 ----
 echo.
 set "OUT=%ROOT%\分享包.zip"
-powershell -NoProfile -Command "$src=@('android-client','pc-server','drivers','platform-tools','dist','工具箱.cmd') | ForEach-Object { Join-Path '%ROOT%' $_ } | Where-Object { Test-Path -LiteralPath $_ }; if ($src) { Compress-Archive -LiteralPath $src -DestinationPath '%OUT%' -Force -CompressionLevel Optimal; Write-Host ('[完成] ' + '%OUT%') } else { Write-Host '[失败] 没有可打包的内容' }"
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; $root='%ROOT%'; $stage=Join-Path $env:TEMP ('phone-console-pkg-' + [guid]::NewGuid().ToString('N').Substring(0,8)); New-Item -ItemType Directory -Path $stage | Out-Null; try { $dirs=@('android-client','pc-server','drivers','platform-tools','dist'); foreach ($d in $dirs) { $src=Join-Path $root $d; if (-not (Test-Path -LiteralPath $src)) { continue }; $dst=Join-Path $stage $d; & robocopy $src $dst /E /XD .gradle .idea build target keystore /XF local.properties keystore.properties config.json '*.log' '*.lnk' /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null; if ($LASTEXITCODE -ge 8) { throw ('robocopy failed: ' + $d) } }; if (Test-Path -LiteralPath (Join-Path $root '工具箱.cmd')) { Copy-Item -LiteralPath (Join-Path $root '工具箱.cmd') -Destination $stage }; if (Test-Path -LiteralPath '%OUT%') { Remove-Item -LiteralPath '%OUT%' -Force }; Compress-Archive -Path (Join-Path $stage '*') -DestinationPath '%OUT%' -Force -CompressionLevel Optimal; Write-Host ('[完成] ' + '%OUT%') } finally { if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue } }"
 echo.
 echo 该文件包含源代码、工具、驱动与产物，可直接发给其他电脑使用。
 echo 复制到新电脑后，重新运行 环境检查 确认 JDK / Maven / Android SDK 即可。
