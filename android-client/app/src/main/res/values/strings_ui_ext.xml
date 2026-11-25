@@ -18,10 +18,6 @@
     <string name="touchpad_volume_hint">仅在本页生效；开启后音量键不再调节系统音量，改作上下滚动。</string>
 
     <string name="touchpad_pad_visible">显示悬浮按键</string>
-    <string name="touchpad_pad_size">按键大小</string>
-    <string name="touchpad_pad_small">小</string>
-    <string name="touchpad_pad_normal">标准</string>
-    <string name="touchpad_pad_large">大</string>
     <string name="touchpad_pad_reset">重置全部按键</string>
     <string name="touchpad_adjust_keys">调整按键</string>
     <string name="touchpad_adjust_done">完成调整</string>
@@ -53,10 +49,7 @@
     <string name="touchpad_add_key">添加按键</string>
     <string name="touchpad_haptics">按键震动</string>
     <string name="touchpad_key_name">按键名称</string>
-    <string name="touchpad_key_combo">组合键</string>
-    <string name="touchpad_key_combo_hint">例如 ctrl+c、alt+tab、f5</string>
     <string name="touchpad_dpi">灵敏度</string>
-    <string name="touchpad_size_value">大小</string>
     <string name="touchpad_key_picker_empty">请选择按键（可多选，组合键）</string>
     <string name="touchpad_key_picker_empty_toast">请至少选择一个按键</string>
     <string name="touchpad_gestures">手势导航</string>
@@ -65,10 +58,23 @@
     <string name="touchpad_gesture_help_ok">知道了</string>
     <string name="touchpad_gesture_detail">双指上下滑动：滚动\n\n三指上滑：任务视图（Win + Tab）\n三指下滑：显示桌面（Win + D）\n三指右滑：下一个窗口（Alt + Tab）\n三指左滑：上一个窗口（Alt + Shift + Tab）\n\n四指右滑：下一个虚拟桌面（Ctrl + Win + →）\n四指左滑：上一个虚拟桌面（Ctrl + Win + ←）\n\n从触控板中间开始滑动，位移超过约 60dp 触发；三指/四指请尽量同时落下。</string>
 
-    <string name="camera_card_title">VCamdroid 摄像头</string>
-    <string name="camera_card_subtitle">前后摄像头 → Windows 虚拟摄像头</string>
-    <string name="camera_card_open">打开</string>
-    <string name="camera_install_hint">请先安装 tools/vcamdroid/apk 下的 VCamdroid APK</string>
+    <string name="camera_card_title">手机虚拟摄像头</string>
+    <string name="camera_card_subtitle">微信视频 / 会议摄像头 · 点按预览或控流</string>
+    <string name="camera_card_open">控制</string>
+    <string name="camera_fg_notice">虚拟摄像头正在后台推流，点击返回控制台</string>
+    <string name="camera_dialog_title">手机虚拟摄像头</string>
+    <string name="camera_start">开启推流</string>
+    <string name="camera_stop">停止推流</string>
+    <string name="camera_switch">切换前后摄</string>
+    <string name="camera_rotate">旋转 90°</string>
+    <string name="camera_mirror_h">水平镜像</string>
+    <string name="camera_mirror_v">垂直翻转</string>
+    <string name="camera_flash">闪光灯</string>
+    <string name="camera_auto_demand">自动唤醒</string>
+    <string name="camera_res">画质</string>
+    <string name="camera_close">收起面板</string>
+    <string name="camera_bg_hint">收起面板后若正在推流，将在后台保持不断线；手动点「停止推流」后不会在当前通话中再次强启，也可按需关闭「自动唤醒」。</string>
+    <string name="camera_permission_denied">未授予相机权限，无法开启虚拟摄像头</string>
 
     <string name="ctrl_manage_keys">管理按键</string>
     <string name="ctrl_finish_manage">完成编辑</string>
@@ -78,37 +84,11 @@
     <string name="ctrl_mic">麦克风</string>
     <string name="ctrl_mic_muted">已闭麦</string>
     <string name="ctrl_sleep">睡眠</string>
-    <string name="ctrl_prev">上一首</string>
-    <string name="ctrl_play">播放</string>
-    <string name="ctrl_next">下一首</string>
     <string name="ctrl_screenshot">截图</string>
     <string name="ctrl_desktop">桌面</string>
     <string name="ctrl_lock">锁屏</string>
     <string name="ctrl_deck_title">按键甲板</string>
     <string name="ctrl_deck_hint">点击即时执行 · 长按音量连发</string>
-
-    <string name="companion_tab_input">快捷输入</string>
-    <string name="companion_tab_touchpad">触控板</string>
-    <string name="companion_tab_history">历史</string>
-    <string name="companion_input_label">远程输入文本或命令到 PC</string>
-    <string name="companion_input_hint">输入文本、网址或终端命令…</string>
-    <string name="companion_send_only">仅发送</string>
-    <string name="companion_send_enter">发送并回车</string>
-    <string name="companion_hotkeys_title">常用组合键</string>
-
-    <string name="touchpad_title">触控移动区域</string>
-    <string name="touchpad_guide">拖动移动光标 · 轻点左键</string>
-    <string name="mouse_left">左键</string>
-    <string name="mouse_middle">中键</string>
-    <string name="mouse_right">右键</string>
-    <string name="scroll_up">上滚</string>
-    <string name="scroll_down">下滚</string>
-    <string name="sensitivity_label">灵敏度</string>
-
-    <string name="history_title">最近执行记录</string>
-    <string name="history_clear">清空</string>
-    <string name="history_empty">点击按键、快捷键或发送文本后，这里会自动记录并支持一键重放。</string>
-    <string name="history_replay">重放</string>
 
     <string name="dialog_add_key_title">新增自定义按键</string>
     <string name="dialog_key_name">按键名称</string>

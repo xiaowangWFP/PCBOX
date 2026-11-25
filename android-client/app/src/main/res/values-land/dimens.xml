@@ -15,12 +15,8 @@
     <dimen name="keycap_min_height">74dp</dimen>
     <dimen name="keycap_padding">9dp</dimen>
     <dimen name="keycap_icon_box">26dp</dimen>
-    <dimen name="grid_gap">8dp</dimen>
 
     <dimen name="touch_target_min">44dp</dimen>
-    <dimen name="touchpad_height">116dp</dimen>
-    <dimen name="kpi_value_text">20sp</dimen>
-    <dimen name="graph_height">46dp</dimen>
     <dimen name="page_title_text">15sp</dimen>
     <dimen name="screen_meta_max_width">320dp</dimen>
 

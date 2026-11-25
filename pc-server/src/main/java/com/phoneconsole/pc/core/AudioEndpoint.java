@@ -6,7 +6,6 @@ import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.Guid;
 import com.sun.jna.platform.win32.Ole32;
-import com.sun.jna.platform.win32.WTypes;
 import com.sun.jna.ptr.FloatByReference;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
@@ -42,10 +41,13 @@ public class AudioEndpoint {
     private static final int VTABLE_SET_MUTE = 14;
     private static final int VTABLE_GET_MUTE = 15;
 
+    private static final long RETRY_COOLDOWN_MS = 5000;
+
     private Pointer enumerator;
     private Pointer device;
     private Pointer endpoint;
-    private boolean initialized;
+    private long lastAttemptAt;
+    private boolean warnLogged;
 
     public AudioEndpoint() {
         this(0);
@@ -63,8 +65,12 @@ public class AudioEndpoint {
         if (!Platform.isWindows()) {
             return false;
         }
-        if (!initialized) {
-            initialize();
+        if (endpoint == null) {
+            long now = System.currentTimeMillis();
+            if (lastAttemptAt == 0 || now - lastAttemptAt >= RETRY_COOLDOWN_MS) {
+                lastAttemptAt = now;
+                initialize();
+            }
         }
         return endpoint != null;
     }
@@ -79,11 +85,14 @@ public class AudioEndpoint {
             FloatByReference level = new FloatByReference();
             int hr = invoke(endpoint, VTABLE_GET_MASTER_SCALAR, level);
             if (hr != 0) {
+                // 默认音频设备可能已切换或失效，释放句柄以便下次重连
+                close();
                 return -1;
             }
             return Math.round(Math.max(0, Math.min(1, level.getValue())) * 100);
         } catch (Throwable t) {
             log.debug("读取系统音量失败：{}", t.getMessage());
+            close();
             return -1;
         }
     }
@@ -98,11 +107,13 @@ public class AudioEndpoint {
             IntByReference mute = new IntByReference();
             int hr = invoke(endpoint, VTABLE_GET_MUTE, mute);
             if (hr != 0) {
+                close();
                 return null;
             }
             return mute.getValue() != 0;
         } catch (Throwable t) {
             log.debug("读取静音状态失败：{}", t.getMessage());
+            close();
             return null;
         }
     }
@@ -114,9 +125,15 @@ public class AudioEndpoint {
         }
         try {
             comInit();
-            return invoke(endpoint, VTABLE_SET_MUTE, value ? 1 : 0, Pointer.NULL) == 0;
+            int hr = invoke(endpoint, VTABLE_SET_MUTE, value ? 1 : 0, Pointer.NULL);
+            if (hr != 0) {
+                close();
+                return false;
+            }
+            return true;
         } catch (Throwable t) {
             log.debug("设置静音失败：{}", t.getMessage());
+            close();
             return false;
         }
     }
@@ -129,9 +146,15 @@ public class AudioEndpoint {
         try {
             comInit();
             float scalar = Math.max(0, Math.min(100, percent)) / 100f;
-            return invoke(endpoint, VTABLE_SET_MASTER_SCALAR, scalar, Pointer.NULL) == 0;
+            int hr = invoke(endpoint, VTABLE_SET_MASTER_SCALAR, scalar, Pointer.NULL);
+            if (hr != 0) {
+                close();
+                return false;
+            }
+            return true;
         } catch (Throwable t) {
             log.debug("设置音量失败：{}", t.getMessage());
+            close();
             return false;
         }
     }
@@ -143,11 +166,9 @@ public class AudioEndpoint {
         endpoint = null;
         device = null;
         enumerator = null;
-        initialized = false;
     }
 
     private void initialize() {
-        initialized = true;
         try {
             comInit();
             PointerByReference enumeratorRef = new PointerByReference();
@@ -159,24 +180,37 @@ public class AudioEndpoint {
             }
             PointerByReference deviceRef = new PointerByReference();
             if (invoke(enumerator, VTABLE_GET_DEFAULT_ENDPOINT, dataFlow, E_CONSOLE, deviceRef) != 0) {
+                close();
                 return;
             }
             device = deviceRef.getValue();
+            if (device == null) {
+                close();
+                return;
+            }
 
             Guid.IID iid = new Guid.IID(IID_IAUDIO_ENDPOINT_VOLUME);
             iid.write();
             PointerByReference endpointRef = new PointerByReference();
             if (invoke(device, VTABLE_ACTIVATE, iid.getPointer(), CLSCTX_ALL, Pointer.NULL, endpointRef) != 0) {
+                close();
                 return;
             }
             endpoint = endpointRef.getValue();
-            if (endpoint != null) {
-                log.info(dataFlow == 0
-                        ? "系统音量读取已启用（Windows Core Audio）"
-                        : "麦克风音量/静音控制已启用（Windows Core Audio）");
+            if (endpoint == null) {
+                close();
+                return;
             }
+            warnLogged = false;
+            log.info(dataFlow == 0
+                    ? "系统音量读取已启用（Windows Core Audio）"
+                    : "麦克风音量/静音控制已启用（Windows Core Audio）");
         } catch (Throwable t) {
-            log.warn("Core Audio 初始化失败，音量回退为估算值：{}", t.getMessage());
+            close();
+            if (!warnLogged) {
+                warnLogged = true;
+                log.warn("Core Audio 初始化失败，音量回退为估算值：{}", t.getMessage());
+            }
         }
     }
 

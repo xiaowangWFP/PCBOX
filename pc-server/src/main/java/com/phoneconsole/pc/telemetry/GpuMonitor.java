@@ -40,9 +40,24 @@ public class GpuMonitor {
     private boolean memWarned;
 
     public GpuMonitor() {
+        init();
+    }
+
+    /** 睡眠恢复或长时间运行后重建 PDH 查询，避免计数器失效后数值乱跳 */
+    public synchronized void reset() {
+        close();
+        init();
+    }
+
+    private void init() {
         if (!Platform.isWindows()) {
             return;
         }
+        initEngineCounter();
+        initMemoryCounter();
+    }
+
+    private void initEngineCounter() {
         try {
             PointerByReference queryRef = new PointerByReference();
             int status = Pdh.INSTANCE.PdhOpenQueryW(null, null, queryRef);
@@ -56,7 +71,7 @@ public class GpuMonitor {
             status = Pdh.INSTANCE.PdhAddEnglishCounterW(query, new WString(COUNTER_PATH), null, counterRef);
             if (status != 0) {
                 log.warn("GPU 计数器不可用（0x{}），GPU 占用将显示为 —", Integer.toHexString(status));
-                close();
+                closeEngine();
                 return;
             }
             counter = counterRef.getValue();
@@ -65,9 +80,8 @@ public class GpuMonitor {
             log.info("GPU 占用采集已启用（PDH GPU Engine）");
         } catch (Throwable t) {
             log.warn("GPU 采集初始化失败：{}", t.getMessage());
-            close();
+            closeEngine();
         }
-        initMemoryCounter();
     }
 
     /** 显存计数器独立初始化：GPU 占用不可用时显存仍可能可读 */
@@ -192,8 +206,12 @@ public class GpuMonitor {
     }
 
     public synchronized void close() {
-        primed = false;
+        closeEngine();
         closeMemory();
+    }
+
+    private void closeEngine() {
+        primed = false;
         if (query != null) {
             try {
                 Pdh.INSTANCE.PdhCloseQuery(query);

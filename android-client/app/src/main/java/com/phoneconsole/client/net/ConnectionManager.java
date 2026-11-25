@@ -12,6 +12,7 @@ import androidx.annotation.Nullable;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.phoneconsole.client.camera.CameraConfig;
 import com.phoneconsole.client.model.ButtonStateMessage;
 import com.phoneconsole.client.model.LayoutMessage;
 import com.phoneconsole.client.model.ScreenDevicesMessage;
@@ -61,6 +62,9 @@ public class ConnectionManager {
 
         /** H.264 访问单元（OkHttp 工作线程回调，交由解码线程处理） */
         void onScreenFrame(byte[] data);
+
+        /** PC 端下发虚拟摄像头控制指令 */
+        void onCameraControl(JsonObject command);
     }
 
     private static final String TAG = "ConnectionManager";
@@ -227,6 +231,51 @@ public class ConnectionManager {
         sendJson(payload);
     }
 
+    /** 向 PC 端上报手机虚拟摄像头状态与 RTSP 参数 */
+    public void sendCameraState(CameraConfig state) {
+        if (state == null) {
+            return;
+        }
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "camera_state");
+        payload.addProperty("available", state.available);
+        payload.addProperty("permissionGranted", state.permissionGranted);
+        payload.addProperty("streaming", state.streaming);
+        payload.addProperty("rtspPort", state.rtspPort);
+        payload.addProperty("width", state.width);
+        payload.addProperty("height", state.height);
+        payload.addProperty("fps", state.fps);
+        payload.addProperty("facing", state.facing);
+        payload.addProperty("rotation", state.rotation);
+        payload.addProperty("mirrorHorizontal", state.mirrorHorizontal);
+        payload.addProperty("mirrorVertical", state.mirrorVertical);
+        payload.addProperty("flash", state.flash);
+        payload.addProperty("error", state.error == null ? "" : state.error);
+        sendJson(payload);
+    }
+
+    /** 手机端 UI 主动操作后同步给 PC 端，避免状态反向覆盖 */
+    public void sendCameraRequest(String action, CameraConfig state) {
+        if (action == null || action.isEmpty()) {
+            return;
+        }
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "camera_request");
+        payload.addProperty("action", action);
+        if (state != null) {
+            payload.addProperty("width", state.width);
+            payload.addProperty("height", state.height);
+            payload.addProperty("fps", state.fps);
+            payload.addProperty("facing", state.facing);
+            payload.addProperty("rotation", state.rotation);
+            payload.addProperty("mirrorHorizontal", state.mirrorHorizontal);
+            payload.addProperty("mirrorVertical", state.mirrorVertical);
+            payload.addProperty("flash", state.flash);
+            payload.addProperty("enabled", state.autoDemand);
+        }
+        sendJson(payload);
+    }
+
     private void sendJson(JsonObject payload) {
         WebSocket ws = socket;
         if (ws != null) {
@@ -243,18 +292,6 @@ public class ConnectionManager {
         JsonObject payload = new JsonObject();
         payload.addProperty("type", "layout_request");
         payload.addProperty("pageId", pageId);
-        ws.send(payload.toString());
-    }
-
-    /** 请求 PC 下发可选显示器列表 */
-    public void requestScreenDevices() {
-        WebSocket ws = socket;
-        if (ws == null) {
-            return;
-        }
-        JsonObject payload = new JsonObject();
-        payload.addProperty("type", "screen_control");
-        payload.addProperty("action", "list");
         ws.send(payload.toString());
     }
 
@@ -291,7 +328,14 @@ public class ConnectionManager {
 
     private void attempt(String url) {
         final int gen = ++generation;
-        Request request = new Request.Builder().url(url).build();
+        Request request;
+        try {
+            request = new Request.Builder().url(url).build();
+        } catch (Exception e) {
+            Log.w(TAG, "非法连接地址 " + url + "：" + e.getMessage());
+            main.post(ConnectionManager.this::connectNext);
+            return;
+        }
         client.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
@@ -356,7 +400,7 @@ public class ConnectionManager {
     private void dispatch(String text) {
         try {
             JsonObject obj = JsonParser.parseString(text).getAsJsonObject();
-            String type = obj.has("type") ? obj.get("type").getAsString() : "";
+            String type = strOf(obj, "type", "");
             switch (type) {
                 case "layout_sync": {
                     LayoutMessage layout = gson.fromJson(obj, LayoutMessage.class);
@@ -388,17 +432,21 @@ public class ConnectionManager {
                     break;
                 }
                 case "screen_stats": {
-                    double actualFps = obj.has("actualFps") ? obj.get("actualFps").getAsDouble() : 0;
-                    int kbps = obj.has("kbps") ? obj.get("kbps").getAsInt() : 0;
-                    int width = obj.has("width") ? obj.get("width").getAsInt() : 0;
-                    int height = obj.has("height") ? obj.get("height").getAsInt() : 0;
-                    int fps = obj.has("fps") ? obj.get("fps").getAsInt() : 0;
+                    double actualFps = doubleOf(obj, "actualFps", 0);
+                    int kbps = intOf(obj, "kbps", 0);
+                    int width = intOf(obj, "width", 0);
+                    int height = intOf(obj, "height", 0);
+                    int fps = intOf(obj, "fps", 0);
                     main.post(() -> listener.onScreenStats(actualFps, kbps, width, height, fps));
                     break;
                 }
                 case "screen_devices": {
                     ScreenDevicesMessage devices = gson.fromJson(obj, ScreenDevicesMessage.class);
                     main.post(() -> listener.onScreenDevices(devices));
+                    break;
+                }
+                case "camera_control": {
+                    main.post(() -> listener.onCameraControl(obj));
                     break;
                 }
                 default:
@@ -408,5 +456,17 @@ public class ConnectionManager {
         } catch (Exception e) {
             Log.w(TAG, "报文解析失败：" + e.getMessage());
         }
+    }
+
+    private static String strOf(JsonObject obj, String key, String fallback) {
+        return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : fallback;
+    }
+
+    private static int intOf(JsonObject obj, String key, int fallback) {
+        return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsInt() : fallback;
+    }
+
+    private static double doubleOf(JsonObject obj, String key, double fallback) {
+        return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsDouble() : fallback;
     }
 }

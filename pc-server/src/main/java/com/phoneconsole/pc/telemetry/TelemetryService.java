@@ -44,6 +44,12 @@ public class TelemetryService {
     private long lastRecv = -1;
     private long lastSent = -1;
     private long lastTime = 0;
+    /** 睡眠/长时间停顿检测：两次快照间隔超过该值就重建基准 */
+    private static final long RESUME_GAP_MS = 5000;
+    private long lastTickAt = 0;
+    private double lastCpu = 0;
+    private double lastGpu = -1;
+    private int gpuMissCount = 0;
 
     public TelemetryService(long intervalMs, Consumer<String> sink, MediaController media) {
         this.intervalMs = intervalMs;
@@ -99,11 +105,30 @@ public class TelemetryService {
         return gson.toJson(snapshot());
     }
 
-    public TelemetryMessage snapshot() {
+    /**
+     * 同步快照：定时 tick 与新连接首帧都会调用，必须串行，
+     * 否则网络基准会被并发改写，导致网速尖峰/归零。
+     */
+    public synchronized TelemetryMessage snapshot() {
+        long now = System.currentTimeMillis();
+        boolean resumed = lastTickAt > 0 && now - lastTickAt > RESUME_GAP_MS;
+        lastTickAt = now;
+        if (resumed) {
+            // 睡眠或长时间卡顿：网络计数器、PDH GPU 查询都重新起算
+            lastRecv = -1;
+            lastSent = -1;
+            lastTime = 0;
+            gpu.reset();
+            log.info("检测到休眠/长时间停顿，已重置遥测基准");
+        }
+
+        double prevCpu = lastCpu;
+        double prevGpu = lastGpu;
+
         TelemetryMessage message = new TelemetryMessage();
-        message.cpu = cpuUsage();
+        message.cpu = resumed ? prevCpu : cpuUsage();
         message.mem = memoryUsage();
-        message.gpu = gpu.usage();
+        message.gpu = resumed ? prevGpu : gpuUsage();
         message.vram = gpu.vramUsedMb();
         message.vramTotal = vramTotalMb;
         double[] speed = networkSpeed();
@@ -117,13 +142,27 @@ public class TelemetryService {
 
     private double cpuUsage() {
         if (osBean == null) {
-            return 0;
+            return lastCpu;
         }
         double load = osBean.getCpuLoad();
         if (load < 0) {
-            return 0;
+            // 采样间隔过短或睡眠恢复时可能返回 -1，保留上次值，避免图表掉到 0
+            return lastCpu;
         }
-        return Math.round(load * 1000.0) / 10.0;
+        lastCpu = Math.round(load * 1000.0) / 10.0;
+        return lastCpu;
+    }
+
+    /** GPU 采样失败时保留上次值，连续 3 次失败才显示 — */
+    private double gpuUsage() {
+        double value = gpu.usage();
+        if (value < 0) {
+            gpuMissCount++;
+            return gpuMissCount >= 3 ? -1 : lastGpu;
+        }
+        gpuMissCount = 0;
+        lastGpu = value;
+        return value;
     }
 
     private double memoryUsage() {

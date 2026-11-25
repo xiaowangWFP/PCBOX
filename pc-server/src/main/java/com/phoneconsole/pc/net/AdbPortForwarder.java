@@ -34,6 +34,7 @@ public class AdbPortForwarder {
 
     private volatile AppConfig.Network network;
     private final int port;
+    private volatile int forwardPort;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "adb-watchdog");
         t.setDaemon(true);
@@ -77,8 +78,13 @@ public class AdbPortForwarder {
     }
 
     public AdbPortForwarder(AppConfig.Network network, int wsPort) {
+        this(network, wsPort, 0);
+    }
+
+    public AdbPortForwarder(AppConfig.Network network, int wsPort, int forwardPort) {
         this.network = network;
         this.port = wsPort;
+        this.forwardPort = Math.max(0, forwardPort);
         this.status = new Status(network != null ? network.adbExecutable : "adb");
     }
 
@@ -86,6 +92,15 @@ public class AdbPortForwarder {
     public void setNetwork(AppConfig.Network network) {
         if (network != null) {
             this.network = network;
+        }
+    }
+
+    /** 设置或更新需要自动维持的 adb forward 端口（用于虚拟摄像头 RTSP，<=0 表示禁用） */
+    public void setForwardPort(int forwardPort) {
+        int normalized = Math.max(0, forwardPort);
+        if (this.forwardPort != normalized) {
+            this.forwardPort = normalized;
+            this.lastMapped = "";
         }
     }
 
@@ -105,10 +120,6 @@ public class AdbPortForwarder {
         scheduler.shutdownNow();
     }
 
-    public Status status() {
-        return status;
-    }
-
     /** 转成接口返回用的 Map，字段名与前端约定一致 */
     public Map<String, Object> statusMap() {
         Status snapshot = status;
@@ -121,6 +132,7 @@ public class AdbPortForwarder {
         map.put("checkedAt", snapshot.checkedAt);
         map.put("message", snapshot.message);
         map.put("port", port);
+        map.put("forwardPort", forwardPort);
         map.put("redundancy", "serial+transport_id");
         return map;
     }
@@ -130,49 +142,106 @@ public class AdbPortForwarder {
             synchronized (adbLock) {
                 Result devicesResult = run(net().adbExecutable, "devices", "-l");
                 if (!devicesResult.ok()) {
-                    publishStatus(List.of(), false, firstLine(devicesResult.output, "adb 不可用"));
+                    publishStatus(List.of(), List.of(), false, firstLine(devicesResult.output, "adb 不可用"));
                     lastMapped = "";
                     return;
                 }
 
                 List<Device> details = parseDeviceDetails(devicesResult.output);
                 List<Device> online = onlineDevices(details);
-                publishStatus(details, true, online.isEmpty() ? "未检测到已授权设备" : "");
-
                 if (online.isEmpty()) {
+                    publishStatus(details, List.of(), true, "未检测到已授权设备");
                     lastMapped = "";
                     return;
                 }
 
                 String joined = mappingKey(online);
-                if (joined.equals(lastMapped)) {
-                    return;
-                }
-
+                boolean previouslyMapped = joined.equals(lastMapped);
+                List<String> mappings = new ArrayList<>();
                 boolean allOk = true;
+                int fwd = forwardPort;
+
                 for (Device device : online) {
-                    Result reverse = runOn(device, "reverse", "tcp:" + port, "tcp:" + port);
-                    if (reverse.ok()) {
-                        log.info("已建立有线端口映射 [{}]：tcp:{}（{} 寻址）",
-                                device.serial, port, selectorLabel(device));
-                        LogBuffer.get().info("ADB", "已建立端口映射 [" + device.serial + "] tcp:" + port
-                                + "（" + selectorLabel(device) + "）");
-                    } else {
+                    if (!ensureMapping(device, "reverse", port, previouslyMapped, mappings)) {
                         allOk = false;
-                        log.warn("端口映射失败 [{}]：tcp:{}，{}", device.serial, port,
-                                firstLine(reverse.output, "未知错误"));
-                        LogBuffer.get().warn("ADB", "端口映射失败 [" + device.serial + "] tcp:" + port
-                                + "：" + firstLine(reverse.output, "未知错误"));
+                    }
+                    if (fwd > 0 && !ensureMapping(device, "forward", fwd, previouslyMapped, mappings)) {
+                        allOk = false;
                     }
                 }
-                if (allOk) {
-                    lastMapped = joined;
-                }
-                publishStatus(details, true, allOk ? "" : "端口映射存在失败，下个周期重试");
+
+                lastMapped = allOk ? joined : "";
+                publishStatus(details, mappings, true, allOk ? "" : "端口映射存在失败，下个周期重试");
             }
         } catch (Throwable t) {
             log.debug("ADB 轮询异常：{}", t.getMessage());
         }
+    }
+
+    private boolean ensureMapping(Device device, String mode, int targetPort,
+                                  boolean previouslyMapped, List<String> mappings) {
+        boolean isForward = "forward".equals(mode);
+        String verbLabel = isForward ? "正向端口映射" : "有线端口映射";
+        Result list = runOn(device, mode, "--list");
+        if (list.ok() && hasPortMapping(list.output(), targetPort, isForward ? device.serial : null)) {
+            appendMappingLines(mappings, device.serial, mode, list.output());
+            return true;
+        }
+
+        Result applied = runOn(device, mode, "tcp:" + targetPort, "tcp:" + targetPort);
+        if (applied.ok()) {
+            String verb = previouslyMapped ? "检测到" + verbLabel + "丢失，已自动重建" : "已建立" + verbLabel;
+            log.info("{} [{}]：{} tcp:{}（{} 寻址）", verb, device.serial, mode, targetPort, selectorLabel(device));
+            LogBuffer.get().info("ADB", verb + " [" + device.serial + "] " + mode + " tcp:" + targetPort
+                    + "（" + selectorLabel(device) + "）");
+            Result refreshed = runOn(device, mode, "--list");
+            if (refreshed.ok()) {
+                appendMappingLines(mappings, device.serial, mode, refreshed.output());
+            } else {
+                mappings.add(device.serial + " " + mode + " tcp:" + targetPort + " tcp:" + targetPort);
+            }
+            return true;
+        }
+
+        log.warn("{}失败 [{}]：{} tcp:{}，{}", verbLabel, device.serial, mode, targetPort,
+                firstLine(applied.output, "未知错误"));
+        LogBuffer.get().warn("ADB", verbLabel + "失败 [" + device.serial + "] " + mode + " tcp:" + targetPort
+                + "：" + firstLine(applied.output, "未知错误"));
+        return false;
+    }
+
+    private void appendMappingLines(List<String> out, String serial, String mode, String rawOutput) {
+        boolean isForward = "forward".equals(mode);
+        for (String line : parseLines(rawOutput)) {
+            if (isForward) {
+                // adb forward --list 返回包含全部设备的映射，过滤出当前设备并去重序列号前缀
+                if (!line.startsWith(serial + " ")) {
+                    continue;
+                }
+                out.add(serial + " forward " + line.substring(serial.length()).trim());
+            } else {
+                out.add(serial + " " + line);
+            }
+        }
+    }
+
+    private static boolean hasPortMapping(String output, int port, String requiredSerialPrefix) {
+        if (output == null || output.isBlank()) {
+            return false;
+        }
+        String needle = "tcp:" + port;
+        for (String line : output.split("\\R")) {
+            String trimmed = line.trim();
+            if (requiredSerialPrefix != null && !trimmed.startsWith(requiredSerialPrefix + " ")) {
+                continue;
+            }
+            for (String token : trimmed.split("\\s+")) {
+                if (needle.equals(token)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** 手动检测：读取设备列表（含 transport_id）与每个设备的已有 reverse 映射 */
@@ -240,13 +309,23 @@ public class AdbPortForwarder {
 
             List<String> notes = new ArrayList<>();
             boolean allOk = true;
+            int fwd = forwardPort;
             for (Device device : online) {
                 Result reverse = runOn(device, "reverse", "tcp:" + port, "tcp:" + port);
                 if (reverse.ok()) {
-                    notes.add(device.serial + " 映射成功（" + selectorLabel(device) + "）");
+                    notes.add(device.serial + " 反向映射成功（" + selectorLabel(device) + "）");
                 } else {
                     allOk = false;
-                    notes.add(device.serial + " 映射失败：" + firstLine(reverse.output, "未知错误"));
+                    notes.add(device.serial + " 反向映射失败：" + firstLine(reverse.output, "未知错误"));
+                }
+                if (fwd > 0) {
+                    Result forward = runOn(device, "forward", "tcp:" + fwd, "tcp:" + fwd);
+                    if (forward.ok()) {
+                        notes.add(device.serial + " 摄像头端口转发成功（tcp:" + fwd + "）");
+                    } else {
+                        allOk = false;
+                        notes.add(device.serial + " 摄像头端口转发失败：" + firstLine(forward.output, "未知错误"));
+                    }
                 }
             }
             if (allOk) {
@@ -270,28 +349,33 @@ public class AdbPortForwarder {
         }
     }
 
-    /** 读取每个在线设备的 reverse 列表，前缀序列号便于多设备区分 */
+    /** 读取每个在线设备的 reverse 与 forward 列表，前缀序列号便于多设备区分 */
     private List<String> readMappings(List<Device> devices, List<String> notes) {
         List<String> mappings = new ArrayList<>();
+        int fwd = forwardPort;
         for (Device device : onlineDevices(devices)) {
             Result list = runOn(device, "reverse", "--list");
             if (!list.ok()) {
                 notes.add(device.serial + " 读取映射失败：" + firstLine(list.output, "未知错误"));
                 continue;
             }
-            for (String line : parseLines(list.output)) {
-                mappings.add(device.serial + " " + line);
+            appendMappingLines(mappings, device.serial, "reverse", list.output());
+            if (fwd > 0) {
+                Result fwdList = runOn(device, "forward", "--list");
+                if (fwdList.ok()) {
+                    appendMappingLines(mappings, device.serial, "forward", fwdList.output());
+                }
             }
         }
         return mappings;
     }
 
-    private void publishStatus(List<Device> details, boolean available, String message) {
+    private void publishStatus(List<Device> details, List<String> mappings, boolean available, String message) {
         Status snapshot = new Status(net().adbExecutable);
         snapshot.adbAvailable = available;
         snapshot.deviceDetails = List.copyOf(details);
         snapshot.devices = List.copyOf(onlineSerials(details));
-        snapshot.mappings = snapshot.devices.isEmpty() ? List.of() : status.mappings;
+        snapshot.mappings = snapshot.devices.isEmpty() ? List.of() : List.copyOf(mappings);
         snapshot.checkedAt = System.currentTimeMillis();
         snapshot.message = message != null ? message
                 : (available ? (snapshot.devices.isEmpty() ? "未检测到已授权设备" : "") : "未找到 adb 可执行文件");
@@ -371,6 +455,7 @@ public class AdbPortForwarder {
             }
             builder.append(device.serial).append('#').append(device.transportId);
         }
+        builder.append("#fwd=").append(forwardPort);
         return builder.toString();
     }
 
@@ -409,13 +494,15 @@ public class AdbPortForwarder {
             serialCounts.merge(device.serial, 1, Integer::sum);
         }
         for (Device device : devices) {
+            if (serialCounts.getOrDefault(device.serial, 0) > 1 && hasText(device.transportId)) {
+                device.selector = SELECTOR_TRANSPORT;
+                continue;
+            }
             String cached = selectorBySerial.get(device.serial);
             if (SELECTOR_TRANSPORT.equals(cached) && hasText(device.transportId)) {
                 device.selector = SELECTOR_TRANSPORT;
             } else if (SELECTOR_SERIAL.equals(cached)) {
                 device.selector = SELECTOR_SERIAL;
-            } else if (serialCounts.getOrDefault(device.serial, 0) > 1 && hasText(device.transportId)) {
-                device.selector = SELECTOR_TRANSPORT;
             }
         }
     }

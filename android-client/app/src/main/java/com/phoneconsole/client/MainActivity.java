@@ -3,7 +3,6 @@ package com.phoneconsole.client;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.text.InputType;
 import android.os.Handler;
@@ -12,7 +11,6 @@ import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -33,6 +31,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
+import com.google.gson.JsonObject;
+import com.phoneconsole.client.camera.CameraPanelController;
 import com.phoneconsole.client.model.ButtonItem;
 import com.phoneconsole.client.model.ButtonStateMessage;
 import com.phoneconsole.client.model.LayoutMessage;
@@ -51,7 +51,6 @@ import com.phoneconsole.client.ui.UiMotionHelper;
 import com.phoneconsole.client.ui.WindowInsetsHelper;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -151,8 +150,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private final List<TactileDeckAdapter.DeckKeyItem> deckItems = new ArrayList<>();
     /** 服务端下发的面板清单，旋转重建布局后需要原样恢复 */
     private List<ControlWorkspaceController.DeckPageMeta> deckPages = new ArrayList<>();
-    private final Map<String, String> buttonStates = new HashMap<>();
+    private int deckCols = 3;
     private String deckPageTitle = "";
+    private TelemetryMessage lastTelemetry;
 
     // 屏幕页
     private TextView btnToggleStream;
@@ -185,6 +185,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private TextView tvSessionDetail;
 
     private ConnectionManager connection;
+    private CameraPanelController cameraPanelController;
     private String currentPage = PAGE_PERFORMANCE;
     private String currentPageId = DEFAULT_PAGE_ID;
 
@@ -234,6 +235,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         setupSettingsPage();
 
         connection = new ConnectionManager(getApplicationContext(), this);
+        cameraPanelController = new CameraPanelController(this, connection);
+        cameraPanelController.bindControlCard(pageControl);
         connection.start();
 
         String initialPage = getIntent() == null ? null : getIntent().getStringExtra("page");
@@ -271,6 +274,12 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (h264Decoder != null) {
             h264Decoder.stop();
         }
+        if (touchpadController != null) {
+            touchpadController.destroy();
+        }
+        if (streaming) {
+            firstFrame = false;
+        }
 
         setContentView(R.layout.activity_main);
         bindViews();
@@ -288,21 +297,28 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         selectPage(currentPage);
 
         if (controlController != null) {
-            if (!deckItems.isEmpty()) {
-                controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), 3, 1);
-            }
             List<ControlWorkspaceController.DeckPageMeta> pages = deckPages;
             if (pages == null || pages.isEmpty()) {
                 pages = new ArrayList<>();
                 pages.add(new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle));
             }
+            if (!deckItems.isEmpty()) {
+                controlController.updateDeckButtons(
+                        deckPageTitle, new ArrayList<>(deckItems), deckCols, pages.size());
+            }
             controlController.updateDeckPages(pages, currentPageId);
+        }
+        if (lastTelemetry != null) {
+            onTelemetry(lastTelemetry);
         }
 
         applyStreamFormat(0, 0, 0);
         renderConnStatus();
         updateScreenUi();
         renderSessionDetail();
+        if (cameraPanelController != null) {
+            cameraPanelController.onConfigurationChanged();
+        }
     }
 
     /** 顶栏连接状态（旋转后重建布局时需要重新套用，避免停留在默认的「未连接」） */
@@ -326,8 +342,14 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         stopStream();
+        if (touchpadController != null) {
+            touchpadController.destroy();
+        }
         if (h264Decoder != null) {
             h264Decoder.stop();
+        }
+        if (cameraPanelController != null) {
+            cameraPanelController.destroy();
         }
         if (connection != null) {
             connection.stop();
@@ -428,21 +450,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         updateFpsCard();
     }
 
-    /** 打开已安装的 VCamdroid；未安装时提示安装包位置 */
-    private void openVcamdroid() {
-        android.content.Intent intent = getPackageManager()
-                .getLaunchIntentForPackage("com.darusc.vcamdroid");
-        if (intent != null) {
-            startActivity(intent);
-        } else {
-            Toast.makeText(this, R.string.camera_install_hint, Toast.LENGTH_LONG).show();
-        }
-    }
-
     private void setupControlPage() {
-        View cardCamera = pageControl.findViewById(R.id.cardCamera);
-        if (cardCamera != null) {
-            cardCamera.setOnClickListener(v -> openVcamdroid());
+        if (cameraPanelController != null) {
+            cameraPanelController.bindControlCard(pageControl);
         }
         controlController = new ControlWorkspaceController(pageControl,
                 new ControlWorkspaceController.ControlActionDispatcher() {
@@ -493,46 +503,12 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                     }
 
                     @Override
-                    public void onQuickMediaCommand(String command) {
-                        if ("prev".equals(command)) {
-                            sendMedia("media_prev");
-                        } else if ("next".equals(command)) {
-                            sendMedia("media_next");
-                        } else {
-                            sendMedia("media_play");
-                        }
-                    }
-
-                    @Override
                     public void onQuickHotkey(String combo) {
                         if ("alt+tab".equals(combo)) {
                             connection.sendAction(DEFAULT_PAGE_ID, "btn_alt_tab", "click");
                         } else {
                             connection.sendQuickHotkey(combo);
                         }
-                    }
-
-                    @Override
-                    public void onSendRemoteText(String text, boolean pressEnter) {
-                        if (text == null || text.isEmpty()) {
-                            return;
-                        }
-                        connection.sendRemoteText(text, pressEnter);
-                    }
-
-                    @Override
-                    public void onTouchpadMove(int dx, int dy) {
-                        connection.sendTouchpadMove(dx, dy);
-                    }
-
-                    @Override
-                    public void onTouchpadClick(String mouseButton) {
-                        connection.sendTouchpadClick(mouseButton);
-                    }
-
-                    @Override
-                    public void onTouchpadScroll(int deltaY) {
-                        connection.sendTouchpadScroll(deltaY);
                     }
                 });
     }
@@ -714,10 +690,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     private void saveAndReconnect() {
-        String host = etServerHost.getText().toString().trim();
+        String host = etServerHost.getText().toString().trim().replaceFirst("^wss?://", "");
         String portText = etServerPort.getText().toString().trim();
-        if (host.isEmpty()) {
-            Toast.makeText(this, "请填写服务端地址", Toast.LENGTH_SHORT).show();
+        if (host.isEmpty() || host.matches(".*\\s+.*")) {
+            Toast.makeText(this, "请填写有效服务端地址", Toast.LENGTH_SHORT).show();
             return;
         }
         int port;
@@ -725,6 +701,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             port = portText.isEmpty() ? Integer.parseInt(DEFAULT_PORT) : Integer.parseInt(portText);
         } catch (NumberFormatException e) {
             Toast.makeText(this, "端口需为数字", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (port < 1 || port > 65535) {
+            Toast.makeText(this, "端口需在 1~65535", Toast.LENGTH_SHORT).show();
             return;
         }
         ChannelStore.Channel channel = channels.get(channelIndex);
@@ -766,9 +746,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                 .setView(box)
                 .setNegativeButton("取消", null)
                 .setPositiveButton("保存", (dialog, which) -> {
-                    String host = hostInput.getText().toString().trim();
-                    if (host.isEmpty()) {
-                        Toast.makeText(this, "请填写地址", Toast.LENGTH_SHORT).show();
+                    String host = hostInput.getText().toString().trim().replaceFirst("^wss?://", "");
+                    if (host.isEmpty() || host.matches(".*\\s+.*")) {
+                        Toast.makeText(this, "请填写有效地址", Toast.LENGTH_SHORT).show();
                         return;
                     }
                     int port;
@@ -776,7 +756,12 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                         String text = portInput.getText().toString().trim();
                         port = text.isEmpty() ? Integer.parseInt(DEFAULT_PORT) : Integer.parseInt(text);
                     } catch (NumberFormatException e) {
-                        port = Integer.parseInt(DEFAULT_PORT);
+                        Toast.makeText(this, "端口需为数字", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (port < 1 || port > 65535) {
+                        Toast.makeText(this, "端口需在 1~65535", Toast.LENGTH_SHORT).show();
+                        return;
                     }
                     String name = nameInput.getText().toString().trim();
                     channels.add(new ChannelStore.Channel(name.isEmpty() ? host : name, host, port));
@@ -823,11 +808,21 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             host = body.substring(0, idx);
             portText = body.substring(idx + 1);
         }
-        if (host.isEmpty() || !portText.matches("\\d+")) {
+        if (host.isEmpty() || host.matches(".*\\s+.*") || !portText.matches("\\d+")) {
             Toast.makeText(this, "无法识别的二维码：" + raw, Toast.LENGTH_SHORT).show();
             return;
         }
-        int port = Integer.parseInt(portText);
+        int port;
+        try {
+            port = Integer.parseInt(portText);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "端口无效：" + portText, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (port < 1 || port > 65535) {
+            Toast.makeText(this, "端口需在 1~65535：" + port, Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         int found = -1;
         for (int i = 0; i < channels.size(); i++) {
@@ -926,6 +921,12 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                     && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
             if (touchpadController != null) {
                 touchpadController.onRecordPermissionResult(granted);
+            }
+        } else if (requestCode == CameraPanelController.REQ_CAMERA) {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            if (cameraPanelController != null) {
+                cameraPanelController.onCameraPermissionResult(granted);
             }
         }
     }
@@ -1075,7 +1076,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         deckPageTitle = layout.pageTitle == null ? "" : layout.pageTitle;
 
-        buttonStates.clear();
         deckItems.clear();
         for (ButtonItem item : layout.buttons) {
             if (item == null || item.id == null) {
@@ -1083,9 +1083,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             }
             deckItems.add(toDeckItem(item));
         }
-
-        int cols = layout.grid != null && layout.grid.cols > 0 ? layout.grid.cols : 3;
-        controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), cols, 1);
 
         List<ControlWorkspaceController.DeckPageMeta> pages = new ArrayList<>();
         if (layout.pages != null) {
@@ -1100,19 +1097,29 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             pages.add(new ControlWorkspaceController.DeckPageMeta(currentPageId, deckPageTitle));
         }
         deckPages = pages;
+        deckCols = layout.grid != null && layout.grid.cols > 0 ? layout.grid.cols : 3;
+        controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), deckCols, pages.size());
         controlController.updateDeckPages(deckPages, currentPageId);
     }
 
     private TactileDeckAdapter.DeckKeyItem toDeckItem(ButtonItem item) {
         String hint = item.icon == null ? "" : item.icon;
-        boolean active = "active".equalsIgnoreCase(item.state) || "on".equalsIgnoreCase(item.state);
+        boolean active = isActiveState(item.state);
         return new TactileDeckAdapter.DeckKeyItem(
                 item.id,
                 item.label == null ? item.id : item.label,
                 hint,
                 item.bgColor,
                 active,
-                false);
+                isRepeatableDeckButton(item.id));
+    }
+
+    private static boolean isActiveState(String state) {
+        return state != null && !state.isEmpty() && !"normal".equalsIgnoreCase(state);
+    }
+
+    private static boolean isRepeatableDeckButton(String buttonId) {
+        return "btn_vol_up".equals(buttonId) || "btn_vol_down".equals(buttonId);
     }
 
     @Override
@@ -1120,6 +1127,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (telemetry == null) {
             return;
         }
+        this.lastTelemetry = telemetry;
         setMetric(tvCpuValue, telemetry.cpu);
         setMetric(tvMemValue, telemetry.mem);
         setMetric(tvGpuValue, telemetry.gpu);
@@ -1147,7 +1155,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             controlController.updateAudioTelemetry(volume, muted, telemetry.micMuted);
         }
         if (System.currentTimeMillis() - lastVolumeInputAt > 1500) {
-            lastVolumeSent = volume;
+            lastVolumeSent = Math.max(0, Math.min(100, telemetry.volume));
         }
     }
 
@@ -1156,7 +1164,6 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (state == null || state.buttonId == null) {
             return;
         }
-        buttonStates.put(state.buttonId, state.state == null ? "" : state.state);
         for (int i = 0; i < deckItems.size(); i++) {
             TactileDeckAdapter.DeckKeyItem item = deckItems.get(i);
             if (!item.id.equals(state.buttonId)) {
@@ -1165,14 +1172,14 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             String label = state.label == null ? item.label : state.label;
             String bgColor = state.bgColor == null ? item.bgColorHex : state.bgColor;
             String hint = state.icon == null ? item.hint : state.icon;
-            boolean active = "active".equalsIgnoreCase(state.state) || "on".equalsIgnoreCase(state.state);
+            boolean active = isActiveState(state.state);
             deckItems.set(i, new TactileDeckAdapter.DeckKeyItem(
-                    item.id, label, hint, bgColor, active, false));
+                    item.id, label, hint, bgColor, active, item.repeatable));
             break;
         }
         if (controlController != null) {
-            int cols = 3;
-            controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), cols, 1);
+            int totalPages = deckPages == null || deckPages.isEmpty() ? 1 : deckPages.size();
+            controlController.updateDeckButtons(deckPageTitle, new ArrayList<>(deckItems), deckCols, totalPages);
         }
     }
 
@@ -1187,6 +1194,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             streaming = false;
             streamRequested = false;
             stopDecoder();
+        } else if (cameraPanelController != null) {
+            cameraPanelController.onConnected();
         }
         updateScreenUi();
         renderSessionDetail();
@@ -1282,6 +1291,13 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         if (h264Decoder != null) {
             h264Decoder.feed(data);
+        }
+    }
+
+    @Override
+    public void onCameraControl(JsonObject command) {
+        if (cameraPanelController != null) {
+            cameraPanelController.handleServerCommand(command);
         }
     }
 
@@ -1543,36 +1559,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     // ---------------- 设置页 ----------------
 
     private void fillEndpointFields() {
-        if (connection == null) {
-            return;
-        }
-        String endpoint = connection.getLanEndpoint();
-        String host = "127.0.0.1";
-        String port = DEFAULT_PORT;
-        if (endpoint != null && !endpoint.isEmpty()) {
-            String body = endpoint.replaceFirst("^wss?://", "");
-            int index = body.lastIndexOf(':');
-            if (index > 0) {
-                host = body.substring(0, index);
-                port = body.substring(index + 1);
-            } else {
-                host = body;
-            }
-        }
-        etServerHost.setText(host);
-        etServerPort.setText(port);
-
-        if (!channels.isEmpty() && channelIndex >= 0 && channelIndex < channels.size()) {
-            ChannelStore.Channel channel = channels.get(channelIndex);
-            channel.host = host;
-            try {
-                channel.port = Integer.parseInt(port);
-            } catch (NumberFormatException ignored) {
-                // 端口非法时保持原值
-            }
-            ChannelStore.save(this, channels, channelIndex);
-            renderChannelSpinner();
-        }
+        renderChannelSpinner();
     }
 
     private void renderSessionDetail() {
@@ -1613,7 +1600,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         connection.sendAction(DEFAULT_PAGE_ID, mapped, "click");
     }
 
-    /** 音量滑块按差值换算成若干次 volume_up / volume_down */
+    /** 音量滑块按差值换算成若干次 volume_up / volume_down（Windows 每次系统媒体键步进约 2%） */
     private void applyVolumeByDelta(int percent) {
         lastVolumeInputAt = System.currentTimeMillis();
         if (lastVolumeSent < 0) {
@@ -1624,12 +1611,12 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (Math.abs(diff) < 2) {
             return;
         }
-        int steps = Math.min(10, Math.max(1, Math.abs(diff) / 4));
+        int steps = Math.min(25, Math.max(1, Math.round(Math.abs(diff) / 2f)));
         String buttonId = diff > 0 ? "btn_vol_up" : "btn_vol_down";
         for (int i = 0; i < steps; i++) {
             connection.sendAction(DEFAULT_PAGE_ID, buttonId, "click");
         }
-        lastVolumeSent = percent;
+        lastVolumeSent = Math.max(0, Math.min(100, lastVolumeSent + (diff > 0 ? steps * 2 : -steps * 2)));
     }
 
     // ---------------- 其它 ----------------

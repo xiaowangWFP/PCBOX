@@ -73,12 +73,19 @@ public final class ConfigStore {
         return GSON.toJson(config);
     }
 
+    public static boolean isSupportedMediaCommand(String command) {
+        return command != null && MEDIA_COMMANDS.contains(command.trim().toLowerCase(Locale.ROOT));
+    }
+
     private static void normalize(AppConfig config) {
         if (config.network == null) {
             config.network = new AppConfig.Network();
         }
         if (config.screen == null) {
             config.screen = new AppConfig.Screen();
+        }
+        if (config.camera == null) {
+            config.camera = new AppConfig.Camera();
         }
         if (config.pages == null) {
             config.pages = new ArrayList<>();
@@ -168,6 +175,7 @@ public final class ConfigStore {
             errors.add("screen.monitor 需在 -1~15（-1 表示整块桌面，0 起为显示器序号）");
         }
         normalizeScreen(config.screen, errors);
+        normalizeCamera(config.camera, errors);
 
         List<AppConfig.AppBinding> validBindings = new ArrayList<>();
         for (AppConfig.AppBinding binding : config.appBindings) {
@@ -215,6 +223,31 @@ public final class ConfigStore {
             log.warn("screen.x264Preset 不受支持（{}），回退 ultrafast", screen.x264Preset);
             screen.x264Preset = "ultrafast";
         }
+    }
+
+    /** 虚拟摄像头参数校验与归一化（softcam 要求宽高为 4 的倍数） */
+    private static void normalizeCamera(AppConfig.Camera camera, List<String> errors) {
+        if (camera.rtspPort < 1024 || camera.rtspPort > 65535) {
+            errors.add("camera.rtspPort 需在 1024~65535");
+        }
+        if (camera.width < 320 || camera.width > 3840) {
+            errors.add("camera.width 需在 320~3840");
+        }
+        if (camera.height < 240 || camera.height > 2160) {
+            errors.add("camera.height 需在 240~2160");
+        }
+        camera.width = Math.max(320, camera.width & ~3);
+        camera.height = Math.max(240, camera.height & ~3);
+        if (camera.fps < 5 || camera.fps > 60) {
+            errors.add("camera.fps 需在 5~60");
+        }
+        if (camera.bitrateKbps < 300 || camera.bitrateKbps > 25000) {
+            errors.add("camera.bitrateKbps 需在 300~25000");
+        }
+        String facing = camera.facing == null ? "front" : camera.facing.trim().toLowerCase(Locale.ROOT);
+        camera.facing = "back".equals(facing) ? "back" : "front";
+        int rot = ((camera.rotation % 360) + 360) % 360;
+        camera.rotation = (rot / 90) * 90;
     }
 
     private static void validateAction(String pageId, AppConfig.ButtonConfig button, List<String> errors) {

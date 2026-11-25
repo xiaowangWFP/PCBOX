@@ -1,12 +1,5 @@
-*.iml
-.gradle
-/local.properties
-/.idea
-.DS_Store
+# 模块特有产物；通用规则（.idea、*.iml、local.properties、keystore 等）见根 .gitignore
 /build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
-keystore.properties
-/keystore

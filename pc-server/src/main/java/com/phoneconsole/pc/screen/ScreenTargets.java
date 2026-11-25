@@ -35,7 +35,7 @@ public final class ScreenTargets {
     /** 按序号取显示器；序号不存在（比如上次使用了两块屏、这次只接了一块）时返回 null */
     public Target get(int id) {
         synchronized (lock) {
-            if (targets.isEmpty()) {
+            if (targets.isEmpty() || System.currentTimeMillis() - lastRefresh > 10_000) {
                 refreshLocked();
             }
             for (Target target : targets) {
@@ -44,20 +44,6 @@ public final class ScreenTargets {
                 }
             }
             return null;
-        }
-    }
-
-    public Target primary() {
-        synchronized (lock) {
-            if (targets.isEmpty()) {
-                refreshLocked();
-            }
-            for (Target target : targets) {
-                if (target.primary()) {
-                    return target;
-                }
-            }
-            return targets.isEmpty() ? null : targets.get(0);
         }
     }
 
@@ -85,8 +71,10 @@ public final class ScreenTargets {
         AffineTransform transform = configuration.getDefaultTransform();
         double scaleX = transform == null ? 1.0 : transform.getScaleX();
         double scaleY = transform == null ? 1.0 : transform.getScaleY();
+        int x = (int) Math.round(bounds.x * scaleX);
+        int y = (int) Math.round(bounds.y * scaleY);
         int width = (int) Math.round(bounds.width * scaleX);
         int height = (int) Math.round(bounds.height * scaleY);
-        return new Rectangle(bounds.x, bounds.y, width, height);
+        return new Rectangle(x, y, width, height);
     }
 }

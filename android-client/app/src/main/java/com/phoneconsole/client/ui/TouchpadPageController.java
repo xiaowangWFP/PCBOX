@@ -142,6 +142,7 @@ public final class TouchpadPageController {
         this.prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         this.gestureEnabled = prefs.getBoolean(KEY_GESTURES, true);
+        this.volumeScrollEnabled = prefs.getBoolean(KEY_VOLUME_SCROLL, false);
 
         touchpad = root.findViewById(R.id.tpTouchpadView);
         padLayer = root.findViewById(R.id.tpPadLayer);
@@ -190,6 +191,10 @@ public final class TouchpadPageController {
 
     public boolean isVolumeScrollEnabled() {
         return volumeScrollEnabled;
+    }
+
+    public void destroy() {
+        voiceInput.destroy();
     }
 
     // ---------------- 触摸区 ----------------

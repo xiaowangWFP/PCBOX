@@ -292,6 +292,7 @@
                             android:textStyle="bold" />
 
                         <TextView
+                            android:id="@+id/tvCameraSubtitle"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
@@ -301,6 +302,7 @@
                     </LinearLayout>
 
                     <TextView
+                        android:id="@+id/tvCameraAction"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
@@ -308,14 +310,6 @@
                         android:textColor="@color/accent_bright"
                         android:textSize="12sp" />
                 </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/camera_card_subtitle"
-                    android:textColor="@color/text_muted"
-                    android:textSize="11sp" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </LinearLayout>

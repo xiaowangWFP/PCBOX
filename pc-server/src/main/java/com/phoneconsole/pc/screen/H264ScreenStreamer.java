@@ -80,7 +80,7 @@ public final class H264ScreenStreamer {
     private int sessionCounter;
     private volatile Process process;
     private Thread pumpThread;
-    /** 采集通道降级：0 = ddagrab 单屏，1 = gdigrab 按屏裁剪，2 = gdigrab 整块桌面 */
+    /** 采集通道降级：0 = gdigrab 按屏裁剪，1 = gdigrab 整块桌面 */
     private volatile int captureMode;
     /** 最近一次请求的显示器序号，切换后清除降级状态 */
     private volatile int lastRequestedMonitor = Integer.MIN_VALUE;
@@ -98,10 +98,6 @@ public final class H264ScreenStreamer {
         this.monitor = monitor;
         this.targets = targets;
         this.fps = fps <= 0 ? DEFAULT_FPS : fps;
-    }
-
-    public boolean isRunning() {
-        return running;
     }
 
     /** 当前编码宽度（已按采集源比例换算，可能小于 maxWidth） */
@@ -133,6 +129,12 @@ public final class H264ScreenStreamer {
                 subscribers.remove(conn);
                 return false;
             }
+            // 先同步算出目标分辨率，保证调用方紧接着下发的 screen_state 尺寸准确
+            int target = monitorIndex();
+            int[] initialSize = outputSize(target);
+            outputWidth = initialSize[0];
+            outputHeight = initialSize[1];
+
             statsStart = System.nanoTime();
             statsFrames = 0;
             statsBytes = 0;

@@ -2,6 +2,8 @@ package com.phoneconsole.pc.net;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.phoneconsole.pc.runtime.ConsoleRuntime;
 import com.phoneconsole.pc.runtime.LogBuffer;
 
@@ -45,6 +47,10 @@ public final class AdminApi {
                     return post ? methodNotAllowed(path) : logs(query);
                 case "/api/logs/clear":
                     return post ? json(200, runtime.clearLogs()) : methodNotAllowed(path);
+                case "/api/camera":
+                    return post ? methodNotAllowed(path) : json(200, runtime.cameraStatus());
+                case "/api/camera/control":
+                    return post ? cameraControl(body) : methodNotAllowed(path);
                 case "/api/shutdown":
                     return post ? shutdown() : methodNotAllowed(path);
                 default:
@@ -107,6 +113,21 @@ public final class AdminApi {
         long since = longParam(query, "since", 0);
         int limit = (int) longParam(query, "limit", 300);
         return json(200, runtime.logs(since, limit));
+    }
+
+    private Response cameraControl(String body) {
+        if (body == null || body.isBlank()) {
+            return error(400, "请求体为空");
+        }
+        try {
+            JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+            String action = json.has("action") && !json.get("action").isJsonNull()
+                    ? json.get("action").getAsString()
+                    : "";
+            return json(200, runtime.cameraControl(action, json));
+        } catch (Exception e) {
+            return error(400, "请求 JSON 无效：" + e.getMessage());
+        }
     }
 
     private Response shutdown() {
