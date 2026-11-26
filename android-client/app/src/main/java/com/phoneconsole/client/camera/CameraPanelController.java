@@ -2,38 +2,31 @@ package com.phoneconsole.client.camera;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.IBinder;
-import android.util.DisplayMetrics;
-import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
 import android.view.View;
-import android.view.Window;
-import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import com.google.gson.JsonObject;
 import com.pedro.encoder.utils.gl.AspectRatioMode;
 import com.pedro.library.view.OpenGlView;
 import com.phoneconsole.client.R;
 import com.phoneconsole.client.net.ConnectionManager;
+import com.phoneconsole.client.ui.ThemeManager;
 
 /**
- * 手机端内置虚拟摄像头控制面板与服务绑定协调器：
- * - 管理控制页底部入口卡片状态展示
- * - 响应 PC 端 camera_control（含微信按需唤醒）
- * - 打开内置 OpenGlView 预览/旋转/镜像弹窗，收起弹窗后自动退入前台服务继续推流
+ * 手机虚拟摄像头主工作台控制器：
+ * - 直接绑定到独立的「相机」Tab 页面（page_camera.xml / layout-land/page_camera.xml）
+ * - 切到「相机」Tab 时自动挂载 OpenGlView 预览，切走时自动退入前台服务不断流
+ * - 响应 PC 端 camera_control（含微信/会议打开时自动唤醒）并同步 4 套外观主题
  */
 public final class CameraPanelController implements CameraStreamService.StateObserver {
 
@@ -45,17 +38,19 @@ public final class CameraPanelController implements CameraStreamService.StateObs
     private CameraStreamService service;
     private boolean bound;
     private CameraConfig lastState = new CameraConfig();
-
     private CameraConfig pendingStartConfig;
-    private boolean pendingOpenDialog;
+    private boolean pageVisible;
+    private boolean surfaceReady;
+    private boolean promptedPermissionOnTab;
 
-    // 控制页卡片（横竖屏重建后会重新绑定）
-    private TextView tvCardSubtitle;
-    private TextView tvCardAction;
+    private ThemeManager.AppTheme activeTheme = ThemeManager.AppTheme.OLED;
 
-    // 当前打开的弹窗及其控件引用
-    private AlertDialog dialog;
+    private View previewFrame;
     private OpenGlView previewView;
+    private View permissionCard;
+    private TextView tvPermHint;
+    private TextView btnGrantPerm;
+    private View statusDot;
     private TextView tvStatus;
     private TextView tvMeta;
     private TextView btnToggle;
@@ -66,6 +61,9 @@ public final class CameraPanelController implements CameraStreamService.StateObs
     private TextView btnFlash;
     private TextView btnAutoDemand;
     private TextView btnRes;
+    private View cardWake;
+    private TextView tvWakeTitle;
+    private TextView tvWakeSub;
 
     private final ServiceConnection serviceConn = new ServiceConnection() {
         @Override
@@ -75,8 +73,8 @@ public final class CameraPanelController implements CameraStreamService.StateObs
                 service = local.service();
                 service.setObserver(CameraPanelController.this);
                 lastState = service.snapshot();
-                renderCard();
-                renderDialog();
+                attachPreviewIfReady();
+                renderUi();
                 connection.sendCameraState(lastState);
             }
         }
@@ -95,18 +93,190 @@ public final class CameraPanelController implements CameraStreamService.StateObs
         bound = activity.bindService(intent, serviceConn, Context.BIND_AUTO_CREATE);
     }
 
-    /** 绑定控制页上的入口卡片（Activity 启动及横竖屏切换时调用） */
-    public void bindControlCard(View pageControl) {
-        if (pageControl == null) {
+    /** 绑定独立的「相机」Tab 视图（启动及横竖屏重建布局后调用） */
+    public void bindCameraPage(View pageCamera) {
+        if (pageCamera == null) {
             return;
         }
-        View card = pageControl.findViewById(R.id.cardCamera);
-        tvCardSubtitle = pageControl.findViewById(R.id.tvCameraSubtitle);
-        tvCardAction = pageControl.findViewById(R.id.tvCameraAction);
-        if (card != null) {
-            card.setOnClickListener(v -> openDialog());
+        surfaceReady = false;
+        previewFrame = pageCamera.findViewById(R.id.cameraPreviewFrame);
+        previewView = pageCamera.findViewById(R.id.cameraGlView);
+        permissionCard = pageCamera.findViewById(R.id.cameraPermissionCard);
+        tvPermHint = pageCamera.findViewById(R.id.tvCameraPermHint);
+        btnGrantPerm = pageCamera.findViewById(R.id.btnCameraGrant);
+        statusDot = pageCamera.findViewById(R.id.cameraStatusDot);
+        tvStatus = pageCamera.findViewById(R.id.tvCameraStatus);
+        tvMeta = pageCamera.findViewById(R.id.tvCameraMeta);
+        btnToggle = pageCamera.findViewById(R.id.btnCameraToggle);
+        btnSwitch = pageCamera.findViewById(R.id.btnCameraSwitch);
+        btnRotate = pageCamera.findViewById(R.id.btnCameraRotate);
+        btnMirrorH = pageCamera.findViewById(R.id.btnCameraMirrorH);
+        btnMirrorV = pageCamera.findViewById(R.id.btnCameraMirrorV);
+        btnFlash = pageCamera.findViewById(R.id.btnCameraFlash);
+        btnAutoDemand = pageCamera.findViewById(R.id.btnCameraAutoDemand);
+        btnRes = pageCamera.findViewById(R.id.btnCameraRes);
+        cardWake = pageCamera.findViewById(R.id.cardCameraWake);
+        tvWakeTitle = pageCamera.findViewById(R.id.tvCameraWakeTitle);
+        tvWakeSub = pageCamera.findViewById(R.id.tvCameraWakeSub);
+
+        if (previewView != null) {
+            previewView.setAspectRatioMode(AspectRatioMode.Adjust);
+            final OpenGlView gl = previewView;
+            gl.getHolder().addCallback(new SurfaceHolder.Callback() {
+                @Override
+                public void surfaceCreated(@NonNull SurfaceHolder holder) {
+                    surfaceReady = true;
+                    attachPreviewIfReady();
+                }
+
+                @Override
+                public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
+                }
+
+                @Override
+                public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+                    surfaceReady = false;
+                    if (service != null) {
+                        service.detachPreview(gl);
+                    }
+                }
+            });
         }
-        renderCard();
+
+        if (btnGrantPerm != null) {
+            btnGrantPerm.setOnClickListener(v -> requestCameraPermission());
+        }
+
+        if (btnToggle != null) {
+            btnToggle.setOnClickListener(v -> {
+                if (!CameraStreamService.hasCameraPermission(activity)) {
+                    requestCameraPermission();
+                    return;
+                }
+                boolean willStart = !lastState.streaming;
+                if (service != null) {
+                    service.toggleManualStream();
+                } else {
+                    CameraConfig next = lastState.copy();
+                    next.manual = willStart;
+                    CameraStreamService.startCommand(activity,
+                            willStart ? CameraStreamService.ACTION_START_STREAM : CameraStreamService.ACTION_STOP_STREAM,
+                            next, willStart);
+                }
+                connection.sendCameraRequest(willStart ? "start" : "stop", lastState);
+            });
+        }
+
+        if (btnSwitch != null) {
+            btnSwitch.setOnClickListener(v -> {
+                if (service != null) {
+                    service.switchCamera();
+                }
+            });
+        }
+        if (btnRotate != null) {
+            btnRotate.setOnClickListener(v -> {
+                if (service != null) {
+                    service.rotateStep(90);
+                }
+            });
+        }
+        if (btnMirrorH != null) {
+            btnMirrorH.setOnClickListener(v -> {
+                if (service != null) {
+                    service.toggleMirrorHorizontal();
+                }
+            });
+        }
+        if (btnMirrorV != null) {
+            btnMirrorV.setOnClickListener(v -> {
+                if (service != null) {
+                    service.toggleMirrorVertical();
+                }
+            });
+        }
+        if (btnFlash != null) {
+            btnFlash.setOnClickListener(v -> {
+                if (service != null) {
+                    service.toggleFlash();
+                }
+            });
+        }
+        if (btnAutoDemand != null) {
+            btnAutoDemand.setOnClickListener(v -> {
+                CameraConfig next = lastState.copy();
+                next.autoDemand = !lastState.autoDemand;
+                lastState.autoDemand = next.autoDemand;
+                if (service != null) {
+                    service.updatePrefsFromUi(next.autoDemand, 0, 0);
+                }
+                renderUi();
+                connection.sendCameraRequest("auto_demand", next);
+            });
+        }
+        if (btnRes != null) {
+            btnRes.setOnClickListener(v -> {
+                CameraConfig next = lastState.copy();
+                if (next.width == 1280) {
+                    next.width = 1920;
+                    next.height = 1080;
+                } else if (next.width == 1920) {
+                    next.width = 640;
+                    next.height = 480;
+                } else {
+                    next.width = 1280;
+                    next.height = 720;
+                }
+                lastState.width = next.width;
+                lastState.height = next.height;
+                if (service != null) {
+                    service.updatePrefsFromUi(next.autoDemand, next.width, next.height);
+                }
+                renderUi();
+                connection.sendCameraRequest("configure", next);
+            });
+        }
+
+        syncPermissionOverlay();
+        renderUi();
+    }
+
+    public void setPageVisible(boolean visible) {
+        this.pageVisible = visible;
+        syncPermissionOverlay();
+        if (visible) {
+            if (!CameraStreamService.hasCameraPermission(activity) && !promptedPermissionOnTab) {
+                promptedPermissionOnTab = true;
+                requestCameraPermission();
+            } else {
+                attachPreviewIfReady();
+            }
+        }
+        renderUi();
+    }
+
+    public void applyTheme(@NonNull ThemeManager.AppTheme theme) {
+        this.activeTheme = theme;
+        if (previewFrame != null) {
+            ThemeManager.styleCard(previewFrame, theme);
+        }
+        if (cardWake != null) {
+            ThemeManager.styleCard(cardWake, theme);
+        }
+        if (tvWakeTitle != null) {
+            tvWakeTitle.setTextColor(theme.textPrimary);
+            ThemeManager.applyHeaderTypeface(tvWakeTitle, theme, true);
+        }
+        if (tvWakeSub != null) {
+            tvWakeSub.setTextColor(theme.textMuted);
+        }
+        if (tvPermHint != null) {
+            tvPermHint.setTextColor(theme.textSecondary);
+        }
+        if (btnGrantPerm != null) {
+            ThemeManager.stylePillButton(btnGrantPerm, theme, true, false);
+        }
+        renderUi();
     }
 
     public void onConnected() {
@@ -114,7 +284,6 @@ public final class CameraPanelController implements CameraStreamService.StateObs
         connection.sendCameraState(service != null ? service.snapshot() : lastState);
     }
 
-    /** 处理 PC 端下发的 camera_control JSON */
     public void handleServerCommand(JsonObject cmd) {
         if (cmd == null) {
             return;
@@ -147,8 +316,7 @@ public final class CameraPanelController implements CameraStreamService.StateObs
                 lastState.permissionGranted = false;
                 lastState.error = activity.getString(R.string.camera_permission_denied);
                 connection.sendCameraState(lastState);
-                ActivityCompat.requestPermissions(activity,
-                        new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+                requestCameraPermission();
                 return;
             }
             target.manual = lastState.manual;
@@ -161,197 +329,25 @@ public final class CameraPanelController implements CameraStreamService.StateObs
             if (service != null) {
                 CameraStreamService.startCommand(activity, CameraStreamService.ACTION_UPDATE_CONFIG, target);
             } else {
-                renderCard();
-                renderDialog();
+                renderUi();
             }
         }
     }
 
-    public void openDialog() {
-        if (!CameraStreamService.hasCameraPermission(activity)) {
-            pendingOpenDialog = true;
-            ActivityCompat.requestPermissions(activity,
-                    new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
-            return;
-        }
-        if (dialog != null && dialog.isShowing()) {
-            return;
-        }
-
-        View root = LayoutInflater.from(activity).inflate(R.layout.dialog_camera, null);
-        OpenGlView glView = root.findViewById(R.id.cameraGlView);
-        // XML 构造默认 AspectRatioMode.NONE 会强制铺满拉伸画面，改为 Adjust 按真实比例等比展示
-        glView.setAspectRatioMode(AspectRatioMode.Adjust);
-        previewView = glView;
-        tvStatus = root.findViewById(R.id.tvCameraStatus);
-        tvMeta = root.findViewById(R.id.tvCameraMeta);
-        btnToggle = root.findViewById(R.id.btnCameraToggle);
-        btnSwitch = root.findViewById(R.id.btnCameraSwitch);
-        btnRotate = root.findViewById(R.id.btnCameraRotate);
-        btnMirrorH = root.findViewById(R.id.btnCameraMirrorH);
-        btnMirrorV = root.findViewById(R.id.btnCameraMirrorV);
-        btnFlash = root.findViewById(R.id.btnCameraFlash);
-        btnAutoDemand = root.findViewById(R.id.btnCameraAutoDemand);
-        btnRes = root.findViewById(R.id.btnCameraRes);
-        View btnClose = root.findViewById(R.id.btnCameraClose);
-
-        AlertDialog d = new AlertDialog.Builder(activity).setView(root).create();
-        dialog = d;
-
-        btnToggle.setOnClickListener(v -> {
-            boolean willStart = !lastState.streaming;
-            if (service != null) {
-                service.toggleManualStream();
-            } else {
-                CameraConfig next = lastState.copy();
-                next.manual = willStart;
-                CameraStreamService.startCommand(activity,
-                        willStart ? CameraStreamService.ACTION_START_STREAM : CameraStreamService.ACTION_STOP_STREAM,
-                        next, willStart);
-            }
-            connection.sendCameraRequest(willStart ? "start" : "stop", lastState);
-        });
-        btnSwitch.setOnClickListener(v -> {
-            if (service != null) {
-                service.switchCamera();
-            }
-        });
-        btnRotate.setOnClickListener(v -> {
-            if (service != null) {
-                service.rotateStep(90);
-            }
-        });
-        btnMirrorH.setOnClickListener(v -> {
-            if (service != null) {
-                service.toggleMirrorHorizontal();
-            }
-        });
-        btnMirrorV.setOnClickListener(v -> {
-            if (service != null) {
-                service.toggleMirrorVertical();
-            }
-        });
-        btnFlash.setOnClickListener(v -> {
-            if (service != null) {
-                service.toggleFlash();
-            }
-        });
-        if (btnAutoDemand != null) {
-            btnAutoDemand.setOnClickListener(v -> {
-                CameraConfig next = lastState.copy();
-                next.autoDemand = !lastState.autoDemand;
-                lastState.autoDemand = next.autoDemand;
-                if (service != null) {
-                    service.updatePrefsFromUi(next.autoDemand, 0, 0);
-                }
-                renderDialog();
-                renderCard();
-                connection.sendCameraRequest("auto_demand", next);
-            });
-        }
-        if (btnRes != null) {
-            btnRes.setOnClickListener(v -> {
-                CameraConfig next = lastState.copy();
-                if (next.width == 1280) {
-                    next.width = 1920;
-                    next.height = 1080;
-                } else if (next.width == 1920) {
-                    next.width = 640;
-                    next.height = 480;
-                } else {
-                    next.width = 1280;
-                    next.height = 720;
-                }
-                lastState.width = next.width;
-                lastState.height = next.height;
-                if (service != null) {
-                    service.updatePrefsFromUi(next.autoDemand, next.width, next.height);
-                }
-                renderDialog();
-                renderCard();
-                connection.sendCameraRequest("configure", next);
-            });
-        }
-        btnClose.setOnClickListener(v -> d.dismiss());
-
-        glView.getHolder().addCallback(new SurfaceHolder.Callback() {
-            @Override
-            public void surfaceCreated(@NonNull SurfaceHolder holder) {
-                if (service != null && glView == previewView) {
-                    service.attachPreview(glView);
-                }
-            }
-
-            @Override
-            public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-            }
-
-            @Override
-            public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-                if (service != null) {
-                    service.detachPreview(glView);
-                }
-            }
-        });
-
-        d.setOnDismissListener(ignored -> {
-            if (service != null && previewView != null) {
-                service.detachPreview(previewView);
-            }
-            previewView = null;
-            tvStatus = null;
-            tvMeta = null;
-            btnToggle = null;
-            btnSwitch = null;
-            btnRotate = null;
-            btnMirrorH = null;
-            btnMirrorV = null;
-            btnFlash = null;
-            btnAutoDemand = null;
-            btnRes = null;
-            dialog = null;
-        });
-
-        d.show();
-        resizeDialogWindow();
-        renderDialog();
-    }
-
-    /** 横竖屏切换时调整弹窗宽度与推流方向，防止画面拉伸或卡片过窄 */
     public void onConfigurationChanged() {
-        resizeDialogWindow();
         if (service != null) {
             service.onOrientationChanged();
         }
     }
 
-    private void resizeDialogWindow() {
-        if (dialog == null || !dialog.isShowing()) {
-            return;
-        }
-        Window window = dialog.getWindow();
-        if (window == null) {
-            return;
-        }
-        window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        if (window.getDecorView() != null) {
-            window.getDecorView().setPadding(0, 0, 0, 0);
-        }
-        DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-        boolean landscape = dm.widthPixels > dm.heightPixels;
-        int targetWidth = landscape
-                ? Math.round(dm.widthPixels * 0.94f)
-                : Math.max(Math.round(dm.widthPixels * 0.96f), dm.widthPixels - Math.round(12f * dm.density));
-        window.setLayout(targetWidth, WindowManager.LayoutParams.WRAP_CONTENT);
-    }
-
     public void onCameraPermissionResult(boolean granted) {
         lastState.permissionGranted = granted;
+        syncPermissionOverlay();
         if (!granted) {
             pendingStartConfig = null;
-            pendingOpenDialog = false;
             lastState.error = activity.getString(R.string.camera_permission_denied);
             connection.sendCameraState(lastState);
+            renderUi();
             Toast.makeText(activity, R.string.camera_permission_denied, Toast.LENGTH_LONG).show();
             return;
         }
@@ -362,10 +358,8 @@ public final class CameraPanelController implements CameraStreamService.StateObs
             pendingStartConfig = null;
             CameraStreamService.startCommand(activity, CameraStreamService.ACTION_START_STREAM, target);
         }
-        if (pendingOpenDialog) {
-            pendingOpenDialog = false;
-            openDialog();
-        }
+        attachPreviewIfReady();
+        renderUi();
     }
 
     @Override
@@ -374,17 +368,11 @@ public final class CameraPanelController implements CameraStreamService.StateObs
             return;
         }
         lastState = state;
-        activity.runOnUiThread(() -> {
-            renderCard();
-            renderDialog();
-        });
+        activity.runOnUiThread(this::renderUi);
         connection.sendCameraState(state);
     }
 
     public void destroy() {
-        if (dialog != null && dialog.isShowing()) {
-            dialog.dismiss();
-        }
         if (service != null) {
             service.setObserver(null);
             if (lastState.streaming) {
@@ -399,73 +387,82 @@ public final class CameraPanelController implements CameraStreamService.StateObs
             }
             bound = false;
         }
+        service = null;
     }
 
-    private void renderCard() {
-        if (tvCardSubtitle != null) {
-            if (!lastState.permissionGranted) {
-                tvCardSubtitle.setText("需要相机权限 · 点按授权并开启");
-            } else if (lastState.streaming) {
-                String facing = lastState.isFrontFacing() ? "前摄" : "后摄";
-                String wake = lastState.autoDemand ? "自动唤醒:开" : "自动唤醒:关";
-                tvCardSubtitle.setText("推流中 · " + facing + " " + lastState.width + "×"
-                        + lastState.height + " · " + lastState.rotation + "° · " + wake);
-            } else {
-                String wake = lastState.autoDemand ? "自动唤醒:开" : "自动唤醒:关";
-                tvCardSubtitle.setText("待机中 · " + lastState.width + "×" + lastState.height + " · " + wake);
-            }
+    private void requestCameraPermission() {
+        ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+    }
+
+    private void syncPermissionOverlay() {
+        boolean granted = CameraStreamService.hasCameraPermission(activity);
+        if (previewView != null) {
+            previewView.setVisibility(granted ? View.VISIBLE : View.GONE);
         }
-        if (tvCardAction != null) {
-            tvCardAction.setText(lastState.streaming ? "管理" : activity.getString(R.string.camera_card_open));
-            tvCardAction.setTextColor(ContextCompat.getColor(activity,
-                    lastState.streaming ? R.color.status_ok : R.color.accent_bright));
+        if (permissionCard != null) {
+            permissionCard.setVisibility(granted ? View.GONE : View.VISIBLE);
         }
     }
 
-    private void renderDialog() {
-        if (dialog == null || !dialog.isShowing()) {
-            return;
+    private void attachPreviewIfReady() {
+        if (pageVisible && surfaceReady && service != null && previewView != null
+                && CameraStreamService.hasCameraPermission(activity)) {
+            service.attachPreview(previewView);
         }
+    }
+
+    private void renderUi() {
         String facing = lastState.isFrontFacing() ? "前摄" : "后摄";
+        if (statusDot != null) {
+            statusDot.setBackground(ThemeManager.circle(activity,
+                    lastState.streaming ? activeTheme.ok : activeTheme.textMuted,
+                    android.graphics.Color.TRANSPARENT));
+        }
         if (tvStatus != null) {
             String badge = lastState.streaming
                     ? (lastState.consumerConnected ? "推流中 · PC占用" : "推流中")
-                    : (lastState.consumerConnected ? "待机 · PC占用" : "预览待机");
+                    : (lastState.consumerConnected ? "待机 · PC占用" : "虚拟相机待机");
             tvStatus.setText(badge);
-            tvStatus.setTextColor(ContextCompat.getColor(activity,
-                    lastState.streaming ? R.color.status_ok : R.color.text_secondary));
+            tvStatus.setTextColor(lastState.streaming ? activeTheme.ok : activeTheme.textPrimary);
+            ThemeManager.applyHeaderTypeface(tvStatus, activeTheme, true);
         }
         if (tvMeta != null) {
-            String mirror = (lastState.mirrorHorizontal ? " · 水平镜像" : "")
-                    + (lastState.mirrorVertical ? " · 垂直翻转" : "");
-            String wake = lastState.autoDemand ? " · 自动唤醒:开" : " · 自动唤醒:关";
             String err = lastState.error != null && !lastState.error.isEmpty() ? " · " + lastState.error : "";
-            tvMeta.setText(lastState.width + "×" + lastState.height + " · " + lastState.fps + "fps · "
-                    + facing + " · " + lastState.rotation + "°" + mirror + wake + err);
+            tvMeta.setText(lastState.width + "×" + lastState.height + " · " + lastState.fps + "fps" + err);
+            tvMeta.setTextColor(activeTheme.textMuted);
         }
         if (btnToggle != null) {
             btnToggle.setText(lastState.streaming ? R.string.camera_stop : R.string.camera_start);
+            ThemeManager.stylePillButton(btnToggle, activeTheme, !lastState.streaming, lastState.streaming);
+            ThemeManager.applyHeaderTypeface(btnToggle, activeTheme, true);
         }
         if (btnSwitch != null) {
-            btnSwitch.setText("切换镜头（" + facing + "）");
+            btnSwitch.setText("镜头: " + facing);
+            ThemeManager.styleSoftAccentButton(btnSwitch, activeTheme, false);
         }
         if (btnRotate != null) {
-            btnRotate.setText("旋转画面 " + lastState.rotation + "°");
+            btnRotate.setText("旋转 " + lastState.rotation + "°");
+            ThemeManager.styleSoftAccentButton(btnRotate, activeTheme, lastState.rotation != 0);
         }
         if (btnMirrorH != null) {
-            btnMirrorH.setText(lastState.mirrorHorizontal ? "水平镜像：开" : "水平镜像：关");
+            btnMirrorH.setText(lastState.mirrorHorizontal ? "镜像:开" : "镜像:关");
+            ThemeManager.styleSoftAccentButton(btnMirrorH, activeTheme, lastState.mirrorHorizontal);
         }
         if (btnMirrorV != null) {
-            btnMirrorV.setText(lastState.mirrorVertical ? "垂直翻转：开" : "垂直翻转：关");
+            btnMirrorV.setText(lastState.mirrorVertical ? "翻转:开" : "翻转:关");
+            ThemeManager.styleSoftAccentButton(btnMirrorV, activeTheme, lastState.mirrorVertical);
         }
         if (btnFlash != null) {
             btnFlash.setText(lastState.flash ? "闪光灯：开" : "闪光灯：关");
-        }
-        if (btnAutoDemand != null) {
-            btnAutoDemand.setText(lastState.autoDemand ? "自动唤醒：开" : "自动唤醒：关");
+            ThemeManager.styleSoftAccentButton(btnFlash, activeTheme, lastState.flash);
         }
         if (btnRes != null) {
-            btnRes.setText("画质：" + lastState.width + "×" + lastState.height);
+            btnRes.setText("画质 " + lastState.width + "×" + lastState.height);
+            ThemeManager.styleSoftAccentButton(btnRes, activeTheme, false);
+        }
+        if (btnAutoDemand != null) {
+            btnAutoDemand.setText(lastState.autoDemand ? "已开启" : "已关闭");
+            ThemeManager.stylePillButton(btnAutoDemand, activeTheme, lastState.autoDemand, false);
         }
     }
 
@@ -481,4 +478,3 @@ public final class CameraPanelController implements CameraStreamService.StateObs
         return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsBoolean() : fallback;
     }
 }
-

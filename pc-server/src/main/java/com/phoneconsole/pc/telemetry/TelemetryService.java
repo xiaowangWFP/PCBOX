@@ -29,6 +29,9 @@ public class TelemetryService {
     private final Consumer<String> sink;
     private final MediaController media;
     private final GpuMonitor gpu = new GpuMonitor();
+    private final DisplayMonitor displayMonitor = new DisplayMonitor();
+    private final FpsMonitor fpsMonitor = new FpsMonitor();
+    private volatile String selectedDisplayId;
     private final Gson gson = new Gson();
     private final com.sun.management.OperatingSystemMXBean osBean;
     private final HardwareAbstractionLayer hardware;
@@ -83,12 +86,14 @@ public class TelemetryService {
     }
 
     public void start() {
+        fpsMonitor.start();
         scheduler.scheduleAtFixedRate(this::tick, 0, intervalMs, TimeUnit.MILLISECONDS);
         log.info("硬件状态采集已启动，间隔 {} ms", intervalMs);
     }
 
     public void stop() {
         scheduler.shutdownNow();
+        fpsMonitor.stop();
         gpu.close();
     }
 
@@ -137,7 +142,25 @@ public class TelemetryService {
         message.volume = media.volume();
         message.isMuted = media.isMuted();
         message.micMuted = media.isMicMuted();
+
+        List<DisplayMonitor.DisplayInfo> displays = displayMonitor.list();
+        message.displays = displays;
+        DisplayMonitor.DisplayInfo current = displayMonitor.find(selectedDisplayId, displays);
+        if (current != null) {
+            message.displayId = current.id;
+            message.displayName = current.name;
+            // 部分虚拟显示器会返回 0/1，视为不可用
+            message.displayHz = current.hz >= 20 ? current.hz : -1;
+        }
+        FpsMonitor.Sample fpsSample = fpsMonitor.sample();
+        message.fps = fpsSample.fps;
+        message.fpsSource = fpsSample.source;
         return message;
+    }
+
+    /** 手机端选择要显示的显示器；空字符串表示回到主屏 */
+    public void selectDisplay(String displayId) {
+        this.selectedDisplayId = displayId;
     }
 
     private double cpuUsage() {

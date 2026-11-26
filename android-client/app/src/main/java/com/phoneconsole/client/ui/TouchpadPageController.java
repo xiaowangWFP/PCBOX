@@ -128,6 +128,7 @@ public final class TouchpadPageController {
     private final VoiceInputController voiceInput;
 
     private final List<KeyEntry> keys = new ArrayList<>();
+    private ThemeManager.AppTheme activeTheme = ThemeManager.AppTheme.OLED;
     private boolean volumeScrollEnabled;
     private boolean hapticsEnabled;
     private boolean gestureEnabled;
@@ -191,6 +192,100 @@ public final class TouchpadPageController {
 
     public boolean isVolumeScrollEnabled() {
         return volumeScrollEnabled;
+    }
+
+    public void openKeyPicker() {
+        showKeyPickerDialog();
+    }
+
+    public void applyTheme(@NonNull ThemeManager.AppTheme theme) {
+        this.activeTheme = theme;
+        if (touchpad != null) {
+            touchpad.applyTheme(theme);
+        }
+        if (adjustHint instanceof TextView) {
+            adjustHint.setBackground(ThemeManager.roundRect(context, theme.cardBg, theme.accent, theme.btnRadiusDp));
+            ((TextView) adjustHint).setTextColor(theme.textPrimary);
+        }
+        if (settingsPanel != null) {
+            ThemeManager.styleCard(settingsPanel, theme);
+            tintPanelChildren(settingsPanel, theme);
+        }
+        if (adjustButton != null) {
+            ThemeManager.stylePillButton(adjustButton, theme, adjustMode, false);
+        }
+        if (renameButton != null) {
+            ThemeManager.styleSoftAccentButton(renameButton, theme, false);
+        }
+        if (deleteButton != null) {
+            ThemeManager.styleSoftAccentButton(deleteButton, theme, false);
+        }
+        if (sizeSeek != null) {
+            ThemeManager.styleSeekBar(sizeSeek, theme);
+        }
+        if (dpiSeek != null) {
+            ThemeManager.styleSeekBar(dpiSeek, theme);
+        }
+        if (currentKeyView != null) {
+            currentKeyView.setTextColor(theme.accent);
+        }
+        View settingsBtn = activity.findViewById(R.id.tpSettingsButton);
+        if (settingsBtn instanceof android.widget.ImageView) {
+            settingsBtn.setBackground(ThemeManager.roundRect(context, theme.cardAltBg, theme.border, theme.btnRadiusDp));
+            ((android.widget.ImageView) settingsBtn).setColorFilter(theme.textPrimary);
+        }
+        View voiceBtn = activity.findViewById(R.id.tpVoiceButton);
+        if (voiceBtn instanceof TextView) {
+            ThemeManager.styleCard(voiceBtn, theme);
+            ((TextView) voiceBtn).setTextColor(theme.textPrimary);
+        }
+        View voiceResult = activity.findViewById(R.id.tpVoiceResult);
+        if (voiceResult != null) {
+            ThemeManager.styleCard(voiceResult, theme);
+        }
+        View voiceHint = activity.findViewById(R.id.tpVoiceHint);
+        if (voiceHint instanceof TextView) {
+            ThemeManager.styleCard(voiceHint, theme);
+            ((TextView) voiceHint).setTextColor(theme.textSecondary);
+        }
+        EditText voiceText = activity.findViewById(R.id.tpVoiceText);
+        if (voiceText != null) {
+            voiceText.setTextColor(theme.textPrimary);
+            voiceText.setHintTextColor(theme.textMuted);
+        }
+        View voiceSend = activity.findViewById(R.id.tpVoiceSend);
+        if (voiceSend instanceof TextView) {
+            ThemeManager.stylePillButton((TextView) voiceSend, theme, true, false);
+        }
+        View voiceClose = activity.findViewById(R.id.tpVoiceClose);
+        if (voiceClose instanceof TextView) {
+            ThemeManager.styleSoftAccentButton((TextView) voiceClose, theme, false);
+        }
+        for (KeyEntry key : keys) {
+            applyKeyStyle(key);
+        }
+    }
+
+    private void tintPanelChildren(@NonNull View view, @NonNull ThemeManager.AppTheme theme) {
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup vg = (android.view.ViewGroup) view;
+            for (int i = 0; i < vg.getChildCount(); i++) {
+                tintPanelChildren(vg.getChildAt(i), theme);
+            }
+            return;
+        }
+        int id = view.getId();
+        if (id == R.id.tpAdjustButton || id == R.id.tpRenameKey || id == R.id.tpDeleteKey) {
+            return;
+        }
+        if (id == R.id.tpAddKey && view instanceof TextView) {
+            ThemeManager.stylePillButton((TextView) view, theme, true, false);
+        } else if ((id == R.id.tpPadReset || id == R.id.tpGestureHelp) && view instanceof TextView) {
+            ThemeManager.styleSoftAccentButton((TextView) view, theme, false);
+        } else if (view instanceof TextView) {
+            ((TextView) view).setTextColor(theme.textPrimary);
+            ThemeManager.applyHeaderTypeface((TextView) view, theme, false);
+        }
     }
 
     public void destroy() {
@@ -890,9 +985,7 @@ public final class TouchpadPageController {
         key.view.setLayoutParams(lp);
         key.view.setTextSize(textSizeFor(key.sizePercent));
         boolean primary = "left".equals(key.id);
-        key.view.setBackgroundResource(primary ? R.drawable.bg_primary_button : R.drawable.bg_ghost_button);
-        key.view.setTextColor(ContextCompat.getColor(context,
-                primary ? R.color.text_on_accent : R.color.text_primary));
+        ThemeManager.stylePillButton(key.view, activeTheme, primary, false);
     }
 
     private void applyKeyPosition(KeyEntry key) {

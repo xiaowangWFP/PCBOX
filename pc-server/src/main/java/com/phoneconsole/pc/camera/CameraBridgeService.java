@@ -90,7 +90,8 @@ public final class CameraBridgeService {
     private volatile int phoneHeight;
     private volatile String phoneError = "";
 
-    // FFmpeg 解码子进程状态
+    // FFmpeg 解码子进程状态（优先走原生 8MB pipe_feeder.dll，不可用时回退 Java 管道）
+    private final PipeFeeder pipeFeeder = new PipeFeeder();
     private volatile Process ffmpegProcess;
     private volatile Thread ffmpegReaderThread;
     private volatile long lastFfmpegAttemptAt;
@@ -287,6 +288,8 @@ public final class CameraBridgeService {
             }
         }
 
+        boolean fromPhone = params != null && params.has("fromPhone")
+                && !params.get("fromPhone").isJsonNull() && params.get("fromPhone").getAsBoolean();
         if ("configure".equals(act)) {
             refreshSoftcamHandle();
             stopReceiver();
@@ -300,12 +303,15 @@ public final class CameraBridgeService {
             if (!autoDemand && !manualActive && (phoneStreaming || receiverRunning)) {
                 stopReceiverAndSendBlank();
                 sendControl("stop", false);
-            } else {
+            } else if (!fromPhone) {
                 sendControl("sync", false);
             }
+        } else if ("configure".equals(act) && fromPhone) {
+            // 手机端发起画质变更时自身已完成本地重启，PC 侧不回发冗余 start 避免二次重建冲突
+            log.info("手机端更新画质参数：{}x{}@{}fps", cfg.width, cfg.height, cfg.fps);
         } else if (!"sync".equals(act) && (commandedActive || manualActive || phoneStreaming)) {
             sendControl("start", manualActive);
-        } else {
+        } else if (!fromPhone) {
             sendControl("sync", false);
         }
         notifyStatus();
@@ -396,6 +402,38 @@ public final class CameraBridgeService {
                 notifyStatus();
             }
 
+            if (receiverRunning && ffmpegProcess == null) {
+                // 同步原生 8MB pipe_feeder 的实时帧数与帧率
+                if (pipeFeeder.isRunning()) {
+                    long delta = pipeFeeder.pollNewFrames();
+                    if (delta > 0) {
+                        framesSent += delta;
+                    }
+                    double f = pipeFeeder.fps();
+                    if (f > 0) {
+                        actualFps = f;
+                        if (!lastError.isBlank()) {
+                            lastError = "";
+                        }
+                    } else {
+                        String err = pipeFeeder.lastError();
+                        if (!err.isBlank()) {
+                            lastError = err;
+                        }
+                    }
+                    notifyStatus();
+                } else {
+                    String err = pipeFeeder.lastError();
+                    if (!err.isBlank()) {
+                        lastError = err;
+                    }
+                    pipeFeeder.stop();
+                    receiverRunning = false;
+                    actualFps = 0;
+                    notifyStatus();
+                }
+            }
+
             boolean desired = computeDesiredActive();
             if (!phoneConnected) {
                 return;
@@ -408,7 +446,12 @@ public final class CameraBridgeService {
                     lastCommandSentAt = now;
                     sendControl("start", manualActive);
                 }
-                if (phoneStreaming && !receiverRunning && now - lastFfmpegAttemptAt >= RETRY_COOLDOWN_MS) {
+                if (phoneStreaming && !receiverRunning
+                        && phoneWidth == cfg.width && phoneHeight == cfg.height
+                        && now - lastFfmpegAttemptAt >= RETRY_COOLDOWN_MS) {
+                    startReceiver(cfg);
+                } else if (phoneStreaming && !receiverRunning && now - lastFfmpegAttemptAt >= RETRY_COOLDOWN_MS + 1000L) {
+                    // 兜底：若手机分辨率未能切到期望尺寸仍允许按原分辨率拉流
                     startReceiver(cfg);
                 }
             } else {
@@ -447,6 +490,11 @@ public final class CameraBridgeService {
             softcam.close();
             return;
         }
+        // DirectShow 客户端（微信/会议软件）已连接时不可销毁重建句柄，否则会强行断开输出 Pin；
+        // 保持当前画布并通过 ffmpeg scale/pad 自动适配不同推流分辨率即可无缝切换画质。
+        if (softcam.isOpen() && softcam.isConnected()) {
+            return;
+        }
         if (!softcam.open(cfg.width, cfg.height)) {
             lastError = SoftcamBridge.resolveDllPath() == null
                     ? "未找到 softcam.dll（请检查 drivers/softcam）"
@@ -466,7 +514,8 @@ public final class CameraBridgeService {
             lastError = "未找到 ffmpeg 可执行文件";
             return;
         }
-        if (!softcam.open(cfg.width, cfg.height)) {
+        refreshSoftcamHandle();
+        if (!softcam.isOpen()) {
             return;
         }
 
@@ -481,6 +530,7 @@ public final class CameraBridgeService {
                 targetW, targetH, targetW, targetH);
 
         // rtsp_transport=tcp 走 ADB 转发；allowed_media_types=video 跳过空音频轨探测；
+        // probesize 设为 256KB 避免 1080p 关键帧超出 32KB 探测限制；
         // fps_mode=passthrough 禁止 rawvideo 默认按流时基(90k tbr)倍增复制首帧导致画面卡死
         List<String> cmd = List.of(
                 ffmpeg,
@@ -490,8 +540,8 @@ public final class CameraBridgeService {
                 "-allowed_media_types", "video",
                 "-fflags", "nobuffer",
                 "-flags", "low_delay",
-                "-probesize", "32768",
-                "-analyzeduration", "500000",
+                "-probesize", "262144",
+                "-analyzeduration", "800000",
                 "-i", rtspUrl,
                 "-an",
                 "-vf", scalePad,
@@ -499,6 +549,17 @@ public final class CameraBridgeService {
                 "-pix_fmt", "bgr24",
                 "-f", "rawvideo",
                 "pipe:1");
+
+        long peer = softcam.cameraHandlePeer();
+        if (peer != 0 && PipeFeeder.isAvailable()
+                && pipeFeeder.start(cmd, targetW, targetH, peer, softcam.loadedDllPath())) {
+            receiverRunning = true;
+            lastError = "";
+            log.info("启动摄像头原生 8MB 管道拉流：{} -> {}x{}", rtspUrl, targetW, targetH);
+            LogBuffer.get().info("CAMERA", "开始拉取手机摄像头流：" + rtspUrl + " -> " + targetW + "x" + targetH);
+            notifyStatus();
+            return;
+        }
 
         try {
             Process proc = new ProcessBuilder(cmd).start();
@@ -592,6 +653,7 @@ public final class CameraBridgeService {
     }
 
     private void stopReceiver() {
+        pipeFeeder.stop();
         Process proc = ffmpegProcess;
         ffmpegProcess = null;
         receiverRunning = false;

@@ -96,6 +96,7 @@ public final class Main {
         httpServer.start();
 
         TelemetryService telemetry = new TelemetryService(1000, wsServer::broadcast, engine.media());
+    wsServer.setTelemetry(telemetry);
         // 新连接接入时立即补一帧遥测，页面不必等下一个 1 秒周期
         wsServer.setTelemetrySource(telemetry::snapshotJson);
         telemetry.start();

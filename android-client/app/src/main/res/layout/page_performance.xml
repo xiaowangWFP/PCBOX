@@ -334,12 +334,35 @@
                         android:layout_weight="1"
                         android:orientation="vertical">
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="画面帧率"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="11.5sp" />
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="屏幕刷新率"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="11.5sp" />
+
+                            <TextView
+                                android:id="@+id/tvDisplayPicker"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:background="@drawable/bg_ghost_button"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:paddingStart="6dp"
+                                android:paddingTop="2dp"
+                                android:paddingEnd="6dp"
+                                android:paddingBottom="2dp"
+                                android:text="选择"
+                                android:textColor="@color/accent_bright"
+                                android:textSize="10.5sp" />
+                        </LinearLayout>
 
                         <TextView
                             android:id="@+id/tvFpsValue"

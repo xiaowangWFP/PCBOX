@@ -19,4 +19,14 @@ public class TelemetryMessage {
     public boolean isMuted;
     /** 麦克风是否静音 */
     public boolean micMuted;
+    /** 当前选中显示器的刷新率；-1 表示无法采集 */
+    public double displayHz = -1;
+    /** 实时屏幕/前台应用帧率（FPS，ETW）；-1 表示不可用 */
+    public double fps = -1;
+    /** 帧率来源（foreground | desktop） */
+    public String fpsSource = "";
+    public String displayId;
+    public String displayName;
+    /** 所有活动显示器，供手机端选择 */
+    public java.util.List<com.phoneconsole.pc.telemetry.DisplayMonitor.DisplayInfo> displays;
 }

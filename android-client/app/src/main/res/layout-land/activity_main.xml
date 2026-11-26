@@ -1,312 +1,254 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/rootContainer"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootOuter"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/bg_obsidian"
-    android:orientation="horizontal">
+    android:layout_height="match_parent">
 
-    <!-- 横屏专属：左侧 58dp 紧凑图标导航轨（左侧挖孔安全区由 WindowInsetsHelper 动态注入） -->
     <LinearLayout
-        android:id="@+id/sideNavRail"
-        android:layout_width="wrap_content"
+        android:id="@+id/rootContainer"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/surface_panel"
         android:orientation="horizontal">
 
+        <!-- 横屏左侧 58dp 导航轨（精简为 3 个主图标） -->
         <LinearLayout
-            android:layout_width="@dimen/rail_width"
+            android:id="@+id/sideNavRail"
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
-
-            <!-- 顶部品牌徽章（与 44dp 顶栏齐平） -->
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/topbar_height">
-
-                <ImageView
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_primary_button"
-                    android:contentDescription="@null"
-                    android:padding="5dp"
-                    android:src="@drawable/ic_nav_screen" />
-            </FrameLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/divider_line" />
-
-            <!-- 纵向居中导航图标轨 + 滑动背景高亮指示器 -->
-            <FrameLayout
-                android:id="@+id/sideNavRailTrack"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:padding="6dp">
-
-                <View
-                    android:id="@+id/railNavIndicator"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/touch_target_min"
-                    android:background="@drawable/bg_nav_indicator" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center_vertical"
-                    android:orientation="vertical">
-
-                    <FrameLayout
-                        android:id="@+id/navPerf"
-                        style="@style/ConsoleNavRailItem"
-                        android:contentDescription="@string/nav_perf_full">
-
-                        <ImageView
-                            android:id="@+id/ivNavPerf"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_nav_performance" />
-                    </FrameLayout>
-
-                    <FrameLayout
-                        android:id="@+id/navControl"
-                        style="@style/ConsoleNavRailItem"
-                        android:contentDescription="@string/nav_ctrl_full">
-
-                        <ImageView
-                            android:id="@+id/ivNavControl"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_nav_control" />
-                    </FrameLayout>
-
-                    <FrameLayout
-                        android:id="@+id/navTouchpad"
-                        style="@style/ConsoleNavRailItem"
-                        android:contentDescription="@string/nav_touchpad_full">
-
-                        <ImageView
-                            android:id="@+id/ivNavTouchpad"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_nav_touchpad" />
-                    </FrameLayout>
-
-                    <FrameLayout
-                        android:id="@+id/navScreen"
-                        style="@style/ConsoleNavRailItem"
-                        android:contentDescription="@string/nav_screen_full">
-
-                        <ImageView
-                            android:id="@+id/ivNavScreen"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_nav_screen" />
-                    </FrameLayout>
-
-                    <FrameLayout
-                        android:id="@+id/navSettings"
-                        style="@style/ConsoleNavRailItem"
-                        android:contentDescription="@string/nav_settings_full">
-
-                        <ImageView
-                            android:id="@+id/ivNavSettings"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_nav_settings" />
-                    </FrameLayout>
-                </LinearLayout>
-            </FrameLayout>
-        </LinearLayout>
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="match_parent"
-            android:background="@color/divider_line" />
-    </LinearLayout>
-
-    <!-- 右侧主视口：44dp 紧凑顶栏 + 页面内容区（右侧挖孔安全区由 WindowInsetsHelper 动态注入） -->
-    <LinearLayout
-        android:id="@+id/mainPane"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical">
-
-        <LinearLayout
-            android:id="@+id/topBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@color/surface_panel"
-            android:orientation="vertical">
+            android:orientation="horizontal">
 
             <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/topbar_height"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp">
+                android:layout_width="@dimen/rail_width"
+                android:layout_height="match_parent"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tvPageTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:maxLines="1"
-                    android:text="@string/nav_perf_full"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/page_title_text"
-                    android:textStyle="bold" />
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/topbar_height">
 
-                <!-- 横屏顶栏实时硬件速览：每项等宽占位，数值位数变化不会推动相邻项 -->
-                <LinearLayout
-                    android:id="@+id/topTelemetryStrip"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    <ImageView
+                        android:id="@+id/ivRailBrand"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:padding="4dp"
+                        android:src="@drawable/ic_nav_screen" />
+                </FrameLayout>
+
+                <View
+                    android:id="@+id/railTopDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp" />
+
+                <FrameLayout
+                    android:id="@+id/sideNavRailTrack"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
                     android:layout_weight="1"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp">
-
-                    <TextView
-                        android:id="@+id/tvTopFps"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="10dp"
-                        android:fontFamily="monospace"
-                        android:maxLines="1"
-                        android:text="FPS  --"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11.5sp" />
-
-                    <TextView
-                        android:id="@+id/tvTopCpu"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="10dp"
-                        android:fontFamily="monospace"
-                        android:maxLines="1"
-                        android:text="CPU  --"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11.5sp" />
-
-                    <TextView
-                        android:id="@+id/tvTopGpu"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="10dp"
-                        android:fontFamily="monospace"
-                        android:maxLines="1"
-                        android:text="GPU  --"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11.5sp" />
-
-                    <TextView
-                        android:id="@+id/tvTopMem"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="10dp"
-                        android:fontFamily="monospace"
-                        android:maxLines="1"
-                        android:text="内存 --"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11.5sp" />
-
-                    <TextView
-                        android:id="@+id/tvTopVram"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="monospace"
-                        android:maxLines="1"
-                        android:text="显存 --"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11.5sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/connStatusWrap"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:padding="6dp">
 
                     <View
-                        android:id="@+id/statusDot"
-                        android:layout_width="7dp"
-                        android:layout_height="7dp"
-                        android:layout_marginEnd="6dp"
-                        android:background="@drawable/bg_status_dot_off" />
+                        android:id="@+id/railNavIndicator"
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/touch_target_min" />
 
-                    <TextView
-                        android:id="@+id/tvConnStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="未连接"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11.5sp" />
-                </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="vertical">
+
+                        <FrameLayout
+                            android:id="@+id/navOverview"
+                            style="@style/ConsoleNavRailItem"
+                            android:layout_marginTop="4dp"
+                            android:layout_marginBottom="4dp"
+                            android:contentDescription="@string/nav_overview_full">
+
+                            <ImageView
+                                android:id="@+id/ivNavOverview"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@null"
+                                android:src="@drawable/ic_nav_performance" />
+                        </FrameLayout>
+
+                        <FrameLayout
+                            android:id="@+id/navCamera"
+                            style="@style/ConsoleNavRailItem"
+                            android:layout_marginTop="4dp"
+                            android:layout_marginBottom="4dp"
+                            android:contentDescription="@string/nav_camera_full">
+
+                            <ImageView
+                                android:id="@+id/ivNavCamera"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@null"
+                                android:src="@drawable/ic_nav_camera" />
+                        </FrameLayout>
+
+                        <FrameLayout
+                            android:id="@+id/navTouchpad"
+                            style="@style/ConsoleNavRailItem"
+                            android:layout_marginTop="4dp"
+                            android:layout_marginBottom="4dp"
+                            android:contentDescription="@string/nav_touchpad_full">
+
+                            <ImageView
+                                android:id="@+id/ivNavTouchpad"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@null"
+                                android:src="@drawable/ic_nav_touchpad" />
+                        </FrameLayout>
+                    </LinearLayout>
+                </FrameLayout>
             </LinearLayout>
 
             <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/divider_line" />
+                android:id="@+id/railRightDivider"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
         </LinearLayout>
 
-        <FrameLayout
-            android:id="@+id/pageContainer"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
+        <!-- 右侧主视口 -->
+        <LinearLayout
+            android:id="@+id/mainPane"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-            <include
-                android:id="@+id/pagePerformance"
-                layout="@layout/page_performance"
+            <LinearLayout
+                android:id="@+id/topBar"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-            <include
-                android:id="@+id/pageControl"
-                layout="@layout/page_control"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/topbar_height"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp">
 
-            <include
-                android:id="@+id/pageTouchpad"
-                layout="@layout/page_touchpad"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/tvPageTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:text="@string/nav_overview_full"
+                        android:textSize="@dimen/page_title_text"
+                        android:textStyle="bold" />
 
-            <include
-                android:id="@+id/pageScreen"
-                layout="@layout/page_screen"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
+                    <LinearLayout
+                        android:id="@+id/connStatusWrap"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp">
 
-            <include
-                android:id="@+id/pageSettings"
-                layout="@layout/page_settings"
+                        <View
+                            android:id="@+id/statusDot"
+                            android:layout_width="7dp"
+                            android:layout_height="7dp"
+                            android:layout_marginEnd="6dp" />
+
+                        <TextView
+                            android:id="@+id/tvConnStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="未连接"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <FrameLayout
+                        android:id="@+id/btnThemePicker"
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:layout_marginEnd="6dp"
+                        android:clickable="true"
+                        android:contentDescription="切换外观主题"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:id="@+id/ivThemePicker"
+                            android:layout_width="17dp"
+                            android:layout_height="17dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_palette" />
+                    </FrameLayout>
+
+                    <FrameLayout
+                        android:id="@+id/btnSettings"
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:clickable="true"
+                        android:contentDescription="@string/nav_settings_full"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:id="@+id/ivSettings"
+                            android:layout_width="17dp"
+                            android:layout_height="17dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_settings_gear" />
+                    </FrameLayout>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/topBarDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/pageContainer"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
-        </FrameLayout>
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <include
+                    android:id="@+id/pageOverview"
+                    layout="@layout/page_overview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+                <include
+                    android:id="@+id/pageCamera"
+                    layout="@layout/page_camera"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <include
+                    android:id="@+id/pageTouchpad"
+                    layout="@layout/page_touchpad"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
+    <include layout="@layout/sheet_theme_picker" />
+    <include layout="@layout/sheet_settings" />
+</FrameLayout>

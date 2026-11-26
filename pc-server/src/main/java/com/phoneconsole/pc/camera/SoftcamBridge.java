@@ -201,6 +201,12 @@ public final class SoftcamBridge {
         }
     }
 
+    public long cameraHandlePeer() {
+        synchronized (lock) {
+            return cameraHandle == null ? 0L : Pointer.nativeValue(cameraHandle);
+        }
+    }
+
     private void closeLocked() {
         if (cameraHandle != null && api != null) {
             try {
