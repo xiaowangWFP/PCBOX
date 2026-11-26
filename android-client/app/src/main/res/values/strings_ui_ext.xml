@@ -1,21 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 增量新增 UI 字符串（独立文件，避免覆盖原 strings.xml 中的已有键名） -->
-    <string name="nav_perf_short">性能</string>
-    <string name="nav_ctrl_short">控制</string>
+    <!-- 新版 3-Tab 导航文案 -->
+    <string name="nav_overview_short">总览</string>
+    <string name="nav_camera_short">相机</string>
     <string name="nav_touchpad_short">触控</string>
+
+    <string name="nav_overview_full">PC 总览</string>
+    <string name="nav_camera_full">虚拟摄像头</string>
+    <string name="nav_touchpad_full">触控与投屏</string>
+
+    <!-- 保留兼容引用 -->
+    <string name="nav_perf_short">总览</string>
+    <string name="nav_ctrl_short">相机</string>
     <string name="nav_screen_short">屏幕</string>
     <string name="nav_settings_short">连接</string>
-
-    <string name="nav_perf_full">性能监视</string>
-    <string name="nav_ctrl_full">功能控制</string>
-    <string name="nav_touchpad_full">触控板</string>
+    <string name="nav_perf_full">PC 总览</string>
+    <string name="nav_ctrl_full">虚拟摄像头</string>
     <string name="nav_screen_full">屏幕监视</string>
     <string name="nav_settings_full">连接设置</string>
 
     <string name="touchpad_settings">触控板设置</string>
     <string name="touchpad_volume_scroll">音量键 ↑ / ↓ 滚动</string>
-    <string name="touchpad_volume_hint">仅在本页生效；开启后音量键不再调节系统音量，改作上下滚动。</string>
+    <string name="touchpad_volume_hint">仅在触控页生效；开启后音量键不再调节系统音量，改作上下滚动。</string>
 
     <string name="touchpad_pad_visible">显示悬浮按键</string>
     <string name="touchpad_pad_reset">重置全部按键</string>
@@ -61,11 +67,11 @@
     <string name="camera_card_title">手机虚拟摄像头</string>
     <string name="camera_card_subtitle">微信视频 / 会议摄像头 · 点按预览或控流</string>
     <string name="camera_card_open">控制</string>
-    <string name="camera_fg_notice">虚拟摄像头正在后台推流，点击返回控制台</string>
+    <string name="camera_fg_notice">虚拟摄像头正在后台推流，点击返回相机页</string>
     <string name="camera_dialog_title">手机虚拟摄像头</string>
-    <string name="camera_start">开启推流</string>
+    <string name="camera_start">开启摄像头推流</string>
     <string name="camera_stop">停止推流</string>
-    <string name="camera_switch">切换前后摄</string>
+    <string name="camera_switch">切镜头</string>
     <string name="camera_rotate">旋转 90°</string>
     <string name="camera_mirror_h">水平镜像</string>
     <string name="camera_mirror_v">垂直翻转</string>
@@ -73,7 +79,7 @@
     <string name="camera_auto_demand">自动唤醒</string>
     <string name="camera_res">画质</string>
     <string name="camera_close">收起面板</string>
-    <string name="camera_bg_hint">收起面板后若正在推流，将在后台保持不断线；手动点「停止推流」后不会在当前通话中再次强启，也可按需关闭「自动唤醒」。</string>
+    <string name="camera_bg_hint">切到其他页面或熄屏后，推流会在前台服务中保持不断线；手动点「停止推流」后不会在当前通话中再次强启。</string>
     <string name="camera_permission_denied">未授予相机权限，无法开启虚拟摄像头</string>
 
     <string name="ctrl_manage_keys">管理按键</string>

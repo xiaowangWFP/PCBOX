@@ -1,348 +1,254 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/rootContainer"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootOuter"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/bg_obsidian"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <!-- 竖屏顶栏 (52dp + 状态栏/挖孔安全区由 WindowInsetsHelper 动态注入) -->
     <LinearLayout
-        android:id="@+id/topBar"
+        android:id="@+id/rootContainer"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/surface_panel"
+        android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <!-- 极简顶栏：标题 + 连接状态胶囊 + 主题切换 + 设置抽屉 -->
         <LinearLayout
+            android:id="@+id/topBar"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/topbar_height"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
-
-            <TextView
-                android:id="@+id/tvPageTitle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="@string/nav_perf_full"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/page_title_text"
-                android:textStyle="bold" />
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
             <LinearLayout
-                android:id="@+id/connStatusWrap"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingStart="18dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:id="@+id/tvPageTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="@string/nav_overview_full"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/connStatusWrap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp">
+
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="7dp"
+                        android:layout_height="7dp"
+                        android:layout_marginEnd="6dp" />
+
+                    <TextView
+                        android:id="@+id/tvConnStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="未连接"
+                        android:textSize="11.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <View
-                    android:id="@+id/statusDot"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_status_dot_off" />
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
 
-                <TextView
-                    android:id="@+id/tvConnStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="未连接"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
+                <!-- 4 套皮肤即时切换入口 -->
+                <FrameLayout
+                    android:id="@+id/btnThemePicker"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="8dp"
+                    android:clickable="true"
+                    android:contentDescription="切换外观主题"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/ivThemePicker"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_palette" />
+                </FrameLayout>
+
+                <!-- 连接设置弹窗入口 -->
+                <FrameLayout
+                    android:id="@+id/btnSettings"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:clickable="true"
+                    android:contentDescription="@string/nav_settings_full"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/ivSettings"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_settings_gear" />
+                </FrameLayout>
             </LinearLayout>
+
+            <View
+                android:id="@+id/topBarDivider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp" />
         </LinearLayout>
 
-        <!-- 常驻硬件速览：每项等宽占位，数值位数变化不会推动相邻项 -->
-        <LinearLayout
-            android:id="@+id/topTelemetryStrip"
+        <!-- 3 个主页面容器 -->
+        <FrameLayout
+            android:id="@+id/pageContainer"
             android:layout_width="match_parent"
-            android:layout_height="22dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
-            <TextView
-                android:id="@+id/tvTopFps"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:fontFamily="monospace"
-                android:maxLines="1"
-                android:text="FPS  --"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+            <include
+                android:id="@+id/pageOverview"
+                layout="@layout/page_overview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
 
-            <TextView
-                android:id="@+id/tvTopCpu"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:fontFamily="monospace"
-                android:maxLines="1"
-                android:text="CPU  --"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+            <include
+                android:id="@+id/pageCamera"
+                layout="@layout/page_camera"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tvTopGpu"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:fontFamily="monospace"
-                android:maxLines="1"
-                android:text="GPU  --"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+            <include
+                android:id="@+id/pageTouchpad"
+                layout="@layout/page_touchpad"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+        </FrameLayout>
 
-            <TextView
-                android:id="@+id/tvTopMem"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:fontFamily="monospace"
-                android:maxLines="1"
-                android:text="内存 --"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-
-            <TextView
-                android:id="@+id/tvTopVram"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:maxLines="1"
-                android:text="显存 --"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <View
+        <!-- 竖屏 3 Tab 导航（OLED / 日光主题下变为悬浮胶囊，工业 / 控制中心主题下为贴底面板） -->
+        <FrameLayout
+            android:id="@+id/bottomNavBar"
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/divider_line" />
+            android:layout_height="wrap_content"
+            android:paddingBottom="6dp">
+
+            <View
+                android:id="@+id/bottomNavDivider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_gravity="top" />
+
+            <LinearLayout
+                android:id="@+id/bottomNavPill"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginEnd="16dp"
+                android:baselineAligned="false"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <LinearLayout
+                    android:id="@+id/navOverview"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:contentDescription="@string/nav_overview_full"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/ivNavOverview"
+                        android:layout_width="19dp"
+                        android:layout_height="19dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_nav_performance" />
+
+                    <TextView
+                        android:id="@+id/tvNavOverview"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/nav_overview_short"
+                        android:textSize="11.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/navCamera"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:contentDescription="@string/nav_camera_full"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/ivNavCamera"
+                        android:layout_width="19dp"
+                        android:layout_height="19dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_nav_camera" />
+
+                    <TextView
+                        android:id="@+id/tvNavCamera"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/nav_camera_short"
+                        android:textSize="11.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/navTouchpad"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:contentDescription="@string/nav_touchpad_full"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/ivNavTouchpad"
+                        android:layout_width="19dp"
+                        android:layout_height="19dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_nav_touchpad" />
+
+                    <TextView
+                        android:id="@+id/tvNavTouchpad"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/nav_touchpad_short"
+                        android:textSize="11.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 
-    <!-- 页面内容宿主 -->
-    <FrameLayout
-        android:id="@+id/pageContainer"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <include
-            android:id="@+id/pagePerformance"
-            layout="@layout/page_performance"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <include
-            android:id="@+id/pageControl"
-            layout="@layout/page_control"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
-
-        <include
-            android:id="@+id/pageTouchpad"
-            layout="@layout/page_touchpad"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
-
-        <include
-            android:id="@+id/pageScreen"
-            layout="@layout/page_screen"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
-
-        <include
-            android:id="@+id/pageSettings"
-            layout="@layout/page_settings"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
-    </FrameLayout>
-
-    <!-- 竖屏底部导航栏 (60dp + 底部手势条安全区由 WindowInsetsHelper 注入) -->
-    <FrameLayout
-        android:id="@+id/bottomNavBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/surface_nav_bar">
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_gravity="top"
-            android:background="@color/divider_line" />
-
-        <View
-            android:id="@+id/bottomNavIndicator"
-            android:layout_width="48dp"
-            android:layout_height="2.5dp"
-            android:layout_gravity="top|start"
-            android:background="@color/accent_bright" />
-
-        <LinearLayout
-            android:id="@+id/bottomNavRow"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/bottom_nav_height"
-            android:orientation="horizontal"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp">
-
-            <LinearLayout
-                android:id="@+id/navPerf"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@drawable/bg_nav_item"
-                android:clickable="true"
-                android:contentDescription="@string/nav_perf_full"
-                android:focusable="true"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:id="@+id/ivNavPerf"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_nav_performance" />
-
-                <TextView
-                    android:id="@+id/tvNavPerf"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="@string/nav_perf_short"
-                    android:textColor="@color/accent_bright"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/navControl"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@drawable/bg_nav_item"
-                android:clickable="true"
-                android:contentDescription="@string/nav_ctrl_full"
-                android:focusable="true"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:id="@+id/ivNavControl"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_nav_control" />
-
-                <TextView
-                    android:id="@+id/tvNavControl"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="@string/nav_ctrl_short"
-                    android:textColor="@color/text_muted"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/navTouchpad"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@drawable/bg_nav_item"
-                android:clickable="true"
-                android:contentDescription="@string/nav_touchpad_full"
-                android:focusable="true"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:id="@+id/ivNavTouchpad"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_nav_touchpad" />
-
-                <TextView
-                    android:id="@+id/tvNavTouchpad"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="@string/nav_touchpad_short"
-                    android:textColor="@color/text_muted"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/navScreen"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@drawable/bg_nav_item"
-                android:clickable="true"
-                android:contentDescription="@string/nav_screen_full"
-                android:focusable="true"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:id="@+id/ivNavScreen"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_nav_screen" />
-
-                <TextView
-                    android:id="@+id/tvNavScreen"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="@string/nav_screen_short"
-                    android:textColor="@color/text_muted"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/navSettings"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@drawable/bg_nav_item"
-                android:clickable="true"
-                android:contentDescription="@string/nav_settings_full"
-                android:focusable="true"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:id="@+id/ivNavSettings"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_nav_settings" />
-
-                <TextView
-                    android:id="@+id/tvNavSettings"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="@string/nav_settings_short"
-                    android:textColor="@color/text_muted"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
-    </FrameLayout>
-</LinearLayout>
+    <!-- 主题选择底部弹窗 + 连接设置底部弹窗 -->
+    <include layout="@layout/sheet_theme_picker" />
+    <include layout="@layout/sheet_settings" />
+</FrameLayout>

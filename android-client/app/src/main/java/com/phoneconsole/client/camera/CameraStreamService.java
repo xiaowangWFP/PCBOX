@@ -83,6 +83,9 @@ public class CameraStreamService extends Service implements ConnectChecker {
     private volatile int preparedOrientation = -1;
     private volatile long manualStopGuardUntilMs;
     private volatile StateObserver observer;
+    private Runnable pendingRestartRunnable;
+    private boolean pendingRestartWasStreaming;
+    private boolean retriedServerBind;
 
     /** 判断是否已有相机运行时权限 */
     public static boolean hasCameraPermission(Context context) {
@@ -139,7 +142,7 @@ public class CameraStreamService extends Service implements ConnectChecker {
             return START_NOT_STICKY;
         }
         String action = intent.getAction();
-        applyExtras(intent);
+        final boolean sizeChanged = applyExtras(intent);
         if (ACTION_START_STREAM.equals(action)) {
             boolean force = intent.getBooleanExtra(EXTRA_FORCE, false);
             if (!force && SystemClock.elapsedRealtime() < manualStopGuardUntilMs) {
@@ -162,13 +165,36 @@ public class CameraStreamService extends Service implements ConnectChecker {
                 return START_NOT_STICKY;
             }
             enterForeground();
-            mainHandler.post(this::startStreamingInternal);
+            mainHandler.post(() -> {
+                if (pendingRestartRunnable != null) {
+                    pendingRestartWasStreaming = true;
+                    return;
+                }
+                if (sizeChanged && camera != null) {
+                    if (camera.isStreaming()) {
+                        restartStreamInternal();
+                        return;
+                    }
+                    if (camera.isOnPreview()) {
+                        stopPreviewAndReleaseIfIdle();
+                    }
+                }
+                retriedServerBind = false;
+                startStreamingInternal();
+            });
         } else if (ACTION_STOP_STREAM.equals(action)) {
             state.manual = false;
             manualStopGuardUntilMs = SystemClock.elapsedRealtime() + 2500L;
             mainHandler.post(this::stopStreamingInternal);
         } else if (ACTION_UPDATE_CONFIG.equals(action)) {
-            mainHandler.post(this::applyLiveOptionsAndRestartIfNeeded);
+            mainHandler.post(() -> {
+                if (sizeChanged && (pendingRestartRunnable != null
+                        || (camera != null && (camera.isStreaming() || camera.isOnPreview())))) {
+                    restartStreamInternal();
+                } else {
+                    applyLiveOptionsAndRestartIfNeeded();
+                }
+            });
         }
         return START_NOT_STICKY;
     }
@@ -277,7 +303,8 @@ public class CameraStreamService extends Service implements ConnectChecker {
                 videoPrepared = false;
                 preparedOrientation = -1;
                 RtspServerCamera2 cam = camera;
-                if (cam != null && cam.isStreaming()) {
+                if (pendingRestartRunnable != null
+                        || (cam != null && (cam.isStreaming() || cam.isOnPreview()))) {
                     restartStreamInternal();
                     return;
                 }
@@ -352,7 +379,7 @@ public class CameraStreamService extends Service implements ConnectChecker {
         });
     }
 
-    private void applyExtras(Intent intent) {
+    private boolean applyExtras(Intent intent) {
         boolean sizeChanged = false;
         int newW = intent.getIntExtra(EXTRA_WIDTH, state.width);
         int newH = intent.getIntExtra(EXTRA_HEIGHT, state.height);
@@ -363,10 +390,14 @@ public class CameraStreamService extends Service implements ConnectChecker {
         if (newW > 0 && newH > 0 && (newW != state.width || newH != state.height)) {
             state.width = newW;
             state.height = newH;
+            videoPrepared = false;
+            preparedOrientation = -1;
             sizeChanged = true;
         }
         if (newFps > 0) {
             if (newFps != state.fps) {
+                videoPrepared = false;
+                preparedOrientation = -1;
                 sizeChanged = true;
             }
             state.fps = newFps;
@@ -406,9 +437,7 @@ public class CameraStreamService extends Service implements ConnectChecker {
         if (intent.hasExtra(EXTRA_CONSUMER_CONNECTED)) {
             state.consumerConnected = intent.getBooleanExtra(EXTRA_CONSUMER_CONNECTED, state.consumerConnected);
         }
-        if (sizeChanged && camera != null && camera.isStreaming()) {
-            mainHandler.post(this::restartStreamInternal);
-        }
+        return sizeChanged;
     }
 
     private void ensureCameraCreated(@Nullable OpenGlView view) {
@@ -428,11 +457,14 @@ public class CameraStreamService extends Service implements ConnectChecker {
         if (videoPrepared && preparedOrientation == camOrientation) {
             return true;
         }
+        int targetBitrateKbps = state.width >= 1920
+                ? Math.max(state.bitrateKbps, 6000)
+                : state.bitrateKbps;
         boolean prepared = cam.prepareVideo(
                 state.width,
                 state.height,
                 state.fps,
-                state.bitrateKbps * 1024,
+                targetBitrateKbps * 1024,
                 camOrientation);
         if (prepared) {
             videoPrepared = true;
@@ -499,29 +531,61 @@ public class CameraStreamService extends Service implements ConnectChecker {
         notifyObserver();
     }
 
+    private void cancelPendingRestart() {
+        if (pendingRestartRunnable != null) {
+            mainHandler.removeCallbacks(pendingRestartRunnable);
+            pendingRestartRunnable = null;
+        }
+        pendingRestartWasStreaming = false;
+    }
+
+    private void scheduleDelayedRestart(boolean resumeStream, long delayMs) {
+        cancelPendingRestart();
+        pendingRestartWasStreaming = resumeStream;
+        pendingRestartRunnable = () -> {
+            pendingRestartRunnable = null;
+            boolean shouldStream = pendingRestartWasStreaming;
+            pendingRestartWasStreaming = false;
+            if (shouldStream) {
+                if (SystemClock.elapsedRealtime() >= manualStopGuardUntilMs) {
+                    startStreamingInternal();
+                }
+            } else if (attachedPreview != null) {
+                ensureCameraCreated(attachedPreview);
+                startPreviewInternal();
+                state.previewing = true;
+                notifyObserver();
+            } else {
+                notifyObserver();
+            }
+        };
+        if (delayMs > 0L) {
+            mainHandler.postDelayed(pendingRestartRunnable, delayMs);
+        } else {
+            mainHandler.post(pendingRestartRunnable);
+        }
+    }
+
     private void restartStreamInternal() {
         RtspServerCamera2 cam = camera;
-        if (cam == null) {
+        if (cam == null && pendingRestartRunnable == null) {
             return;
         }
-        boolean wasStreaming = cam.isStreaming();
-        if (wasStreaming) {
-            cam.stopStream();
-        }
-        if (cam.isOnPreview()) {
-            cam.stopPreview();
-        }
-        videoPrepared = false;
-        preparedOrientation = -1;
+        boolean wasStreaming = pendingRestartRunnable != null
+                ? pendingRestartWasStreaming
+                : (cam != null && cam.isStreaming());
+        boolean wasPreviewing = attachedPreview != null || (cam != null && cam.isOnPreview());
+        cancelPendingRestart();
+        stopPreviewAndReleaseIfIdle();
         state.streaming = false;
-        if (wasStreaming || attachedPreview != null) {
-            startPreviewInternal();
+        notifyObserver();
+
+        retriedServerBind = false;
+        if (!wasStreaming && !wasPreviewing) {
+            return;
         }
-        if (wasStreaming) {
-            startStreamingInternal();
-        } else {
-            notifyObserver();
-        }
+        // 给 RootEncoder RtspServer 留出端口 8554 关闭时间，避免切分辨率时触发 Server creation failed
+        scheduleDelayedRestart(wasStreaming, wasStreaming ? 250L : 0L);
     }
 
     private void applyLiveOptionsAndRestartIfNeeded() {
@@ -545,6 +609,8 @@ public class CameraStreamService extends Service implements ConnectChecker {
     }
 
     private void stopStreamingInternal() {
+        cancelPendingRestart();
+        retriedServerBind = false;
         RtspServerCamera2 cam = camera;
         if (cam != null) {
             if (cam.isStreaming()) {
@@ -584,6 +650,8 @@ public class CameraStreamService extends Service implements ConnectChecker {
     }
 
     private void releaseCamera() {
+        cancelPendingRestart();
+        retriedServerBind = false;
         stopPreviewAndReleaseIfIdle();
         state.streaming = false;
         state.previewing = false;
@@ -651,6 +719,7 @@ public class CameraStreamService extends Service implements ConnectChecker {
 
     private Notification buildNotification() {
         Intent launch = new Intent(this, MainActivity.class);
+        launch.putExtra("page", "camera");
         launch.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -698,8 +767,23 @@ public class CameraStreamService extends Service implements ConnectChecker {
 
     @Override
     public void onConnectionFailed(@NonNull String reason) {
-        state.error = reason;
-        notifyObserver();
+        mainHandler.post(() -> {
+            if (!retriedServerBind
+                    && reason.contains("Server creation failed")
+                    && SystemClock.elapsedRealtime() >= manualStopGuardUntilMs) {
+                retriedServerBind = true;
+                Log.w(TAG, "RTSP 端口释放尚未完成，280ms 后自动重试推流: " + reason);
+                state.error = "";
+                stopPreviewAndReleaseIfIdle();
+                state.streaming = false;
+                notifyObserver();
+                scheduleDelayedRestart(true, 280L);
+                return;
+            }
+            state.streaming = false;
+            state.error = reason;
+            notifyObserver();
+        });
     }
 
     @Override
@@ -708,6 +792,11 @@ public class CameraStreamService extends Service implements ConnectChecker {
 
     @Override
     public void onConnectionSuccess() {
+        mainHandler.post(() -> {
+            retriedServerBind = false;
+            state.error = "";
+            notifyObserver();
+        });
     }
 
     @Override

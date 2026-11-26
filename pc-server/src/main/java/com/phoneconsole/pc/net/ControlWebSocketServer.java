@@ -84,6 +84,8 @@ public class ControlWebSocketServer extends WebSocketServer {
     /** 同一（屏 + 帧率）的多个客户端共享一个 ffmpeg 进程 */
     private final Map<String, H264ScreenStreamer> streamers = new ConcurrentHashMap<>();
     private final ScreenTargets targets = new ScreenTargets();
+    /** 由 Main 注入，用于手机端切换要显示的显示器 */
+    private volatile com.phoneconsole.pc.telemetry.TelemetryService telemetry;
     private final Object configLock = new Object();
     /** 新客户端的默认采集目标：-1 = 整块桌面 */
     private volatile int selectedMonitor;
@@ -286,11 +288,21 @@ public class ControlWebSocketServer extends WebSocketServer {
             case "touchpad_move" -> MouseController.moveBy(intOf(json, "dx", 0), intOf(json, "dy", 0));
             case "touchpad_click" -> MouseController.click(strOf(json, "button", "left"));
             case "touchpad_scroll" -> MouseController.scroll(intOf(json, "deltaY", 0));
+            case "select_display" -> {
+                if (telemetry != null) {
+                    telemetry.selectDisplay(strOf(json, "id", ""));
+                }
+            }
             case "mic_mute" -> engine.toggleMicMute();
             case "deck_key_add" -> handleDeckKeyAdd(json);
             case "deck_key_delete" -> handleDeckKeyDelete(json);
             default -> log.debug("忽略消息类型：{}", type);
         }
+    }
+
+    /** Main 启动时注入遥测服务，供 select_display 使用 */
+    public void setTelemetry(com.phoneconsole.pc.telemetry.TelemetryService telemetry) {
+        this.telemetry = telemetry;
     }
 
     @Override

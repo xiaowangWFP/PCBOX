@@ -54,6 +54,9 @@ public class TouchpadView extends View {
     private final Paint subPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF bounds = new RectF();
 
+    private int borderIdleColor;
+    private int borderActiveColor;
+
     private float cornerRadiusPx;
     private float dotSpacingPx;
     private float glowRadiusPx;
@@ -120,9 +123,11 @@ public class TouchpadView extends View {
         bgPaint.setStyle(Paint.Style.FILL);
         bgPaint.setColor(ContextCompat.getColor(context, R.color.bg_obsidian));
 
+        borderIdleColor = ContextCompat.getColor(context, R.color.divider_strong);
+        borderActiveColor = ContextCompat.getColor(context, R.color.accent_border);
         borderPaint.setStyle(Paint.Style.STROKE);
         borderPaint.setStrokeWidth(1f * density);
-        borderPaint.setColor(ContextCompat.getColor(context, R.color.divider_strong));
+        borderPaint.setColor(borderIdleColor);
 
         dotPaint.setStyle(Paint.Style.FILL);
         dotPaint.setColor(ContextCompat.getColor(context, R.color.touchpad_dot));
@@ -137,6 +142,25 @@ public class TouchpadView extends View {
         subPaint.setTextAlign(Paint.Align.CENTER);
 
         setContentDescription("无线触控板，拖动移动鼠标指针，轻点触发左键");
+    }
+
+    public void applyTheme(@NonNull ThemeManager.AppTheme theme) {
+        float density = getResources().getDisplayMetrics().density;
+        cornerRadiusPx = theme.cardRadiusDp * density;
+        bgPaint.setColor(theme.cardBg);
+        dotPaint.setColor(theme.touchDot);
+        borderIdleColor = theme.border;
+        borderActiveColor = theme.accent;
+        titlePaint.setColor(theme.textPrimary);
+        subPaint.setColor(theme.textMuted);
+        int glowEnd = theme.touchGlow & 0x00FFFFFF;
+        glowShader = new RadialGradient(
+                0f, 0f, glowRadiusPx,
+                theme.touchGlow,
+                glowEnd,
+                Shader.TileMode.CLAMP);
+        glowPaint.setShader(glowShader);
+        invalidate();
     }
 
     public void setSensitivity(float sensitivity) {
@@ -185,13 +209,11 @@ public class TouchpadView extends View {
         // 中心引导文案
         float cx = getWidth() * 0.5f;
         float cy = getHeight() * 0.5f;
-        canvas.drawText("触控移动区域", cx, cy - 6f, titlePaint);
-        canvas.drawText(readoutText, cx, cy + 28f, subPaint);
+        float gap = 10f * getResources().getDisplayMetrics().density;
+        canvas.drawText("触控移动区域", cx, cy - gap * 0.5f, titlePaint);
+        canvas.drawText(readoutText, cx, cy + gap * 1.4f, subPaint);
 
-        borderPaint.setColor(ContextCompat.getColor(
-                getContext(),
-                touching ? R.color.accent_border : R.color.divider_strong
-        ));
+        borderPaint.setColor(touching ? borderActiveColor : borderIdleColor);
         canvas.drawRoundRect(bounds, cornerRadiusPx, cornerRadiusPx, borderPaint);
     }
 

@@ -231,6 +231,14 @@ public class ConnectionManager {
         sendJson(payload);
     }
 
+    /** 选择要显示刷新率的显示器；空字符串表示回到主屏 */
+    public void sendSelectDisplay(String displayId) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "select_display");
+        payload.addProperty("id", displayId == null ? "" : displayId);
+        sendJson(payload);
+    }
+
     /** 向 PC 端上报手机虚拟摄像头状态与 RTSP 参数 */
     public void sendCameraState(CameraConfig state) {
         if (state == null) {
@@ -262,6 +270,7 @@ public class ConnectionManager {
         JsonObject payload = new JsonObject();
         payload.addProperty("type", "camera_request");
         payload.addProperty("action", action);
+        payload.addProperty("fromPhone", true);
         if (state != null) {
             payload.addProperty("width", state.width);
             payload.addProperty("height", state.height);
