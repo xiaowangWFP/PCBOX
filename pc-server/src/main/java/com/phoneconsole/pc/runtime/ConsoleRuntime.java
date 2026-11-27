@@ -33,6 +33,7 @@ public final class ConsoleRuntime {
     private final AdbAutoUnlockService autoUnlock;
     private final WindowWatcher watcher;
     private final CameraBridgeService cameraBridge;
+    private final ShortcutManager shortcutManager = new ShortcutManager();
     private final long startedAt = System.currentTimeMillis();
     /** 实际监听的端口，配置里改端口需重启才会变化 */
     private final int boundWsPort;
@@ -59,6 +60,9 @@ public final class ConsoleRuntime {
         this.cameraBridge = cameraBridge;
         this.boundWsPort = config.network.wsPort;
         this.boundHttpPort = config.network.httpPort;
+        Thread initShortcut = new Thread(shortcutManager::refresh, "shortcut-status-init");
+        initShortcut.setDaemon(true);
+        initShortcut.start();
     }
 
     public AppConfig config() {
@@ -98,9 +102,44 @@ public final class ConsoleRuntime {
         status.put("adb", adb.statusMap());
         status.put("autoUnlock", autoUnlock != null ? autoUnlock.statusMap() : Map.of("enabled", false));
         status.put("camera", cameraBridge != null ? cameraBridge.statusMap() : Map.of("enabled", false));
+        status.put("shortcut", shortcutManager.cachedStatus());
         status.put("logCount", LogBuffer.get().size());
         status.put("shuttingDown", shuttingDown);
         return status;
+    }
+
+    public Map<String, Object> shortcutStatus() {
+        return shortcutManager.status();
+    }
+
+    public Map<String, Object> updateShortcut(JsonObject body) {
+        String action = body.has("action") && !body.get("action").isJsonNull()
+                ? body.get("action").getAsString().trim()
+                : "bind";
+        if ("unbind".equalsIgnoreCase(action)) {
+            boolean removeDesktop = !body.has("removeDesktop") || body.get("removeDesktop").getAsBoolean();
+            boolean disableAutoStart = !body.has("disableAutoStart") || body.get("disableAutoStart").getAsBoolean();
+            return shortcutManager.unbind(removeDesktop, disableAutoStart);
+        }
+        String hotkey = body.has("hotkey") && !body.get("hotkey").isJsonNull()
+                ? body.get("hotkey").getAsString()
+                : "";
+        boolean desktopShortcut = body.has("desktopShortcut") && body.get("desktopShortcut").getAsBoolean();
+        boolean autoStart = body.has("autoStart") && body.get("autoStart").getAsBoolean();
+        return shortcutManager.bind(hotkey, desktopShortcut, autoStart);
+    }
+
+    /** 触发静默重启：先拉起等待当前进程退出的后台启动器，再正常退出当前 JVM */
+    public Map<String, Object> requestRestart() {
+        if (shuttingDown) {
+            return failure("服务端已在退出流程中");
+        }
+        if (!ShortcutManager.spawnSilentRestart()) {
+            return failure("未能启动后台重启脚本，请检查 pc-server/launch-silent.vbs");
+        }
+        LogBuffer.get().warn("ADMIN", "网页端请求重启，服务将在 0.3 秒后静默重启");
+        requestShutdown();
+        return success("已触发静默重启，请稍候数秒");
     }
 
     public Map<String, Object> cameraStatus() {

@@ -593,16 +593,44 @@
         </section>
 
         <section class="card">
-          <h2>系统操作</h2>
-          <p class="hint" style="margin-top:0;">
-            退出后 PC 端 WebSocket、网页控制台、遥测与 ADB 守护会一并停止，手机端将断开连接。
-            再次使用需重新运行 <code>run.cmd</code>。
-          </p>
-          <div class="row">
-            <button class="danger" id="btnShutdown">退出服务</button>
+          <h2>系统操作 <span class="tag" id="shortcutStateTag">快捷启动</span></h2>
+          <div style="margin-bottom:12px;">
+            <div class="hint" style="margin-top:0; margin-bottom:8px; color:var(--text);">
+              全局启动快捷键（无需打开网页或 CMD 黑框，桌面按快捷键即可静默后台启动；若已在运行则直接打开控制台）：
+            </div>
+            <div class="row" style="margin-bottom:8px;">
+              <input id="inpShortcutHotkey" type="text" autocomplete="off" placeholder="点击后按组合键，如 Ctrl+Alt+P"
+                style="flex:1; min-width:210px; background:#0d1117; color:var(--text); border:1px solid var(--line-strong); border-radius:9px; padding:7px 10px; font-size:12.5px; font-family:ui-monospace, Consolas, monospace;" />
+              <button id="btnShortcutPreset" type="button">填入 Ctrl+Alt+P</button>
+            </div>
+            <div class="row" style="margin-bottom:8px;">
+              <label class="hint" style="margin:0; color:var(--text);">
+                <input type="checkbox" id="chkShortcutDesktop" /> 同时生成桌面快捷方式
+              </label>
+              <label class="hint" style="margin:0; color:var(--text);">
+                <input type="checkbox" id="chkShortcutAutoStart" /> 开机自动静默启动
+              </label>
+            </div>
+            <div class="row">
+              <button class="primary" id="btnShortcutBind" type="button">绑定启动快捷键</button>
+              <button id="btnShortcutUnbind" type="button">解除快捷键</button>
+            </div>
+            <div class="msg" id="shortcutMsg"></div>
+            <div class="path" id="shortcutSummary" style="margin-top:4px;"></div>
           </div>
-          <div class="msg" id="sysMsg"></div>
-          <div class="hint" id="sysInfo">--</div>
+
+          <div style="border-top:1px solid var(--line); padding-top:12px;">
+            <p class="hint" style="margin-top:0;">
+              退出后 PC 端 WebSocket、网页控制台、遥测与 ADB 守护会一并停止，手机端将断开连接。
+              可通过上方全局快捷键、托盘图标或 <code>run.cmd</code> 重新启动。
+            </p>
+            <div class="row">
+              <button id="btnRestart" type="button">重启服务</button>
+              <button class="danger" id="btnShutdown" type="button">退出服务</button>
+            </div>
+            <div class="msg" id="sysMsg"></div>
+            <div class="hint" id="sysInfo">--</div>
+          </div>
         </section>
       </div>
     </div>
@@ -619,6 +647,7 @@
         logSeq: 0,
         configDirty: false,
         pollSec: 10,
+        shortcutEdited: false,
       };
 
       async function api(path, options) {
@@ -699,6 +728,7 @@
         renderAdb(data.adb);
         renderCamera(data.camera);
         renderAutoUnlock(data.autoUnlock);
+        renderShortcut(data.shortcut, false);
       }
 
       function renderAutoUnlock(au) {
@@ -951,7 +981,166 @@
         }
       }
 
-      // ---------------- 系统 ----------------
+      // ---------------- 系统与快捷键 ----------------
+      async function refreshShortcut() {
+        try {
+          const data = await api('/api/shortcut');
+          if (data && data.ok) {
+            renderShortcut(data, false);
+          }
+        } catch (e) { }
+      }
+
+      function renderShortcut(sc, force) {
+        if (!sc || sc.ok === false) return;
+        const tag = $('shortcutStateTag');
+        const bound = !!sc.bound && !!sc.hotkey;
+        if (bound) {
+          tag.textContent = '已绑定 ' + sc.hotkey + (sc.autoStart ? ' · 开机自启' : '');
+          tag.style.color = '#86efac';
+        } else if (sc.autoStart) {
+          tag.textContent = '未设热键 · 已设开机自启';
+          tag.style.color = '#fcd34d';
+        } else {
+          tag.textContent = '未绑定';
+          tag.style.color = 'var(--text-3)';
+        }
+
+        const inp = $('inpShortcutHotkey');
+        if ((force || (!state.shortcutEdited && document.activeElement !== inp)) && typeof sc.hotkey === 'string') {
+          inp.value = sc.hotkey;
+        }
+        if (force || !state.shortcutEdited) {
+          $('chkShortcutDesktop').checked = !!sc.desktopShortcut;
+          $('chkShortcutAutoStart').checked = !!sc.autoStart;
+        }
+
+        const parts = [];
+        if (bound) parts.push('开始菜单热键：' + sc.hotkey);
+        if (sc.desktopShortcut) parts.push('桌面快捷方式：已创建');
+        if (sc.autoStart) parts.push('开机自启：已开启');
+        $('shortcutSummary').textContent = parts.length
+          ? parts.join(' ｜ ')
+          : '支持双修饰键组合（如 Ctrl+Alt+P / Ctrl+Shift+K）或 F9~F12，可直接点击输入框按键捕获';
+      }
+
+      function captureHotkeyEvent(e) {
+        const modKeys = ['Control', 'Alt', 'Shift', 'Meta', 'OS'];
+        if (modKeys.includes(e.key)) {
+          return;
+        }
+        if (!e.ctrlKey && !e.altKey && !e.shiftKey && (e.key === 'Backspace' || e.key === 'Delete')) {
+          e.preventDefault();
+          $('inpShortcutHotkey').value = '';
+          state.shortcutEdited = true;
+          setMsg('shortcutMsg', '', '');
+          return;
+        }
+        const code = e.code || '';
+        let keyName = '';
+        if (/^Key([A-Z])$/.test(code)) {
+          keyName = code.slice(3);
+        } else if (/^Digit([0-9])$/.test(code)) {
+          keyName = code.slice(5);
+        } else if (/^F([1-9]|1[0-2])$/.test(code)) {
+          keyName = code;
+        } else if (/^[a-zA-Z0-9]$/.test(e.key || '')) {
+          keyName = e.key.toUpperCase();
+        } else if (/^F([1-9]|1[0-2])$/i.test(e.key || '')) {
+          keyName = e.key.toUpperCase();
+        }
+        if (!keyName) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        const parts = [];
+        if (e.ctrlKey) parts.push('Ctrl');
+        if (e.altKey) parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        parts.push(keyName);
+        const combo = parts.join('+');
+        $('inpShortcutHotkey').value = combo;
+        state.shortcutEdited = true;
+        const mods = (e.ctrlKey ? 1 : 0) + (e.altKey ? 1 : 0) + (e.shiftKey ? 1 : 0);
+        if (mods < 2 && !/^F(9|1[0-2])$/.test(keyName)) {
+          setMsg('shortcutMsg', '提示：为避免占用系统常用键，Windows 快捷方式需至少两个修饰键（如 Ctrl+Alt+P）或 F9~F12', 'warn');
+        } else {
+          setMsg('shortcutMsg', '已捕获组合键 ' + combo + '，点击「绑定启动快捷键」保存生效', '');
+        }
+      }
+
+      async function saveShortcut(action) {
+        const isUnbind = action === 'unbind';
+        const hotkey = $('inpShortcutHotkey').value.trim();
+        if (!isUnbind && !hotkey) {
+          setMsg('shortcutMsg', '请先按下或输入要绑定的快捷键（例如 Ctrl+Alt+P）', 'warn');
+          $('inpShortcutHotkey').focus();
+          return;
+        }
+        $('btnShortcutBind').disabled = true;
+        $('btnShortcutUnbind').disabled = true;
+        setMsg('shortcutMsg', isUnbind ? '正在解除全局启动快捷键…' : '正在写入 Windows 启动快捷方式…');
+        try {
+          const payload = isUnbind
+            ? { action: 'unbind', removeDesktop: true, disableAutoStart: true }
+            : {
+                action: 'bind',
+                hotkey,
+                desktopShortcut: $('chkShortcutDesktop').checked,
+                autoStart: $('chkShortcutAutoStart').checked,
+              };
+          const data = await api('/api/shortcut', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          if (data && data.ok) {
+            state.shortcutEdited = false;
+            renderShortcut(data, true);
+            setMsg('shortcutMsg', data.message || (isUnbind ? '已解除快捷键' : '快捷键绑定成功'), 'ok');
+            refreshStatus();
+          } else {
+            setMsg('shortcutMsg', (data && data.error) || '快捷键操作失败', 'err');
+          }
+        } catch (e) {
+          setMsg('shortcutMsg', '请求失败：' + e.message, 'err');
+        } finally {
+          $('btnShortcutBind').disabled = false;
+          $('btnShortcutUnbind').disabled = false;
+        }
+      }
+
+      async function restartService() {
+        if (!confirm('确认静默重启 PC 服务端？重启过程中手机端会短暂断开并在数秒内自动重连。')) {
+          return;
+        }
+        $('btnRestart').disabled = true;
+        $('btnShutdown').disabled = true;
+        setMsg('sysMsg', '正在拉起新的后台服务实例，请稍候…');
+        try {
+          const data = await api('/api/restart', { method: 'POST' });
+          if (data && data.ok) {
+            setMsg('sysMsg', '服务正在静默重启，数秒后自动恢复连接…', 'ok');
+            setTimeout(() => {
+              $('btnRestart').disabled = false;
+              $('btnShutdown').disabled = false;
+              refreshStatus();
+            }, 4500);
+          } else {
+            $('btnRestart').disabled = false;
+            $('btnShutdown').disabled = false;
+            setMsg('sysMsg', (data && data.error) || '重启失败', 'err');
+          }
+        } catch (e) {
+          setMsg('sysMsg', '已发出重启指令，等待服务恢复…', 'warn');
+          setTimeout(() => {
+            $('btnRestart').disabled = false;
+            $('btnShutdown').disabled = false;
+            refreshStatus();
+          }, 4500);
+        }
+      }
+
       async function shutdownService() {
         if (!confirm('确认退出 PC 服务端？退出后手机端会断开，需要重新运行 run.cmd 才能恢复。')) {
           return;
@@ -1193,6 +1382,18 @@
       });
       $('btnConfigSave').addEventListener('click', saveConfig);
       $('btnLogClear').addEventListener('click', clearLogs);
+      $('inpShortcutHotkey').addEventListener('keydown', captureHotkeyEvent);
+      $('inpShortcutHotkey').addEventListener('input', () => { state.shortcutEdited = true; });
+      $('chkShortcutDesktop').addEventListener('change', () => { state.shortcutEdited = true; });
+      $('chkShortcutAutoStart').addEventListener('change', () => { state.shortcutEdited = true; });
+      $('btnShortcutPreset').addEventListener('click', () => {
+        $('inpShortcutHotkey').value = 'Ctrl+Alt+P';
+        state.shortcutEdited = true;
+        setMsg('shortcutMsg', '已填入 Ctrl+Alt+P，点击「绑定启动快捷键」保存生效', '');
+      });
+      $('btnShortcutBind').addEventListener('click', () => saveShortcut('bind'));
+      $('btnShortcutUnbind').addEventListener('click', () => saveShortcut('unbind'));
+      $('btnRestart').addEventListener('click', restartService);
       $('btnShutdown').addEventListener('click', shutdownService);
 
       $('configEditor').addEventListener('input', () => {
@@ -1201,6 +1402,7 @@
       });
 
       refreshStatus();
+      refreshShortcut();
       loadConfig(true);
       refreshLogs();
       refreshConnectInfo();

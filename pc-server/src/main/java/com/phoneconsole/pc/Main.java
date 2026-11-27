@@ -124,10 +124,10 @@ public final class Main {
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LogBuffer.get().warn("CORE", "收到退出信号，正在停止服务");
+            shutdown(wsServer, httpServer, telemetry, adb, autoUnlock, watcher, cameraBridge, engine);
             if (tray != null) {
                 tray.remove();
             }
-            shutdown(wsServer, httpServer, telemetry, adb, autoUnlock, watcher, cameraBridge, engine);
         }, "shutdown-hook"));
 
         log.info("PC 服务端已就绪（调试页面：{}），按 Ctrl+C 退出", debugUrl);

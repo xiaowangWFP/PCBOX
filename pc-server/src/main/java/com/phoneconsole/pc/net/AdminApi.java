@@ -61,6 +61,10 @@ public final class AdminApi {
                     return post ? methodNotAllowed(path) : json(200, runtime.cameraStatus());
                 case "/api/camera/control":
                     return post ? cameraControl(body) : methodNotAllowed(path);
+                case "/api/shortcut":
+                    return post ? shortcutUpdate(body) : json(200, runtime.shortcutStatus());
+                case "/api/restart":
+                    return post ? json(200, runtime.requestRestart()) : methodNotAllowed(path);
                 case "/api/shutdown":
                     return post ? shutdown() : methodNotAllowed(path);
                 default:
@@ -200,6 +204,14 @@ public final class AdminApi {
         } catch (Exception e) {
             return error(400, "请求 JSON 无效：" + e.getMessage());
         }
+    }
+
+    private Response shortcutUpdate(String body) {
+        JsonObject json = parseOptionalJson(body);
+        if (json == null) {
+            return error(400, "请求 JSON 无效");
+        }
+        return json(200, runtime.updateShortcut(json));
     }
 
     private Response shutdown() {
