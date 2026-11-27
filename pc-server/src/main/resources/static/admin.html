@@ -504,6 +504,52 @@
     </section>
 
     <section class="card" style="margin-bottom:16px;">
+      <h2>自动唤醒、解锁与无线调试 <span class="tag" id="unlockStateTag">ADB</span> <span class="tag" id="wirelessStateTag">无线待机</span></h2>
+      <div class="row" style="margin-bottom:10px;">
+        <label class="hint" style="margin:0; color:var(--text);">
+          <input type="checkbox" id="chkUnlockEnabled" checked /> 有线（USB）连接就绪时自动亮屏、解锁并打开手机 App
+        </label>
+        <label class="hint" style="margin:0; color:var(--text);">
+          <input type="checkbox" id="chkWirelessEnabled" /> 开启无线调试（ADB over Wi-Fi）自动连接与解锁
+        </label>
+      </div>
+      <div class="row" style="margin-bottom:10px;">
+        <select id="selUnlockTrigger" style="background:var(--panel-2); color:var(--text); border:1px solid var(--line-strong); border-radius:9px; padding:7px 10px; font-size:12.5px;">
+          <option value="on_connect">启动或每次设备接入时触发</option>
+          <option value="on_startup">仅 PC 服务端启动首次发现时触发</option>
+        </select>
+        <input id="inpUnlockPwd" type="password" autocomplete="off" placeholder="锁屏密码（留空表示不修改或无密码）"
+          style="min-width:250px; background:#0d1117; color:var(--text); border:1px solid var(--line-strong); border-radius:9px; padding:7px 10px; font-size:12.5px; font-family:ui-monospace, Consolas, monospace;" />
+        <button id="btnUnlockTogglePwd" type="button">显示</button>
+        <button id="btnUnlockClearPwd" type="button">清空密码</button>
+        <span class="path" id="unlockPwdHint">未设置密码</span>
+      </div>
+      <div style="border-top:1px solid var(--line); margin:10px 0 12px; padding-top:12px;">
+        <div class="row" style="margin-bottom:10px;">
+          <input id="inpWirelessEndpoint" type="text" autocomplete="off" placeholder="无线调试 IP:端口（如 10.26.3.135:33007）"
+            style="min-width:260px; background:#0d1117; color:var(--text); border:1px solid var(--line-strong); border-radius:9px; padding:7px 10px; font-size:12.5px; font-family:ui-monospace, Consolas, monospace;" />
+          <button id="btnWirelessConnect" type="button">连接无线 ADB</button>
+          <button id="btnWirelessDisconnect" type="button">断开无线</button>
+        </div>
+        <div class="row" style="margin-bottom:10px;">
+          <input id="inpPairEndpoint" type="text" autocomplete="off" placeholder="首次配对 IP:配对端口（手机「使用配对码配对设备」）"
+            style="min-width:290px; background:#0d1117; color:var(--text); border:1px solid var(--line-strong); border-radius:9px; padding:7px 10px; font-size:12.5px; font-family:ui-monospace, Consolas, monospace;" />
+          <input id="inpPairCode" type="text" autocomplete="off" maxlength="12" placeholder="6位配对码"
+            style="width:120px; background:#0d1117; color:var(--text); border:1px solid var(--line-strong); border-radius:9px; padding:7px 10px; font-size:12.5px; font-family:ui-monospace, Consolas, monospace;" />
+          <button id="btnWirelessPair" type="button">无线配对 (adb pair)</button>
+        </div>
+      </div>
+      <div class="row">
+        <button class="primary" id="btnUnlockSave" type="button">保存设置</button>
+        <button id="btnUnlockTest" type="button">测试唤醒解锁并打开 App</button>
+      </div>
+      <div class="msg" id="unlockMsg"></div>
+      <div class="hint">
+        说明：若为小米 / Redmi 手机，请确保在手机「开发者选项」中开启「USB 调试」「USB 调试（安全设置）」及「无线调试」。若校园网/公共 Wi-Fi 开启终端隔离导致无线连不上，可开启 Windows「移动热点」直连手机。
+      </div>
+    </section>
+
+    <section class="card" style="margin-bottom:16px;">
       <h2>配置管理 <span class="tag">config.json</span></h2>
       <div class="between" style="margin-bottom:10px;">
         <div class="path" id="configPath">--</div>
@@ -652,6 +698,41 @@
 
         renderAdb(data.adb);
         renderCamera(data.camera);
+        renderAutoUnlock(data.autoUnlock);
+      }
+
+      function renderAutoUnlock(au) {
+        if (!au) return;
+        $('chkUnlockEnabled').checked = au.enabled !== false;
+        $('chkWirelessEnabled').checked = !!au.wirelessEnabled;
+        const epEl = $('inpWirelessEndpoint');
+        if (document.activeElement !== epEl && typeof au.wirelessEndpoint === 'string') {
+          epEl.value = au.wirelessEndpoint;
+        }
+        if (au.triggerMode === 'on_startup' || au.triggerMode === 'on_connect') {
+          $('selUnlockTrigger').value = au.triggerMode;
+        }
+        const tag = $('unlockStateTag');
+        tag.textContent = au.enabled !== false ? '有线已启用' : '有线已关闭';
+        tag.style.color = au.enabled !== false ? '#86efac' : 'var(--text-3)';
+        const wTag = $('wirelessStateTag');
+        if (au.wirelessConnected) {
+          wTag.textContent = '无线已连接';
+          wTag.style.color = '#86efac';
+        } else if (au.wirelessEnabled) {
+          wTag.textContent = '无线待连接';
+          wTag.style.color = '#fcd34d';
+        } else {
+          wTag.textContent = '无线已关闭';
+          wTag.style.color = 'var(--text-3)';
+        }
+        $('unlockPwdHint').textContent = au.hasPassword
+          ? ('已设置密码（' + (au.passwordLength || '已加密') + ' 位，留空保持不变）')
+          : '未设置密码（仅亮屏上滑）';
+        if (au.lastResult && !$('unlockMsg').dataset.pinned) {
+          setMsg('unlockMsg', (au.lastRunAt ? '[' + fmtTime(au.lastRunAt) + '] ' : '') + au.lastResult,
+            au.needInputPermission ? 'warn' : '');
+        }
       }
 
       function renderCamera(cam) {
@@ -731,7 +812,8 @@
         $('adbPath').textContent = 'adb：' + (adb.executable || '--');
         const okText = adb.available ? '可用' : '不可用';
         const msg = adb.message ? ' · ' + adb.message : '';
-        $('adbState').textContent = '状态：' + okText + ' · 监听端口 ' + (adb.port || '--') + msg;
+        const wMsg = adb.wirelessMessage ? ' · ' + adb.wirelessMessage : '';
+        $('adbState').textContent = '状态：' + okText + ' · 监听端口 ' + (adb.port || '--') + msg + wMsg;
         $('adbState').style.color = adb.available ? 'var(--text-2)' : '#fca5a5';
 
         const body = $('adbDevices');
@@ -740,7 +822,9 @@
           body.innerHTML = '<tr><td colspan="3" class="empty">暂无已连接设备</td></tr>';
         } else {
           body.innerHTML = details.map((d) =>
-            '<tr><td>' + esc(d.serial || '--') + '</td><td>' + esc(d.state || '--') + '</td><td>' + esc(d.model || '--') + '</td></tr>'
+            '<tr><td>' + esc(d.serial || '--')
+            + ' <span class="tag">' + (d.wireless ? '无线' : '有线') + '</span>'
+            + '</td><td>' + esc(d.state || '--') + '</td><td>' + esc(d.model || '--') + '</td></tr>'
           ).join('');
         }
 
@@ -965,7 +1049,126 @@
         }
       }
 
+      // ---------------- 有线 / 无线自动解锁与启动 ----------------
+      async function saveAutoUnlock(clearPassword) {
+        const msgEl = $('unlockMsg');
+        msgEl.dataset.pinned = '1';
+        setMsg('unlockMsg', clearPassword ? '正在清空密码并保存…' : '正在保存自动解锁与无线调试设置…');
+        const payload = {
+          enabled: $('chkUnlockEnabled').checked,
+          swipeToUnlock: true,
+          launchApp: true,
+          triggerMode: $('selUnlockTrigger').value,
+          wirelessEnabled: $('chkWirelessEnabled').checked,
+          wirelessEndpoint: $('inpWirelessEndpoint').value.trim(),
+          wirelessMdnsAutoDiscover: true,
+          clearPassword: !!clearPassword,
+        };
+        const pwd = $('inpUnlockPwd').value;
+        if (!clearPassword && pwd) {
+          payload.password = pwd;
+        }
+        try {
+          const data = await api('/api/adb/unlock-config', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          if (data && data.ok) {
+            $('inpUnlockPwd').value = '';
+            renderAutoUnlock(data.autoUnlock);
+            setMsg('unlockMsg', data.message || '设置已保存并热重载', 'ok');
+            loadConfig(false);
+            refreshStatus();
+          } else {
+            setMsg('unlockMsg', (data && data.error) || '保存失败', 'err');
+          }
+        } catch (e) {
+          setMsg('unlockMsg', '保存失败：' + e.message, 'err');
+        } finally {
+          setTimeout(() => { delete msgEl.dataset.pinned; }, 5000);
+        }
+      }
+
+      async function testAutoUnlock(mode) {
+        const msgEl = $('unlockMsg');
+        msgEl.dataset.pinned = '1';
+        $('btnUnlockTest').disabled = true;
+        setMsg('unlockMsg', '正在向已连接 ADB 手机发送亮屏、解锁与启动指令…');
+        try {
+          const data = await api('/api/adb/unlock', {
+            method: 'POST',
+            body: JSON.stringify({ mode: mode || 'all' }),
+          });
+          if (data && data.autoUnlock) {
+            renderAutoUnlock(data.autoUnlock);
+          }
+          if (data && data.ok) {
+            setMsg('unlockMsg', data.message || '已执行完成', 'ok');
+          } else {
+            setMsg('unlockMsg', (data && data.error) || '执行未完全成功', 'warn');
+          }
+          refreshStatus();
+        } catch (e) {
+          setMsg('unlockMsg', '请求失败：' + e.message, 'err');
+        } finally {
+          $('btnUnlockTest').disabled = false;
+          setTimeout(() => { delete msgEl.dataset.pinned; }, 6000);
+        }
+      }
+
+      async function wirelessAction(action) {
+        const msgEl = $('unlockMsg');
+        msgEl.dataset.pinned = '1';
+        const endpoint = $('inpWirelessEndpoint').value.trim();
+        let url = '/api/adb/wireless/connect';
+        let body = { endpoint, allowMdns: true };
+        if (action === 'disconnect') {
+          url = '/api/adb/wireless/disconnect';
+          body = { endpoint };
+          setMsg('unlockMsg', '正在断开无线 ADB…');
+        } else if (action === 'pair') {
+          url = '/api/adb/wireless/pair';
+          body = {
+            endpoint: $('inpPairEndpoint').value.trim(),
+            pairCode: $('inpPairCode').value.trim(),
+          };
+          setMsg('unlockMsg', '正在执行 adb pair 无线配对…');
+        } else {
+          setMsg('unlockMsg', '正在连接无线 ADB [' + (endpoint || '自动发现') + ']…');
+        }
+        try {
+          const data = await api(url, { method: 'POST', body: JSON.stringify(body) });
+          if (data && data.adb) renderAdb(data.adb);
+          if (data && data.autoUnlock) renderAutoUnlock(data.autoUnlock);
+          if (data && data.ok) {
+            if (action === 'pair') {
+              $('inpPairCode').value = '';
+            }
+            setMsg('unlockMsg', data.message || '操作成功', 'ok');
+            refreshStatus();
+          } else {
+            setMsg('unlockMsg', (data && data.error) || '操作失败', 'warn');
+          }
+        } catch (e) {
+          setMsg('unlockMsg', '请求失败：' + e.message, 'err');
+        } finally {
+          setTimeout(() => { delete msgEl.dataset.pinned; }, 6000);
+        }
+      }
+
       // ---------------- 绑定 ----------------
+      $('btnUnlockTogglePwd').addEventListener('click', () => {
+        const inp = $('inpUnlockPwd');
+        const show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        $('btnUnlockTogglePwd').textContent = show ? '隐藏' : '显示';
+      });
+      $('btnUnlockSave').addEventListener('click', () => saveAutoUnlock(false));
+      $('btnUnlockClearPwd').addEventListener('click', () => saveAutoUnlock(true));
+      $('btnUnlockTest').addEventListener('click', () => testAutoUnlock('all'));
+      $('btnWirelessConnect').addEventListener('click', () => wirelessAction('connect'));
+      $('btnWirelessDisconnect').addEventListener('click', () => wirelessAction('disconnect'));
+      $('btnWirelessPair').addEventListener('click', () => wirelessAction('pair'));
       $('btnCopyUri').addEventListener('click', copyConnectUri);
       $('btnCamStart').addEventListener('click', () => sendCameraControl({ action: 'start' }, '已请求手机开启摄像头推流'));
       $('btnCamStop').addEventListener('click', () => sendCameraControl({ action: 'stop' }, '已停止摄像头推流'));

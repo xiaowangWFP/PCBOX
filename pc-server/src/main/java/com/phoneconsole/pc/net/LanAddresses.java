@@ -26,11 +26,15 @@ public final class LanAddresses {
     /** 明确的虚拟/隧道/蓝牙网卡，直接排除 */
     private static final Pattern VIRTUAL_ALIAS = Pattern.compile(
             "(?i)vmware|virtualbox|hyper-?v|vethernet|tailscale|zerotier|radmin|clash|meta\\b|tun\\b|tap\\b"
-                    + "|bluetooth|蓝牙|loopback|docker|wsl|本地连接\\*|virtual adapter");
+                    + "|bluetooth|蓝牙|loopback|docker|wsl|teredo|isatap");
 
     /** 典型物理局域网网卡，优先 */
     private static final Pattern LAN_ALIAS = Pattern.compile(
             "(?i)wi-?fi|wlan|无线|ethernet|以太网|局域网");
+
+    /** Windows 移动热点虚拟网卡（192.168.137.x）：允许接入，解决校园网隔离时通过电脑热点直连 */
+    private static final Pattern HOTSPOT_ALIAS = Pattern.compile(
+            "(?i)wi-?fi direct|microsoft hosted network|本地连接\\*");
 
     private LanAddresses() {
     }
@@ -44,9 +48,6 @@ public final class LanAddresses {
                     continue;
                 }
                 String alias = nic.getDisplayName() == null ? nic.getName() : nic.getDisplayName();
-                if (VIRTUAL_ALIAS.matcher(alias).find()) {
-                    continue;
-                }
                 for (InetAddress address : Collections.list(nic.getInetAddresses())) {
                     if (!(address instanceof Inet4Address) || address.isLoopbackAddress()) {
                         continue;
@@ -55,14 +56,11 @@ public final class LanAddresses {
                     if (!isUsable(host)) {
                         continue;
                     }
-                    int score = 0;
-                    if (!LAN_ALIAS.matcher(alias).find()) {
-                        score += 10;
+                    boolean isHotspot = host.startsWith("192.168.137.") || HOTSPOT_ALIAS.matcher(alias).find();
+                    if (!isHotspot && VIRTUAL_ALIAS.matcher(alias).find()) {
+                        continue;
                     }
-                    if (!isPrivate(host)) {
-                        score += 5;
-                    }
-                    candidates.add(new Candidate(host, score));
+                    candidates.add(new Candidate(host, scoreInterface(alias, host, isHotspot)));
                 }
             }
         } catch (Exception e) {
@@ -77,6 +75,19 @@ public final class LanAddresses {
             }
         }
         return result;
+    }
+
+    static int scoreInterface(String alias, String host, boolean isHotspot) {
+        int score = 0;
+        if (isHotspot) {
+            score += 2;
+        } else if (!LAN_ALIAS.matcher(alias == null ? "" : alias).find()) {
+            score += 10;
+        }
+        if (!isPrivate(host)) {
+            score += 5;
+        }
+        return score;
     }
 
     private static boolean isUsable(String host) {

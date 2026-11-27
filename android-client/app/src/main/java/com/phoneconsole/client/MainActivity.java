@@ -5,10 +5,12 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -35,6 +37,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 
 import com.google.gson.JsonObject;
 import com.phoneconsole.client.camera.CameraPanelController;
@@ -47,6 +50,7 @@ import com.phoneconsole.client.model.SessionMessage;
 import com.phoneconsole.client.model.TelemetryMessage;
 import com.phoneconsole.client.net.ChannelStore;
 import com.phoneconsole.client.net.ConnectionManager;
+import com.phoneconsole.client.receiver.PowerConnectionReceiver;
 import com.phoneconsole.client.screen.H264Decoder;
 import com.phoneconsole.client.ui.FpsSparklineView;
 import com.phoneconsole.client.ui.Haptics;
@@ -84,6 +88,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private static final String DEFAULT_PORT = "8500";
     private static final String UI_PREFS = "ui_theme_prefs";
     private static final String KEY_HOTKEY_BAR = "show_hotkey_bar";
+    private static final String KEY_KEEP_SCREEN_ON = "keep_screen_on";
 
     private static final Map<String, String> MEDIA_BUTTON_ALIAS = Map.of(
             "media_vol_up", "btn_vol_up",
@@ -270,6 +275,25 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     private TextView btnReconnect;
     private TextView btnScanQr;
     private TextView tvSessionDetail;
+    private TextView tvUsbUnlockSectionLabel;
+    private View usbUnlockCard;
+    private TextView tvKeepScreenOnLabel;
+    private TextView tvPcAutoUnlockLabel;
+    private TextView tvPcWirelessUnlockLabel;
+    private View wirelessDivider;
+    private SwitchCompat switchKeepScreenOn;
+    private SwitchCompat switchPcAutoUnlock;
+    private SwitchCompat switchPcWirelessUnlock;
+    private EditText etPcUnlockPwd;
+    private EditText etPcWirelessEndpoint;
+    private TextView btnSaveUsbUnlock;
+    private TextView btnClearUsbUnlockPwd;
+    private TextView btnTestUsbUnlock;
+    private TextView btnOpenWirelessSettings;
+    private TextView tvUsbUnlockStatus;
+    private boolean keepScreenOn = true;
+    private boolean suppressUsbUnlockUi;
+    private ConnectionManager.UsbUnlockState usbUnlockState = new ConnectionManager.UsbUnlockState();
     private final List<ChannelStore.Channel> channels = new ArrayList<>();
     private int channelIndex;
     private boolean suppressChannelCallback;
@@ -296,9 +320,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         currentTheme = ThemeManager.load(this);
         SharedPreferences uiPrefs = getSharedPreferences(UI_PREFS, MODE_PRIVATE);
         showHotkeyBar = uiPrefs.getBoolean(KEY_HOTKEY_BAR, true);
+        keepScreenOn = uiPrefs.getBoolean(KEY_KEEP_SCREEN_ON, true);
 
         super.onCreate(savedInstanceState);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        applyKeepScreenOnFlag();
         setContentView(R.layout.activity_main);
 
         scanLauncher = registerForActivityResult(
@@ -390,6 +415,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
 
+        handler.removeCallbacks(clearConfirmRunnable);
+        armedConfirmBtn = null;
         if (h264Decoder != null) {
             h264Decoder.stop();
         }
@@ -597,6 +624,22 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         btnReconnect = findViewById(R.id.btnReconnect);
         btnScanQr = findViewById(R.id.btnScanQr);
         tvSessionDetail = findViewById(R.id.tvSessionDetail);
+        tvUsbUnlockSectionLabel = findViewById(R.id.tvUsbUnlockSectionLabel);
+        usbUnlockCard = findViewById(R.id.usbUnlockCard);
+        tvKeepScreenOnLabel = findViewById(R.id.tvKeepScreenOnLabel);
+        tvPcAutoUnlockLabel = findViewById(R.id.tvPcAutoUnlockLabel);
+        tvPcWirelessUnlockLabel = findViewById(R.id.tvPcWirelessUnlockLabel);
+        wirelessDivider = findViewById(R.id.wirelessDivider);
+        switchKeepScreenOn = findViewById(R.id.switchKeepScreenOn);
+        switchPcAutoUnlock = findViewById(R.id.switchPcAutoUnlock);
+        switchPcWirelessUnlock = findViewById(R.id.switchPcWirelessUnlock);
+        etPcUnlockPwd = findViewById(R.id.etPcUnlockPwd);
+        etPcWirelessEndpoint = findViewById(R.id.etPcWirelessEndpoint);
+        btnSaveUsbUnlock = findViewById(R.id.btnSaveUsbUnlock);
+        btnClearUsbUnlockPwd = findViewById(R.id.btnClearUsbUnlockPwd);
+        btnTestUsbUnlock = findViewById(R.id.btnTestUsbUnlock);
+        btnOpenWirelessSettings = findViewById(R.id.btnOpenWirelessSettings);
+        tvUsbUnlockStatus = findViewById(R.id.tvUsbUnlockStatus);
     }
 
     // ---------------- 导航与弹窗 ----------------
@@ -770,6 +813,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                 @Override
                 public void onStartTrackingTouch(SeekBar bar) {
                     userDraggingVolume = true;
+                    if (lastVolumeSent < 0) {
+                        lastVolumeSent = bar.getProgress();
+                    }
                 }
 
                 @Override
@@ -829,9 +875,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                 btn.setText(label);
                 ThemeManager.styleSoftAccentButton(btn, currentTheme, false);
                 Haptics.tap(this);
-                if ("sleep".equals(action)) {
-                    connection.sendAction(DEFAULT_PAGE_ID, "sleep", "click");
-                } else {
+                if (connection != null) {
                     connection.sendQuickHotkey(action);
                 }
                 return;
@@ -1056,13 +1100,27 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         tpQuickHotkeyRow.removeAllViews();
 
         // 默认高频配合鼠标使用的快捷键
-        addHotkeyChip("截屏", () -> connection.sendQuickHotkey("win+shift+s"), false);
-        addHotkeyChip("切窗", () -> connection.sendAction(DEFAULT_PAGE_ID, "btn_alt_tab", "click"), false);
-        addHotkeyChip("桌面", () -> connection.sendQuickHotkey("win+d"), false);
-        addHotkeyChip("复制", () -> connection.sendQuickHotkey("ctrl+c"), false);
-        addHotkeyChip("粘贴", () -> connection.sendQuickHotkey("ctrl+v"), false);
-        addHotkeyChip("撤销", () -> connection.sendQuickHotkey("ctrl+z"), false);
-        addHotkeyChip("任务管理", () -> connection.sendQuickHotkey("ctrl+shift+esc"), false);
+        addHotkeyChip("截屏", () -> {
+            if (connection != null) connection.sendQuickHotkey("win+shift+s");
+        }, false);
+        addHotkeyChip("切窗", () -> {
+            if (connection != null) connection.sendQuickHotkey("alt+tab");
+        }, false);
+        addHotkeyChip("桌面", () -> {
+            if (connection != null) connection.sendQuickHotkey("win+d");
+        }, false);
+        addHotkeyChip("复制", () -> {
+            if (connection != null) connection.sendQuickHotkey("ctrl+c");
+        }, false);
+        addHotkeyChip("粘贴", () -> {
+            if (connection != null) connection.sendQuickHotkey("ctrl+v");
+        }, false);
+        addHotkeyChip("撤销", () -> {
+            if (connection != null) connection.sendQuickHotkey("ctrl+z");
+        }, false);
+        addHotkeyChip("任务管理", () -> {
+            if (connection != null) connection.sendQuickHotkey("ctrl+shift+esc");
+        }, false);
 
         // 保留服务端 config.json 里用户自定义的其它按键（剔除已合并到总览页的媒体键）
         for (ButtonItem item : serverCustomButtons) {
@@ -1433,6 +1491,42 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             ThemeManager.styleAltSurface(tvSessionDetail, currentTheme);
             tvSessionDetail.setTextColor(currentTheme.textSecondary);
         }
+        if (tvUsbUnlockSectionLabel != null) {
+            tvUsbUnlockSectionLabel.setTextColor(currentTheme.textSecondary);
+        }
+        if (usbUnlockCard != null) {
+            ThemeManager.styleAltSurface(usbUnlockCard, currentTheme);
+        }
+        if (wirelessDivider != null) {
+            wirelessDivider.setBackgroundColor(currentTheme.border);
+        }
+        for (TextView lbl : new TextView[]{tvKeepScreenOnLabel, tvPcAutoUnlockLabel, tvPcWirelessUnlockLabel}) {
+            if (lbl != null) {
+                lbl.setTextColor(currentTheme.textPrimary);
+            }
+        }
+        if (etPcUnlockPwd != null) {
+            ThemeManager.styleInput(etPcUnlockPwd, currentTheme);
+        }
+        if (etPcWirelessEndpoint != null) {
+            ThemeManager.styleInput(etPcWirelessEndpoint, currentTheme);
+        }
+        if (btnSaveUsbUnlock != null) {
+            ThemeManager.stylePillButton(btnSaveUsbUnlock, currentTheme, true, false);
+        }
+        if (btnClearUsbUnlockPwd != null) {
+            ThemeManager.styleSoftAccentButton(btnClearUsbUnlockPwd, currentTheme, false);
+        }
+        if (btnTestUsbUnlock != null) {
+            ThemeManager.styleSoftAccentButton(btnTestUsbUnlock, currentTheme, false);
+        }
+        if (btnOpenWirelessSettings != null) {
+            ThemeManager.styleSoftAccentButton(btnOpenWirelessSettings, currentTheme, false);
+        }
+        if (tvUsbUnlockStatus != null) {
+            tvUsbUnlockStatus.setTextColor(usbUnlockState.needInputPermission
+                    ? currentTheme.danger : currentTheme.textSecondary);
+        }
     }
 
     // ---------------- 连接设置底部弹窗 ----------------
@@ -1462,6 +1556,10 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                 etServerHost.setText(channel.host);
                 etServerPort.setText(String.valueOf(channel.port));
                 ChannelStore.save(MainActivity.this, channels, channelIndex);
+                if (connection != null && !"127.0.0.1".equals(channel.host)
+                        && !"localhost".equalsIgnoreCase(channel.host)) {
+                    connection.setLanEndpoint(channel.endpoint());
+                }
             }
 
             @Override
@@ -1474,7 +1572,173 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         if (btnReconnect != null) {
             btnReconnect.setOnClickListener(v -> saveAndReconnect());
         }
+        setupUsbUnlockSettings();
         reloadChannels();
+    }
+
+    private void setupUsbUnlockSettings() {
+        if (switchKeepScreenOn != null) {
+            switchKeepScreenOn.setOnCheckedChangeListener(null);
+            switchKeepScreenOn.setChecked(keepScreenOn);
+            switchKeepScreenOn.setOnCheckedChangeListener((v, checked) -> {
+                keepScreenOn = checked;
+                getSharedPreferences(UI_PREFS, MODE_PRIVATE).edit()
+                        .putBoolean(KEY_KEEP_SCREEN_ON, checked).apply();
+                applyKeepScreenOnFlag();
+            });
+        }
+        if (switchPcAutoUnlock != null) {
+            switchPcAutoUnlock.setOnCheckedChangeListener((v, checked) -> {
+                if (suppressUsbUnlockUi) {
+                    return;
+                }
+                PowerConnectionReceiver.setLocalAutoWakeEnabled(this, checked);
+                if (connected && connection != null) {
+                    syncUsbUnlockToPc(false);
+                } else {
+                    Toast.makeText(this, checked ? "已开启本机插线亮屏" : "已关闭本机插线亮屏",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+        if (switchPcWirelessUnlock != null) {
+            switchPcWirelessUnlock.setOnCheckedChangeListener((v, checked) -> {
+                if (!suppressUsbUnlockUi) {
+                    syncUsbUnlockToPc(false);
+                }
+            });
+        }
+        if (btnSaveUsbUnlock != null) {
+            btnSaveUsbUnlock.setOnClickListener(v -> syncUsbUnlockToPc(false));
+        }
+        if (btnClearUsbUnlockPwd != null) {
+            btnClearUsbUnlockPwd.setOnClickListener(v -> syncUsbUnlockToPc(true));
+        }
+        if (btnTestUsbUnlock != null) {
+            btnTestUsbUnlock.setOnClickListener(v -> {
+                if (!connected || connection == null) {
+                    Toast.makeText(this, "请先连接 PC 服务端", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String typedEndpoint = etPcWirelessEndpoint != null
+                        ? etPcWirelessEndpoint.getText().toString().trim() : "";
+                String prevEndpoint = usbUnlockState.wirelessEndpoint == null ? "" : usbUnlockState.wirelessEndpoint;
+                if (!typedEndpoint.equals(prevEndpoint)) {
+                    syncUsbUnlockToPc(false);
+                }
+                connection.sendUsbUnlockTest("all");
+                Toast.makeText(this, "已请求 PC 测试亮屏、解锁与启动", Toast.LENGTH_SHORT).show();
+            });
+        }
+        if (btnOpenWirelessSettings != null) {
+            btnOpenWirelessSettings.setOnClickListener(v -> openDeveloperSettings());
+        }
+        renderUsbUnlockUi();
+    }
+
+    private void applyKeepScreenOnFlag() {
+        if (keepScreenOn) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    private void syncUsbUnlockToPc(boolean clearPassword) {
+        if (!connected || connection == null) {
+            renderUsbUnlockUi();
+            Toast.makeText(this, "需连接 PC 后才可同步到服务端", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        boolean enabled = switchPcAutoUnlock != null ? switchPcAutoUnlock.isChecked() : usbUnlockState.enabled;
+        PowerConnectionReceiver.setLocalAutoWakeEnabled(this, enabled);
+        boolean wirelessEnabled = switchPcWirelessUnlock != null
+                ? switchPcWirelessUnlock.isChecked() : usbUnlockState.wirelessEnabled;
+        String wirelessEndpoint = etPcWirelessEndpoint != null
+                ? etPcWirelessEndpoint.getText().toString().trim()
+                : (usbUnlockState.wirelessEndpoint == null ? "" : usbUnlockState.wirelessEndpoint);
+        String newPwd = etPcUnlockPwd != null ? etPcUnlockPwd.getText().toString() : "";
+        connection.sendUsbUnlockConfig(
+                enabled,
+                usbUnlockState.triggerMode == null ? "on_connect" : usbUnlockState.triggerMode,
+                true,
+                true,
+                clearPassword ? null : newPwd,
+                clearPassword,
+                wirelessEnabled,
+                wirelessEndpoint,
+                true);
+        if (etPcUnlockPwd != null) {
+            etPcUnlockPwd.setText("");
+        }
+        Toast.makeText(this, clearPassword ? "已请求清空 PC 侧锁屏密码" : "已同步唤醒与无线设置到 PC",
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void renderUsbUnlockUi() {
+        suppressUsbUnlockUi = true;
+        if (switchPcAutoUnlock != null) {
+            boolean checked = connected ? usbUnlockState.enabled
+                    : PowerConnectionReceiver.isLocalAutoWakeEnabled(this);
+            switchPcAutoUnlock.setChecked(checked);
+            switchPcAutoUnlock.setEnabled(true);
+        }
+        if (switchPcWirelessUnlock != null) {
+            switchPcWirelessUnlock.setChecked(usbUnlockState.wirelessEnabled);
+            switchPcWirelessUnlock.setEnabled(connected);
+        }
+        if (etPcWirelessEndpoint != null) {
+            etPcWirelessEndpoint.setEnabled(connected);
+            if (!etPcWirelessEndpoint.hasFocus()) {
+                etPcWirelessEndpoint.setText(usbUnlockState.wirelessEndpoint == null ? "" : usbUnlockState.wirelessEndpoint);
+            }
+        }
+        if (etPcUnlockPwd != null) {
+            etPcUnlockPwd.setEnabled(connected);
+            etPcUnlockPwd.setHint(usbUnlockState.hasPassword
+                    ? "已设 " + usbUnlockState.passwordLength + " 位密码（输入新密码可更新）"
+                    : "锁屏密码（留空仅亮屏上滑）");
+        }
+        for (View v : new View[]{btnSaveUsbUnlock, btnClearUsbUnlockPwd, btnTestUsbUnlock}) {
+            if (v != null) {
+                v.setEnabled(connected);
+                v.setAlpha(connected ? 1f : 0.48f);
+            }
+        }
+        if (tvUsbUnlockStatus != null) {
+            String wirelessState = usbUnlockState.wirelessConnected
+                    ? "无线 ADB 已连接"
+                    : (usbUnlockState.wirelessEnabled ? "无线待连接" : "无线未开启");
+            String hint;
+            if (!connected) {
+                hint = "未连接 PC：可先开关本地插线亮屏；连上 PC 后可同步密码与无线调试";
+            } else if (usbUnlockState.lastResult != null && !usbUnlockState.lastResult.isEmpty()) {
+                hint = wirelessState + " · " + usbUnlockState.lastResult;
+            } else {
+                hint = wirelessState + " · " + (usbUnlockState.hasPassword ? "已设置锁屏密码" : "未设置锁屏密码")
+                        + " · 小米需在开发者选项开「USB 调试（安全设置）」";
+            }
+            tvUsbUnlockStatus.setText(hint);
+            tvUsbUnlockStatus.setTextColor(usbUnlockState.needInputPermission
+                    ? currentTheme.danger : currentTheme.textSecondary);
+        }
+        suppressUsbUnlockUi = false;
+    }
+
+    private void openDeveloperSettings() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            try {
+                Intent fallback = new Intent(Settings.ACTION_SETTINGS);
+                fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(fallback);
+            } catch (Exception ex) {
+                Toast.makeText(this, "无法打开系统设置：" + ex.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     private void openSettingsSheet() {
@@ -1483,6 +1747,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         renderChannelSpinner();
         renderSessionDetail();
+        renderUsbUnlockUi();
         if (sheetSettingsBackdrop != null) {
             sheetSettingsBackdrop.setVisibility(View.VISIBLE);
             applySettingsSheetStyles();
@@ -1651,10 +1916,14 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                         return;
                     }
                     String name = nameInput.getText().toString().trim();
-                    channels.add(new ChannelStore.Channel(name.isEmpty() ? host : name, host, port));
+                    ChannelStore.Channel added = new ChannelStore.Channel(name.isEmpty() ? host : name, host, port);
+                    channels.add(added);
                     channelIndex = channels.size() - 1;
                     ChannelStore.save(this, channels, channelIndex);
                     renderChannelSpinner();
+                    if (connection != null && !"127.0.0.1".equals(host) && !"localhost".equalsIgnoreCase(host)) {
+                        connection.setLanEndpoint(added.endpoint());
+                    }
                 })
                 .show();
     }
@@ -1821,7 +2090,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
 
         speakerMuted = telemetry.isMuted;
         micMuted = telemetry.micMuted;
-        int volume = speakerMuted ? 0 : Math.max(0, Math.min(100, telemetry.volume));
+        int volume = Math.max(0, Math.min(100, telemetry.volume));
         if (!userDraggingVolume && seekVolume != null) {
             seekVolume.setProgress(volume);
             if (tvVolumeValue != null) {
@@ -1871,6 +2140,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
         updateScreenUi();
         renderSessionDetail();
+        renderUsbUnlockUi();
     }
 
     @Override
@@ -1884,6 +2154,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         renderConnStatus();
         updateScreenUi();
         renderSessionDetail();
+        renderUsbUnlockUi();
     }
 
     @Override
@@ -1975,6 +2246,15 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
         }
     }
 
+    @Override
+    public void onUsbUnlockState(ConnectionManager.UsbUnlockState state) {
+        if (state == null) {
+            return;
+        }
+        this.usbUnlockState = state;
+        renderUsbUnlockUi();
+    }
+
     // ---------------- 状态栏 / 显示器 / 投屏实现 ----------------
 
     private void renderConnStatus() {
@@ -1983,12 +2263,30 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
                     connected ? currentTheme.ok : currentTheme.textMuted, Color.TRANSPARENT));
         }
         if (tvConnStatus != null) {
-            String text = connected
-                    ? ("usb".equals(transport) ? "USB 通道" : "Wi-Fi 通道")
-                    : "未连接";
+            String text = connected ? transportSummaryLabel() : "未连接";
             tvConnStatus.setText(text);
             tvConnStatus.setTextColor(connected ? currentTheme.ok : currentTheme.textMuted);
         }
+    }
+
+    private String transportSummaryLabel() {
+        if ("usb".equals(transport)) {
+            return "USB 通道";
+        }
+        if ("wireless_adb".equals(transport)) {
+            return "无线 ADB";
+        }
+        return "Wi-Fi 通道";
+    }
+
+    private String transportDetailLabel() {
+        if ("usb".equals(transport)) {
+            return "USB 有线（adb reverse）";
+        }
+        if ("wireless_adb".equals(transport)) {
+            return "无线 ADB（Wi-Fi 隧道）";
+        }
+        return "Wi-Fi 局域网";
     }
 
     private void updateDisplayCard(TelemetryMessage telemetry) {
@@ -2309,10 +2607,9 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
             return;
         }
         String lan = connection == null ? "" : connection.getLanEndpoint();
-        tvSessionDetail.setText("USB 隧道：ws://127.0.0.1:8500\n"
+        tvSessionDetail.setText("ADB 隧道：ws://127.0.0.1:8500\n"
                 + "局域网地址：" + (lan == null || lan.isEmpty() ? "未设置" : lan) + "\n"
-                + "状态：" + (connected ? "已连接" : "未连接") + " · "
-                + ("usb".equals(transport) ? "USB（adb reverse）" : "Wi-Fi 局域网") + "\n"
+                + "状态：" + (connected ? "已连接" : "未连接") + " · " + transportDetailLabel() + "\n"
                 + "屏幕监视：" + (screenAllowed ? "可用" : "不可用"));
     }
 
@@ -2343,13 +2640,16 @@ public class MainActivity extends AppCompatActivity implements ConnectionManager
     }
 
     private void applyVolumeByDelta(int percent) {
+        if (connection == null) {
+            return;
+        }
         lastVolumeInputAt = System.currentTimeMillis();
         if (lastVolumeSent < 0) {
             lastVolumeSent = percent;
             return;
         }
         int diff = percent - lastVolumeSent;
-        if (Math.abs(diff) < 2) {
+        if (diff == 0 || (Math.abs(diff) < 2 && percent > 0 && percent < 100)) {
             return;
         }
         int steps = Math.min(25, Math.max(1, Math.round(Math.abs(diff) / 2f)));

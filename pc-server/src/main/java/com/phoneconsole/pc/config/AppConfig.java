@@ -12,6 +12,7 @@ public class AppConfig {
     public Network network = new Network();
     public Screen screen = new Screen();
     public Camera camera = new Camera();
+    public AutoUnlock autoUnlock = new AutoUnlock();
     public String defaultPageId = "default_page";
     public List<PageConfig> pages = new ArrayList<>();
     public List<AppBinding> appBindings = new ArrayList<>();
@@ -67,6 +68,27 @@ public class AppConfig {
         /** 水平镜像 / 垂直翻转 */
         public boolean mirrorHorizontal = false;
         public boolean mirrorVertical = false;
+    }
+
+    /** USB 有线 / 无线调试接入自动亮屏、输入密码解锁并打开手机端 App */
+    public static class AutoUnlock {
+        public boolean enabled = true;
+        /** 是否启用无线调试（ADB over Wi-Fi）自动连接与亮屏解锁 */
+        public boolean wirelessEnabled = false;
+        /** 无线调试地址 IP:端口，例如 10.26.3.135:33007 */
+        public String wirelessEndpoint = "";
+        /** 当固定端口连接失败时，自动通过 adb mdns services 发现 _adb-tls-connect._tcp 端口 */
+        public boolean wirelessMdnsAutoDiscover = true;
+        /** on_connect（每次连接触发）| on_startup（仅服务启动首次上线触发） */
+        public String triggerMode = "on_connect";
+        /** 手机锁屏密码（留空则仅亮屏上滑，不输入密码） */
+        public String password = "";
+        /** 解锁前上滑调出密码界面 */
+        public boolean swipeToUnlock = true;
+        /** 解锁后自动拉起手机端应用 */
+        public boolean launchApp = true;
+        public String packageName = "com.phoneconsole.client";
+        public String activityName = "com.phoneconsole.client.MainActivity";
     }
 
     /** 一个手机端页面（一屏按钮） */

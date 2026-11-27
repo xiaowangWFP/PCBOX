@@ -54,12 +54,13 @@
             android:exported="false"
             android:foregroundServiceType="camera" />
 
-        <!-- 插上 USB 线自动拉起应用 -->
+        <!-- 插上 USB 线或 PC ADB 唤醒时亮屏 / 拉起应用 -->
         <receiver
             android:name=".receiver.PowerConnectionReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="com.phoneconsole.client.ACTION_WAKE_UP" />
             </intent-filter>
         </receiver>
     </application>

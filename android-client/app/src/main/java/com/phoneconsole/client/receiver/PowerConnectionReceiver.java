@@ -9,16 +9,40 @@ import android.util.Log;
 import com.phoneconsole.client.MainActivity;
 
 /**
- * 插上 USB 线时唤醒屏幕并拉起应用。
- * 注意：Android 10+ 对后台启动 Activity 有限制，若被系统拦截可改用前台服务或通知引导。
+ * 插上 USB 线或收到 PC ADB 唤醒广播时，按设置唤醒屏幕并拉起应用。
  */
 public class PowerConnectionReceiver extends BroadcastReceiver {
 
     private static final String TAG = "PowerConnectionReceiver";
+    private static final String PREFS = "phone_console";
+    private static final String KEY_LOCAL_AUTO_WAKE = "local_usb_auto_wake";
+    public static final String ACTION_WAKE_UP = "com.phoneconsole.client.ACTION_WAKE_UP";
+
+    public static boolean isLocalAutoWakeEnabled(Context context) {
+        return context.getApplicationContext()
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_LOCAL_AUTO_WAKE, true);
+    }
+
+    public static void setLocalAutoWakeEnabled(Context context, boolean enabled) {
+        context.getApplicationContext()
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_LOCAL_AUTO_WAKE, enabled)
+                .apply();
+    }
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (intent == null || !Intent.ACTION_POWER_CONNECTED.equals(intent.getAction())) {
+        if (intent == null) {
+            return;
+        }
+        String action = intent.getAction();
+        if (ACTION_WAKE_UP.equals(action)) {
+            wakeScreen(context);
+            return;
+        }
+        if (!Intent.ACTION_POWER_CONNECTED.equals(action) || !isLocalAutoWakeEnabled(context)) {
             return;
         }
         wakeScreen(context);

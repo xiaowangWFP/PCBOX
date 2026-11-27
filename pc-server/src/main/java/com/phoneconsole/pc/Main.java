@@ -4,6 +4,7 @@ import com.phoneconsole.pc.camera.CameraBridgeService;
 import com.phoneconsole.pc.config.AppConfig;
 import com.phoneconsole.pc.config.ConfigStore;
 import com.phoneconsole.pc.core.ActionEngine;
+import com.phoneconsole.pc.net.AdbAutoUnlockService;
 import com.phoneconsole.pc.net.AdbPortForwarder;
 import com.phoneconsole.pc.net.AdminApi;
 import com.phoneconsole.pc.net.ControlWebSocketServer;
@@ -73,6 +74,8 @@ public final class Main {
 
         int camForwardPort = (config.camera != null && config.camera.enabled) ? config.camera.rtspPort : 0;
         AdbPortForwarder adb = new AdbPortForwarder(config.network, config.network.wsPort, camForwardPort);
+        AdbAutoUnlockService autoUnlock = new AdbAutoUnlockService(
+                adb, () -> wsServer.currentConfig() != null ? wsServer.currentConfig().autoUnlock : null);
         WindowWatcher watcher = new WindowWatcher(config, wsServer);
         CameraBridgeService cameraBridge = new CameraBridgeService(
                 wsServer::currentConfig,
@@ -89,7 +92,18 @@ public final class Main {
                 });
         wsServer.setCameraBridge(cameraBridge);
         ConsoleRuntime runtime = new ConsoleRuntime(
-                configPath, config, engine, wsServer, adb, watcher, cameraBridge);
+                configPath, config, engine, wsServer, adb, autoUnlock, watcher, cameraBridge);
+        adb.setAutoUnlockSupplier(() -> wsServer.currentConfig() != null ? wsServer.currentConfig().autoUnlock : null);
+        wsServer.setWiredAdbSupplier(adb::hasWiredOnline);
+        adb.setDeviceObserver(devices -> {
+            autoUnlock.onOnlineDevices(devices);
+            wsServer.refreshPhoneSessions();
+        });
+        autoUnlock.setStateListener(wsServer::broadcastUsbUnlockState);
+        wsServer.setUsbUnlockBridge(
+                autoUnlock::statusMap,
+                runtime::updateUsbUnlock,
+                runtime::triggerUsbUnlockNow);
 
         StaticHttpServer httpServer = new StaticHttpServer(
                 config.network.httpPort, runtime::config, new AdminApi(runtime));
@@ -113,7 +127,7 @@ public final class Main {
             if (tray != null) {
                 tray.remove();
             }
-            shutdown(wsServer, httpServer, telemetry, adb, watcher, cameraBridge, engine);
+            shutdown(wsServer, httpServer, telemetry, adb, autoUnlock, watcher, cameraBridge, engine);
         }, "shutdown-hook"));
 
         log.info("PC 服务端已就绪（调试页面：{}），按 Ctrl+C 退出", debugUrl);
@@ -125,6 +139,7 @@ public final class Main {
                                  StaticHttpServer httpServer,
                                  TelemetryService telemetry,
                                  AdbPortForwarder adb,
+                                 AdbAutoUnlockService autoUnlock,
                                  WindowWatcher watcher,
                                  CameraBridgeService cameraBridge,
                                  ActionEngine engine) {
@@ -132,6 +147,7 @@ public final class Main {
         stopQuietly("WebSocket 服务", () -> wsServer.stop(1000));
         stopQuietly("静态资源服务", httpServer::stop);
         stopQuietly("遥测线程", telemetry::stop);
+        stopQuietly("ADB 自动解锁", autoUnlock::stop);
         stopQuietly("ADB 线程", adb::stop);
         stopQuietly("窗口感知", watcher::stop);
         stopQuietly("动作引擎", engine::shutdown);

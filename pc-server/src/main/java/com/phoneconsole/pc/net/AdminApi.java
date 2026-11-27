@@ -43,6 +43,16 @@ public final class AdminApi {
                     return post ? methodNotAllowed(path) : adbStatus();
                 case "/api/adb/reverse":
                     return post ? adbRebuild() : methodNotAllowed(path);
+                case "/api/adb/unlock":
+                    return post ? adbUnlockNow(body) : methodNotAllowed(path);
+                case "/api/adb/unlock-config":
+                    return post ? adbUnlockConfig(body) : methodNotAllowed(path);
+                case "/api/adb/wireless/pair":
+                    return post ? adbWirelessPair(body) : methodNotAllowed(path);
+                case "/api/adb/wireless/connect":
+                    return post ? adbWirelessConnect(body) : methodNotAllowed(path);
+                case "/api/adb/wireless/disconnect":
+                    return post ? adbWirelessDisconnect(body) : methodNotAllowed(path);
                 case "/api/logs":
                     return post ? methodNotAllowed(path) : logs(query);
                 case "/api/logs/clear":
@@ -100,6 +110,68 @@ public final class AdminApi {
     private Response adbRebuild() {
         runtime.adb().rebuild();
         return json(200, adbPayload());
+    }
+
+    private Response adbUnlockNow(String body) {
+        String mode = "all";
+        if (body != null && !body.isBlank()) {
+            try {
+                JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+                if (json.has("mode") && !json.get("mode").isJsonNull()) {
+                    mode = json.get("mode").getAsString();
+                }
+            } catch (Exception e) {
+                return error(400, "请求 JSON 无效：" + e.getMessage());
+            }
+        }
+        return json(200, runtime.triggerUsbUnlockNow(mode));
+    }
+
+    private Response adbUnlockConfig(String body) {
+        if (body == null || body.isBlank()) {
+            return error(400, "请求体为空");
+        }
+        try {
+            JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+            return json(200, runtime.updateUsbUnlock(json));
+        } catch (Exception e) {
+            return error(400, "请求 JSON 无效：" + e.getMessage());
+        }
+    }
+
+    private Response adbWirelessPair(String body) {
+        JsonObject json = parseOptionalJson(body);
+        if (json == null && body != null && !body.isBlank()) {
+            return error(400, "请求 JSON 无效");
+        }
+        return json(200, runtime.pairWireless(json));
+    }
+
+    private Response adbWirelessConnect(String body) {
+        JsonObject json = parseOptionalJson(body);
+        if (json == null && body != null && !body.isBlank()) {
+            return error(400, "请求 JSON 无效");
+        }
+        return json(200, runtime.connectWireless(json));
+    }
+
+    private Response adbWirelessDisconnect(String body) {
+        JsonObject json = parseOptionalJson(body);
+        if (json == null && body != null && !body.isBlank()) {
+            return error(400, "请求 JSON 无效");
+        }
+        return json(200, runtime.disconnectWireless(json));
+    }
+
+    private JsonObject parseOptionalJson(String body) {
+        if (body == null || body.isBlank()) {
+            return new JsonObject();
+        }
+        try {
+            return JsonParser.parseString(body).getAsJsonObject();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private Map<String, Object> adbPayload() {

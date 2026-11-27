@@ -87,6 +87,9 @@ public final class ConfigStore {
         if (config.camera == null) {
             config.camera = new AppConfig.Camera();
         }
+        if (config.autoUnlock == null) {
+            config.autoUnlock = new AppConfig.AutoUnlock();
+        }
         if (config.pages == null) {
             config.pages = new ArrayList<>();
         }
@@ -176,6 +179,7 @@ public final class ConfigStore {
         }
         normalizeScreen(config.screen, errors);
         normalizeCamera(config.camera, errors);
+        normalizeAutoUnlock(config.autoUnlock, errors);
 
         List<AppConfig.AppBinding> validBindings = new ArrayList<>();
         for (AppConfig.AppBinding binding : config.appBindings) {
@@ -248,6 +252,47 @@ public final class ConfigStore {
         camera.facing = "back".equals(facing) ? "back" : "front";
         int rot = ((camera.rotation % 360) + 360) % 360;
         camera.rotation = (rot / 90) * 90;
+    }
+
+    private static void normalizeAutoUnlock(AppConfig.AutoUnlock unlock, List<String> errors) {
+        unlock.triggerMode = "on_startup".equalsIgnoreCase(unlock.triggerMode)
+                ? "on_startup" : "on_connect";
+        if (unlock.password == null) {
+            unlock.password = "";
+        }
+        unlock.wirelessEndpoint = unlock.wirelessEndpoint == null
+                ? "" : unlock.wirelessEndpoint.trim();
+        if (!unlock.wirelessEndpoint.isEmpty() && !isValidHostPort(unlock.wirelessEndpoint)) {
+            errors.add("autoUnlock.wirelessEndpoint 格式需为 IP:端口（如 10.26.3.135:33007）");
+        }
+        if (unlock.packageName == null || unlock.packageName.isBlank()) {
+            unlock.packageName = "com.phoneconsole.client";
+        }
+        if (unlock.activityName == null || unlock.activityName.isBlank()) {
+            unlock.activityName = "com.phoneconsole.client.MainActivity";
+        }
+    }
+
+    public static boolean isValidHostPort(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            return false;
+        }
+        String trimmed = endpoint.trim();
+        int idx = trimmed.lastIndexOf(':');
+        if (idx <= 0 || idx >= trimmed.length() - 1) {
+            return false;
+        }
+        String host = trimmed.substring(0, idx).trim();
+        String portText = trimmed.substring(idx + 1).trim();
+        if (host.isEmpty() || host.matches(".*\\s+.*") || !portText.matches("\\d+")) {
+            return false;
+        }
+        try {
+            int port = Integer.parseInt(portText);
+            return port >= 1 && port <= 65535;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     private static void validateAction(String pageId, AppConfig.ButtonConfig button, List<String> errors) {

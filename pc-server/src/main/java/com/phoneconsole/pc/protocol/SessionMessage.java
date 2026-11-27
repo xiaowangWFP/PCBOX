@@ -6,7 +6,7 @@ package com.phoneconsole.pc.protocol;
  */
 public class SessionMessage {
     public String type = "session";
-    /** usb | lan */
+    /** usb | wireless_adb | lan */
     public String transport;
     /** 是否允许开启屏幕监视推流 */
     public boolean screenStream;
