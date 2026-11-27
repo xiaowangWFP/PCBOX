@@ -53,9 +53,15 @@ public class ControlWebSocketServer extends WebSocketServer {
     private static final String CLIENT_PHONE = "phone";
     /** 每条连接的客户端类型：默认手机端，收到 client_hello 后按声明改写 */
     private final Map<WebSocket, String> clientKinds = new ConcurrentHashMap<>();
+    /** 每条手机连接最近一次下发的通道类型（usb | wireless_adb | lan） */
+    private final Map<WebSocket, String> clientTransports = new ConcurrentHashMap<>();
     /** 遥测快照提供方：连接建立时立即给新客户端一帧 */
     private volatile java.util.function.Supplier<String> telemetrySource;
     private volatile CameraBridgeService cameraBridge;
+    private volatile java.util.function.BooleanSupplier wiredAdbCheck;
+    private volatile java.util.function.Supplier<Map<String, Object>> usbUnlockStatusSource;
+    private volatile Consumer<JsonObject> usbUnlockConfigHandler;
+    private volatile Consumer<String> usbUnlockTestHandler;
 
     public void setTelemetrySource(java.util.function.Supplier<String> source) {
         this.telemetrySource = source;
@@ -63,6 +69,18 @@ public class ControlWebSocketServer extends WebSocketServer {
 
     public void setCameraBridge(CameraBridgeService cameraBridge) {
         this.cameraBridge = cameraBridge;
+    }
+
+    public void setWiredAdbSupplier(java.util.function.BooleanSupplier check) {
+        this.wiredAdbCheck = check;
+    }
+
+    public void setUsbUnlockBridge(java.util.function.Supplier<Map<String, Object>> statusSource,
+                                   Consumer<JsonObject> configHandler,
+                                   Consumer<String> testHandler) {
+        this.usbUnlockStatusSource = statusSource;
+        this.usbUnlockConfigHandler = configHandler;
+        this.usbUnlockTestHandler = testHandler;
     }
 
     public AppConfig currentConfig() {
@@ -219,16 +237,13 @@ public class ControlWebSocketServer extends WebSocketServer {
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         clientKinds.put(conn, CLIENT_PHONE);
-        boolean usb = isUsbChannel(conn);
-        log.info("手机端接入：{}（{} 通道）", conn.getRemoteSocketAddress(), usb ? "USB" : "LAN");
-        LogBuffer.get().info("WS", "客户端接入（" + (usb ? "USB" : "LAN") + "）：" + conn.getRemoteSocketAddress());
+        String transportMode = resolveTransport(conn);
+        clientTransports.put(conn, transportMode);
+        String label = transportLabel(transportMode);
+        log.info("手机端接入：{}（{} 通道）", conn.getRemoteSocketAddress(), label);
+        LogBuffer.get().info("WS", "客户端接入（" + label + "）：" + conn.getRemoteSocketAddress());
 
-        SessionMessage session = new SessionMessage();
-        session.transport = usb ? "usb" : "lan";
-        // 屏幕推流不再限定通道：H.264 码率低，USB / 局域网均可使用
-        session.screenStream = true;
-        session.screenMaxFps = usb ? usbFps() : lanFps();
-        conn.send(gson.toJson(session));
+        sendSession(conn, transportMode);
 
         java.util.function.Supplier<String> telemetry = telemetrySource;
         if (telemetry != null) {
@@ -246,6 +261,7 @@ public class ControlWebSocketServer extends WebSocketServer {
             conn.send(gson.toJson(layout));
         }
         sendScreenDevices(conn);
+        sendUsbUnlockState(conn);
         syncPhoneEndpointToCamera();
     }
 
@@ -271,6 +287,7 @@ public class ControlWebSocketServer extends WebSocketServer {
                 String kind = strOf(json, "client", "");
                 if (CLIENT_WEB.equalsIgnoreCase(kind)) {
                     clientKinds.put(conn, CLIENT_WEB);
+                    clientTransports.remove(conn);
                     log.info("网页控制端接入：{}", conn.getRemoteSocketAddress());
                     syncPhoneEndpointToCamera();
                 }
@@ -296,6 +313,18 @@ public class ControlWebSocketServer extends WebSocketServer {
             case "mic_mute" -> engine.toggleMicMute();
             case "deck_key_add" -> handleDeckKeyAdd(json);
             case "deck_key_delete" -> handleDeckKeyDelete(json);
+            case "usb_unlock_config" -> {
+                Consumer<JsonObject> handler = usbUnlockConfigHandler;
+                if (handler != null) {
+                    handler.accept(json);
+                }
+            }
+            case "usb_unlock_test" -> {
+                Consumer<String> handler = usbUnlockTestHandler;
+                if (handler != null) {
+                    handler.accept(strOf(json, "mode", "all"));
+                }
+            }
             default -> log.debug("忽略消息类型：{}", type);
         }
     }
@@ -308,6 +337,7 @@ public class ControlWebSocketServer extends WebSocketServer {
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
         clientKinds.remove(conn);
+        clientTransports.remove(conn);
         log.info("手机端断开：code={} reason={} remote={}", code, reason, remote);
         LogBuffer.get().info("WS", "客户端断开：code=" + code + (reason == null || reason.isBlank() ? "" : " " + reason));
         engine.stopAllRepeats(conn);
@@ -380,6 +410,45 @@ public class ControlWebSocketServer extends WebSocketServer {
         }
     }
 
+    public void broadcastUsbUnlockState(Map<String, Object> state) {
+        if (state == null) {
+            return;
+        }
+        JsonObject msg = gson.toJsonTree(state).getAsJsonObject();
+        msg.addProperty("type", "usb_unlock_state");
+        String payload = gson.toJson(msg);
+        for (WebSocket conn : getConnections()) {
+            if (CLIENT_WEB.equals(clientKinds.get(conn))) {
+                continue;
+            }
+            try {
+                if (conn.isOpen()) {
+                    conn.send(payload);
+                }
+            } catch (Exception ignored) {
+                // ignore
+            }
+        }
+    }
+
+    private void sendUsbUnlockState(WebSocket conn) {
+        java.util.function.Supplier<Map<String, Object>> source = usbUnlockStatusSource;
+        if (source == null || conn == null || !conn.isOpen()) {
+            return;
+        }
+        Map<String, Object> state = source.get();
+        if (state == null) {
+            return;
+        }
+        JsonObject msg = gson.toJsonTree(state).getAsJsonObject();
+        msg.addProperty("type", "usb_unlock_state");
+        try {
+            conn.send(gson.toJson(msg));
+        } catch (Exception ignored) {
+            // ignore
+        }
+    }
+
     private void handleCameraState(WebSocket conn, JsonObject json) {
         clientKinds.put(conn, CLIENT_PHONE);
         CameraBridgeService bridge = cameraBridge;
@@ -416,32 +485,36 @@ public class ControlWebSocketServer extends WebSocketServer {
             return;
         }
         WebSocket selected = null;
+        String selectedTransport = "lan";
         for (WebSocket conn : getConnections()) {
             if (!conn.isOpen() || CLIENT_WEB.equals(clientKinds.get(conn))) {
                 continue;
             }
-            if (isUsbChannel(conn)) {
+            String mode = resolveTransport(conn);
+            if ("usb".equals(mode)) {
                 selected = conn;
+                selectedTransport = mode;
                 break;
             }
-            if (selected == null) {
+            if (selected == null || ("wireless_adb".equals(mode) && "lan".equals(selectedTransport))) {
                 selected = conn;
+                selectedTransport = mode;
             }
         }
         if (selected == null) {
             bridge.onPhoneDisconnected(false);
             return;
         }
-        boolean usb = isUsbChannel(selected);
+        boolean usesAdbTunnel = !"lan".equals(selectedTransport);
         String host = "127.0.0.1";
-        if (!usb) {
+        if (!usesAdbTunnel) {
             try {
                 host = selected.getRemoteSocketAddress().getAddress().getHostAddress();
             } catch (Exception ignored) {
                 host = "127.0.0.1";
             }
         }
-        bridge.onPhoneConnected(usb, host);
+        bridge.onPhoneConnected(usesAdbTunnel, host);
     }
 
     /** 切换页面并广播页面配置 */
@@ -457,10 +530,57 @@ public class ControlWebSocketServer extends WebSocketServer {
         broadcast(gson.toJson(layout));
     }
 
-    /** adb reverse 下手机以回环地址接入，即 USB 高速通道 */
-    private boolean isUsbChannel(WebSocket conn) {
+    /** 当有线/无线 ADB 在线状态变化时，同步修正已建立回环隧道的通道标识 */
+    public void refreshPhoneSessions() {
+        for (WebSocket conn : getConnections()) {
+            if (!conn.isOpen() || CLIENT_WEB.equals(clientKinds.get(conn))) {
+                continue;
+            }
+            String current = resolveTransport(conn);
+            String previous = clientTransports.put(conn, current);
+            if (!current.equals(previous)) {
+                sendSession(conn, current);
+                String label = transportLabel(current);
+                log.info("通道类型更新：{} -> {}", conn.getRemoteSocketAddress(), label);
+                LogBuffer.get().info("WS", "通道更新（" + label + "）：" + conn.getRemoteSocketAddress());
+            }
+        }
+        syncPhoneEndpointToCamera();
+    }
+
+    private void sendSession(WebSocket conn, String transportMode) {
+        if (conn == null || !conn.isOpen()) {
+            return;
+        }
+        SessionMessage session = new SessionMessage();
+        session.transport = transportMode;
+        session.screenStream = true;
+        session.screenMaxFps = "usb".equals(transportMode) ? usbFps() : lanFps();
+        conn.send(gson.toJson(session));
+    }
+
+    String resolveTransport(WebSocket conn) {
+        if (!isLoopbackConnection(conn)) {
+            return "lan";
+        }
+        java.util.function.BooleanSupplier check = wiredAdbCheck;
+        return (check != null && check.getAsBoolean()) ? "usb" : "wireless_adb";
+    }
+
+    static String transportLabel(String transport) {
+        if ("usb".equals(transport)) {
+            return "USB";
+        }
+        if ("wireless_adb".equals(transport)) {
+            return "无线 ADB";
+        }
+        return "LAN";
+    }
+
+    /** adb reverse 下手机以回环地址接入（可能是有线 USB 或无线 ADB 隧道） */
+    private boolean isLoopbackConnection(WebSocket conn) {
         try {
-            return conn.getRemoteSocketAddress().getAddress().isLoopbackAddress();
+            return conn != null && conn.getRemoteSocketAddress().getAddress().isLoopbackAddress();
         } catch (Exception e) {
             return false;
         }
@@ -526,7 +646,7 @@ public class ControlWebSocketServer extends WebSocketServer {
     }
 
     private void startH264(WebSocket conn, int monitor) {
-        int fps = isUsbChannel(conn) ? usbFps() : lanFps();
+        int fps = "usb".equals(resolveTransport(conn)) ? usbFps() : lanFps();
         final Subscription subscription = new Subscription(monitor, fps);
         final H264ScreenStreamer streamer = streamerFor(monitor, fps);
         H264ScreenStreamer.Sink sink = new H264ScreenStreamer.Sink() {

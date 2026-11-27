@@ -1,5 +1,6 @@
 package com.phoneconsole.pc.tray;
 
+import com.phoneconsole.pc.runtime.ShortcutManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,10 +42,18 @@ public final class TrayManager {
             MenuItem open = new MenuItem("打开调试页面");
             open.addActionListener(e -> openBrowser(debugUrl));
 
+            MenuItem restart = new MenuItem("重启服务");
+            restart.addActionListener(e -> runAsync("tray-restart", () -> {
+                if (ShortcutManager.spawnSilentRestart()) {
+                    System.exit(0);
+                }
+            }));
+
             MenuItem exit = new MenuItem("退出");
-            exit.addActionListener(e -> System.exit(0));
+            exit.addActionListener(e -> runAsync("tray-exit", () -> System.exit(0)));
 
             menu.add(open);
+            menu.add(restart);
             menu.addSeparator();
             menu.add(exit);
 
@@ -54,6 +63,13 @@ public final class TrayManager {
             icon.setToolTip("手机控制台 PC 服务端\n" + debugUrl);
 
             SystemTray.getSystemTray().add(icon);
+            if (Boolean.getBoolean("trayNotify")) {
+                icon.displayMessage(
+                        "手机控制台 PC 服务端",
+                        "已在后台静默启动，右键托盘图标可打开管理网页",
+                        TrayIcon.MessageType.INFO
+                );
+            }
             log.info("托盘图标已就绪");
             return new TrayManager(icon);
         } catch (Exception e) {
@@ -63,11 +79,27 @@ public final class TrayManager {
     }
 
     public void remove() {
+        // 避免 Windows AWT IME / EventQueue 在退出阶段阻塞导致 shutdown-hook 卡死
+        Thread cleaner = new Thread(() -> {
+            try {
+                SystemTray.getSystemTray().remove(trayIcon);
+            } catch (Exception ignored) {
+                // 退出流程中忽略异常
+            }
+        }, "tray-remove");
+        cleaner.setDaemon(true);
+        cleaner.start();
         try {
-            SystemTray.getSystemTray().remove(trayIcon);
-        } catch (Exception ignored) {
-            // 退出流程中忽略异常
+            cleaner.join(400);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
+    }
+
+    private static void runAsync(String name, Runnable task) {
+        Thread thread = new Thread(task, name);
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private static void openBrowser(String url) {

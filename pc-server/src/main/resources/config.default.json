@@ -5,6 +5,18 @@
     "adbExecutable": "adb",
     "reversePollMs": 10000
   },
+  "autoUnlock": {
+    "enabled": true,
+    "wirelessEnabled": false,
+    "wirelessEndpoint": "",
+    "wirelessMdnsAutoDiscover": true,
+    "triggerMode": "on_connect",
+    "password": "",
+    "swipeToUnlock": true,
+    "launchApp": true,
+    "packageName": "com.phoneconsole.client",
+    "activityName": "com.phoneconsole.client.MainActivity"
+  },
   "screen": {
     "ffmpegExecutable": "ffmpeg",
     "monitor": -1,

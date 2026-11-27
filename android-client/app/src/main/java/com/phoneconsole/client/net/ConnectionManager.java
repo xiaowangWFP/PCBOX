@@ -65,6 +65,25 @@ public class ConnectionManager {
 
         /** PC 端下发虚拟摄像头控制指令 */
         void onCameraControl(JsonObject command);
+
+        /** PC 端同步有线自动唤醒解锁设置与结果 */
+        void onUsbUnlockState(UsbUnlockState state);
+    }
+
+    public static final class UsbUnlockState {
+        public boolean enabled = true;
+        public String triggerMode = "on_connect";
+        public boolean swipeToUnlock = true;
+        public boolean launchApp = true;
+        public boolean hasPassword;
+        public int passwordLength;
+        public boolean wirelessEnabled;
+        public String wirelessEndpoint = "";
+        public boolean wirelessMdnsAutoDiscover = true;
+        public boolean wirelessConnected;
+        public String lastResult = "";
+        public long lastRunAt;
+        public boolean needInputPermission;
     }
 
     private static final String TAG = "ConnectionManager";
@@ -72,6 +91,7 @@ public class ConnectionManager {
     private static final String KEY_LAN = "lan_endpoint";
     private static final int DEFAULT_PORT = 8500;
     private static final long CONNECT_TIMEOUT_MS = 800L;
+    private static final long LAN_CONNECT_TIMEOUT_MS = 2500L;
     private static final long RECONNECT_DELAY_MS = 3000L;
 
     private final Context context;
@@ -85,6 +105,9 @@ public class ConnectionManager {
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .pingInterval(20, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false)
+            .build();
+    private final OkHttpClient lanClient = client.newBuilder()
+            .connectTimeout(LAN_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .build();
 
     private volatile WebSocket socket;
@@ -285,6 +308,47 @@ public class ConnectionManager {
         sendJson(payload);
     }
 
+    /** 同步有线与无线调试自动亮屏解锁配置到 PC 服务端 */
+    public void sendUsbUnlockConfig(
+            boolean enabled,
+            @NonNull String triggerMode,
+            boolean swipeToUnlock,
+            boolean launchApp,
+            @Nullable String newPassword,
+            boolean clearPassword,
+            boolean wirelessEnabled,
+            @NonNull String wirelessEndpoint,
+            boolean wirelessMdnsAutoDiscover
+    ) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "usb_unlock_config");
+        payload.addProperty("enabled", enabled);
+        payload.addProperty("triggerMode", triggerMode);
+        payload.addProperty("swipeToUnlock", swipeToUnlock);
+        payload.addProperty("launchApp", launchApp);
+        payload.addProperty("wirelessEnabled", wirelessEnabled);
+        payload.addProperty("wirelessEndpoint", wirelessEndpoint);
+        payload.addProperty("wirelessMdnsAutoDiscover", wirelessMdnsAutoDiscover);
+        payload.addProperty("clearPassword", clearPassword);
+        if (!clearPassword && newPassword != null && !newPassword.isEmpty()) {
+            payload.addProperty("password", newPassword);
+        }
+        sendJson(payload);
+    }
+
+    /** 请求 PC 端立即对已连接 ADB 设备测试一次亮屏、解锁与启动 */
+    public void sendUsbUnlockTest() {
+        sendUsbUnlockTest("all");
+    }
+
+    /** 请求 PC 端立即测试亮屏、解锁与启动（mode = all | wired | wireless） */
+    public void sendUsbUnlockTest(@NonNull String mode) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("type", "usb_unlock_test");
+        payload.addProperty("mode", mode);
+        sendJson(payload);
+    }
+
     private void sendJson(JsonObject payload) {
         WebSocket ws = socket;
         if (ws != null) {
@@ -310,10 +374,14 @@ public class ConnectionManager {
 
     private void buildCandidates() {
         candidates.clear();
-        candidates.add("ws://127.0.0.1:" + DEFAULT_PORT);
+        String loopback = "ws://127.0.0.1:" + DEFAULT_PORT;
+        candidates.add(loopback);
         String lan = prefs().getString(KEY_LAN, null);
-        if (lan != null && !lan.trim().isEmpty()) {
-            candidates.add(lan.trim());
+        if (lan != null) {
+            String trimmed = lan.trim();
+            if (!trimmed.isEmpty() && !loopback.equals(trimmed)) {
+                candidates.add(trimmed);
+            }
         }
     }
 
@@ -345,7 +413,8 @@ public class ConnectionManager {
             main.post(ConnectionManager.this::connectNext);
             return;
         }
-        client.newWebSocket(request, new WebSocketListener() {
+        OkHttpClient wsClient = "USB".equals(modeOf(url)) ? client : lanClient;
+        wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
                 if (gen != generation) {
@@ -403,7 +472,7 @@ public class ConnectionManager {
     }
 
     private String modeOf(String url) {
-        return url.contains("127.0.0.1") || url.contains("localhost") ? "USB" : "Wi-Fi";
+        return url.contains("127.0.0.1") || url.contains("localhost") ? "ADB" : "Wi-Fi";
     }
 
     private void dispatch(String text) {
@@ -458,6 +527,25 @@ public class ConnectionManager {
                     main.post(() -> listener.onCameraControl(obj));
                     break;
                 }
+                case "usb_unlock_state": {
+                    UsbUnlockState state = new UsbUnlockState();
+                    state.enabled = boolOf(obj, "enabled", true);
+                    state.triggerMode = strOf(obj, "triggerMode", "on_connect");
+                    state.swipeToUnlock = boolOf(obj, "swipeToUnlock", true);
+                    state.launchApp = boolOf(obj, "launchApp", true);
+                    state.hasPassword = boolOf(obj, "hasPassword", false);
+                    state.passwordLength = intOf(obj, "passwordLength", 0);
+                    state.wirelessEnabled = boolOf(obj, "wirelessEnabled", false);
+                    state.wirelessEndpoint = strOf(obj, "wirelessEndpoint", "");
+                    state.wirelessMdnsAutoDiscover = boolOf(obj, "wirelessMdnsAutoDiscover", true);
+                    state.wirelessConnected = boolOf(obj, "wirelessConnected", false);
+                    state.lastResult = strOf(obj, "lastResult", "");
+                    state.lastRunAt = obj.has("lastRunAt") && !obj.get("lastRunAt").isJsonNull()
+                            ? obj.get("lastRunAt").getAsLong() : 0L;
+                    state.needInputPermission = boolOf(obj, "needInputPermission", false);
+                    main.post(() -> listener.onUsbUnlockState(state));
+                    break;
+                }
                 default:
                     Log.d(TAG, "忽略消息类型：" + type);
                     break;
@@ -477,5 +565,9 @@ public class ConnectionManager {
 
     private static double doubleOf(JsonObject obj, String key, double fallback) {
         return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsDouble() : fallback;
+    }
+
+    private static boolean boolOf(JsonObject obj, String key, boolean fallback) {
+        return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsBoolean() : fallback;
     }
 }

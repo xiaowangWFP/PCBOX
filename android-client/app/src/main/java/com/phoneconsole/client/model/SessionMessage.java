@@ -5,7 +5,7 @@ package com.phoneconsole.client.model;
  */
 public class SessionMessage {
     public String type;
-    /** usb | lan */
+    /** usb | wireless_adb | lan */
     public String transport;
     public boolean screenStream;
     public int screenMaxFps;

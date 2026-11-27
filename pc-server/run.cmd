@@ -60,7 +60,7 @@ echo [4/4] 启动服务，就绪后将自动打开网页控制台...
 echo.
 
 rem 后台等待 8501 端口就绪后打开浏览器，不阻塞前台日志
-start "" /b powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "for ($i=0; $i -lt 120; $i++) { $c = New-Object Net.Sockets.TcpClient; try { $c.Connect('127.0.0.1', 8501); Start-Process 'http://127.0.0.1:8501/'; break } catch { Start-Sleep -Milliseconds 500 } finally { $c.Dispose() } }"
+rem start "" /b powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "for ($i=0; $i -lt 120; $i++) { $c = New-Object Net.Sockets.TcpClient; try { $c.Connect('127.0.0.1', 8501); Start-Process 'http://127.0.0.1:8501/'; break } catch { Start-Sleep -Milliseconds 500 } finally { $c.Dispose() } }"
 
 rem 优先用本地下载的 JRE，其次 JAVA_HOME，最后 PATH 里的 java
 set "JAVA_CMD=java"

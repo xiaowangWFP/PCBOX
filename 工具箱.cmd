@@ -37,6 +37,8 @@ echo.
 echo   -- PC 服务端 --
 echo   [8]  构建 jar
 echo   [9]  启动服务（自动重启并打开控制台）
+echo   [14] 静默后台启动（无黑框，缩进系统托盘）
+echo   [15] 绑定全局启动快捷键（如 Ctrl+Alt+P）
 echo.
 echo   -- 共享 --
 echo   [10] 打开发布目录 dist
@@ -44,7 +46,7 @@ echo   [11] 打包为 zip
 echo   [0]  退出
 echo  ==========================================================
 set "CH="
-set /p "CH=请选择 [0-13]: "
+set /p "CH=请选择 [0-15]: "
 
 if "!CH!"=="0" exit /b 0
 if "!CH!"=="1" goto ENV
@@ -60,6 +62,8 @@ if "!CH!"=="10" goto OPEN_DIST
 if "!CH!"=="11" goto PACKAGE
 if "!CH!"=="12" goto SOFTCAM_INSTALL
 if "!CH!"=="13" goto SOFTCAM_UNINSTALL
+if "!CH!"=="14" goto SRV_SILENT
+if "!CH!"=="15" goto SRV_SHORTCUT
 goto MENU
 
 :ENV
@@ -241,6 +245,49 @@ goto MENU
 :SRV_RUN
 cls
 call "%SRV%\run.cmd"
+goto MENU
+
+:SRV_SILENT
+cls
+echo  ---- 静默后台启动 PC 服务端 ----
+echo.
+wscript.exe "%SRV%\launch-silent.vbs"
+echo  [完成] 已在后台启动（若服务已在运行，则直接打开管理网页）。
+echo  可在屏幕右下角系统托盘找到「手机控制台 PC 服务端」图标。
+echo.
+pause
+goto MENU
+
+:SRV_SHORTCUT
+cls
+echo  ---- 绑定全局启动快捷键 ----
+echo.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $raw = & '%SRV%\bind-shortcut.ps1' -Action status; $r = $raw | ConvertFrom-Json; if ($r.bound) { Write-Host ('  当前已绑定快捷键: ' + $r.hotkey) } else { Write-Host '  当前状态: 尚未绑定快捷键' }; if ($r.desktopShortcut) { Write-Host '  桌面快捷方式: 已生成' }; if ($r.autoStart) { Write-Host '  开机静默自启: 已开启' } }"
+echo.
+echo  说明: 绑定后在桌面按组合键即可直接无黑框启动服务；输入 unbind 可解除绑定。
+set "HK="
+set /p "HK=请输入快捷键（直接回车默认 Ctrl+Alt+P，输入 unbind 解除）: "
+if /i "!HK!"=="unbind" goto SRV_SHORTCUT_UNBIND
+if not defined HK set "HK=Ctrl+Alt+P"
+set "DESK="
+set /p "DESK=是否同时创建桌面快捷方式？[y/N]: "
+set "AUTO="
+set /p "AUTO=是否开启开机自动静默启动？[y/N]: "
+set "DESK_FLAG="
+if /i "!DESK!"=="y" set "DESK_FLAG=-Desktop"
+set "AUTO_FLAG=-AutoStartMode disable"
+if /i "!AUTO!"=="y" set "AUTO_FLAG=-AutoStartMode enable"
+echo.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $raw = & '%SRV%\bind-shortcut.ps1' -Action bind -Hotkey '!HK!' !DESK_FLAG! !AUTO_FLAG!; $r = $raw | ConvertFrom-Json; if ($r.ok) { Write-Host ('  [成功] 已绑定全局快捷键: ' + $r.hotkey); Write-Host ('  开始菜单捷径: ' + $r.startMenuPath) } else { Write-Host ('  [失败] ' + $r.error) } }"
+echo.
+pause
+goto MENU
+
+:SRV_SHORTCUT_UNBIND
+echo.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $raw = & '%SRV%\bind-shortcut.ps1' -Action unbind -RemoveDesktop -AutoStartMode disable; $r = $raw | ConvertFrom-Json; if ($r.ok) { Write-Host '  [成功] 已解除启动快捷键及相关快捷方式。' } else { Write-Host ('  [失败] ' + $r.error) } }"
+echo.
+pause
 goto MENU
 
 :OPEN_DIST

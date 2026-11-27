@@ -5,7 +5,11 @@ import com.phoneconsole.pc.runtime.LogBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,14 +31,26 @@ import java.util.concurrent.TimeUnit;
  */
 public class AdbPortForwarder {
 
+    @FunctionalInterface
+    public interface CommandExecutor {
+        Result execute(String... command);
+    }
+
     private static final Logger log = LoggerFactory.getLogger(AdbPortForwarder.class);
     private static final long COMMAND_TIMEOUT_SECONDS = 5;
+    private static final long WIRELESS_CONNECT_TIMEOUT_SECONDS = 3;
+    private static final long PAIR_TIMEOUT_SECONDS = 10;
+    private static final int TCP_PROBE_TIMEOUT_MS = 1200;
+    private static final long WIRELESS_RETRY_COOLDOWN_MS = 30_000L;
     private static final String SELECTOR_SERIAL = "serial";
     private static final String SELECTOR_TRANSPORT = "transport";
 
     private volatile AppConfig.Network network;
+    private volatile java.util.function.Supplier<AppConfig.AutoUnlock> autoUnlockSupplier;
     private final int port;
     private volatile int forwardPort;
+    private final CommandExecutor commandExecutor;
+    private final boolean customExecutor;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "adb-watchdog");
         t.setDaemon(true);
@@ -49,6 +65,9 @@ public class AdbPortForwarder {
     /** 上一次成功映射的设备组合（序列号 + transport_id），用于去重 */
     private String lastMapped = "";
     private boolean adbMissing;
+    private long lastWirelessAttemptAt;
+    private volatile String wirelessMessage = "";
+    private volatile java.util.function.Consumer<List<Device>> deviceObserver;
 
     private volatile Status status;
 
@@ -61,31 +80,61 @@ public class AdbPortForwarder {
         public List<String> mappings = List.of();
         public long checkedAt;
         public String message = "";
+        public int wiredCount;
+        public int wirelessCount;
+        public boolean wirelessConnected;
+        public String wirelessMessage = "";
 
         Status(String executable) {
             this.executable = executable;
         }
     }
 
-    /** 单个 USB 设备：序列号与 transport_id 互为冗余地址 */
+    /** 单个 USB/无线设备：序列号与 transport_id 互为冗余地址 */
     public static final class Device {
         public String serial = "";
         public String transportId = "";
         public String state = "";
         public String model = "";
+        public boolean wireless;
         /** serial | transport，最近一次成功使用的寻址方式 */
         public String selector = SELECTOR_SERIAL;
     }
 
     public AdbPortForwarder(AppConfig.Network network, int wsPort) {
-        this(network, wsPort, 0);
+        this(network, wsPort, 0, null);
     }
 
     public AdbPortForwarder(AppConfig.Network network, int wsPort, int forwardPort) {
+        this(network, wsPort, forwardPort, null);
+    }
+
+    AdbPortForwarder(AppConfig.Network network, int wsPort, int forwardPort, CommandExecutor executor) {
         this.network = network;
         this.port = wsPort;
         this.forwardPort = Math.max(0, forwardPort);
+        this.customExecutor = executor != null;
+        this.commandExecutor = customExecutor ? executor : this::runProcess;
         this.status = new Status(network != null ? network.adbExecutable : "adb");
+    }
+
+    public static boolean isWirelessSerial(String serial) {
+        return serial != null && serial.contains(":");
+    }
+
+    public void setAutoUnlockSupplier(java.util.function.Supplier<AppConfig.AutoUnlock> supplier) {
+        this.autoUnlockSupplier = supplier;
+        this.lastWirelessAttemptAt = 0L;
+    }
+
+    /** 配置热重载后清零无线重试冷却，下次轮询立即按新配置尝试 */
+    public void resetWirelessBackoff() {
+        this.lastWirelessAttemptAt = 0L;
+    }
+
+    public boolean hasWiredOnline() {
+        Status s = status;
+        return s != null && s.wiredCount > 0;
     }
 
     /** 配置热重载后更新 adb 路径等参数（轮询间隔需重启生效） */
@@ -131,57 +180,364 @@ public class AdbPortForwarder {
         map.put("mappings", snapshot.mappings);
         map.put("checkedAt", snapshot.checkedAt);
         map.put("message", snapshot.message);
+        map.put("wiredCount", snapshot.wiredCount);
+        map.put("wirelessCount", snapshot.wirelessCount);
+        map.put("wirelessConnected", snapshot.wirelessConnected);
+        map.put("wirelessMessage", snapshot.wirelessMessage);
         map.put("port", port);
         map.put("forwardPort", forwardPort);
         map.put("redundancy", "serial+transport_id");
         return map;
     }
 
-    private void tick() {
+    public void setDeviceObserver(java.util.function.Consumer<List<Device>> observer) {
+        this.deviceObserver = observer;
+    }
+
+    /** 在同步 ADB 锁保护下执行单个设备上的 adb shell 命令 */
+    public Result shellOn(Device device, String shellCommand) {
+        if (device == null || !hasText(shellCommand)) {
+            return new Result(-1, "无效设备或空命令", false);
+        }
+        synchronized (adbLock) {
+            return runOn(device, "shell", shellCommand);
+        }
+    }
+
+    /** 当前最近一次检测到的已授权设备快照 */
+    public List<Device> onlineDevicesSnapshot() {
+        Status snapshot = status;
+        if (snapshot == null || snapshot.deviceDetails == null) {
+            return List.of();
+        }
+        return List.copyOf(onlineDevices(snapshot.deviceDetails));
+    }
+
+    /** 手动触发无线调试配对（Android 11+：adb pair IP:配对端口 配对码） */
+    public Map<String, Object> pairWireless(String endpoint, String pairCode) {
+        String target = endpoint == null ? "" : endpoint.trim();
+        String code = pairCode == null ? "" : pairCode.trim();
+        if (!com.phoneconsole.pc.config.ConfigStore.isValidHostPort(target)) {
+            return Map.of("ok", false, "error", "配对地址格式需为 IP:配对端口", "adb", statusMap());
+        }
+        if (code.isEmpty() || code.matches(".*\\s+.*")) {
+            return Map.of("ok", false, "error", "请输入有效的 6 位无线配对码", "adb", statusMap());
+        }
+        if (!customExecutor) {
+            String reachError = probeTcpUnreachableReason(target, TCP_PROBE_TIMEOUT_MS);
+            if (reachError != null) {
+                wirelessMessage = "无线配对失败 [" + target + "]：" + reachError;
+                log.warn("ADB {}", wirelessMessage);
+                LogBuffer.get().warn("ADB", wirelessMessage);
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("ok", false);
+                payload.put("error", wirelessMessage);
+                payload.put("adb", statusMap());
+                return payload;
+            }
+        }
+        Result res;
+        synchronized (adbLock) {
+            res = runWithTimeout(PAIR_TIMEOUT_SECONDS, net().adbExecutable, "pair", target, code);
+        }
+        String out = firstLine(res.output(), res.ok() ? "配对成功" : "配对失败");
+        boolean ok = res.ok() && !out.toLowerCase(java.util.Locale.ROOT).contains("failed");
+        if (ok) {
+            wirelessMessage = "无线配对成功：" + out;
+            log.info("ADB 无线配对成功 [{}]", target);
+            LogBuffer.get().info("ADB", "无线配对成功 [" + target + "]：" + out);
+        } else {
+            wirelessMessage = "无线配对失败：" + out;
+            log.warn("ADB 无线配对失败 [{}]：{}", target, out);
+            LogBuffer.get().warn("ADB", "无线配对失败 [" + target + "]：" + out);
+        }
+        probe();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ok", ok);
+        payload.put(ok ? "message" : "error", wirelessMessage);
+        payload.put("adb", statusMap());
+        return payload;
+    }
+
+    /** 手动触发连接无线调试（adb connect IP:端口） */
+    public Map<String, Object> connectWireless(String endpoint, boolean allowMdnsFallback) {
+        String target = endpoint == null ? "" : endpoint.trim();
+        if (!com.phoneconsole.pc.config.ConfigStore.isValidHostPort(target) && !allowMdnsFallback) {
+            return Map.of("ok", false, "error", "无线调试地址格式需为 IP:端口（如 10.26.3.135:33007）", "adb", statusMap());
+        }
+        String connectedEndpoint = "";
+        synchronized (adbLock) {
+            lastWirelessAttemptAt = 0L;
+            Result devRes = run(net().adbExecutable, "devices", "-l");
+            List<Device> details = devRes.ok() ? parseDeviceDetails(devRes.output()) : List.of();
+            connectedEndpoint = tryConnectWirelessLocked(details, target, allowMdnsFallback);
+        }
+        Status latest = probe();
+        boolean ok = hasText(connectedEndpoint) || latest.wirelessConnected;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ok", ok);
+        if (ok) {
+            String msg = "无线调试已连接" + (hasText(connectedEndpoint) ? "：" + connectedEndpoint : "");
+            payload.put("message", msg);
+            payload.put("connectedEndpoint", connectedEndpoint);
+        } else {
+            payload.put("error", hasText(wirelessMessage) ? wirelessMessage : "连接无线调试失败");
+        }
+        payload.put("adb", statusMap());
+        return payload;
+    }
+
+    /** 手动断开无线调试设备 */
+    public Map<String, Object> disconnectWireless(String endpoint) {
+        String target = endpoint == null ? "" : endpoint.trim();
+        synchronized (adbLock) {
+            if (hasText(target)) {
+                run(net().adbExecutable, "disconnect", target);
+            } else {
+                Result devRes = run(net().adbExecutable, "devices", "-l");
+                if (devRes.ok()) {
+                    for (Device d : parseDeviceDetails(devRes.output())) {
+                        if (d.wireless) {
+                            run(net().adbExecutable, "disconnect", d.serial);
+                        }
+                    }
+                }
+            }
+            lastWirelessAttemptAt = System.currentTimeMillis();
+            wirelessMessage = "已断开无线调试";
+        }
+        probe();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ok", true);
+        payload.put("message", "已断开无线调试");
+        payload.put("adb", statusMap());
+        return payload;
+    }
+
+    void tick() {
+        List<Device> onlineForNotify = List.of();
         try {
             synchronized (adbLock) {
                 Result devicesResult = run(net().adbExecutable, "devices", "-l");
                 if (!devicesResult.ok()) {
                     publishStatus(List.of(), List.of(), false, firstLine(devicesResult.output, "adb 不可用"));
                     lastMapped = "";
-                    return;
-                }
-
-                List<Device> details = parseDeviceDetails(devicesResult.output);
-                List<Device> online = onlineDevices(details);
-                if (online.isEmpty()) {
-                    publishStatus(details, List.of(), true, "未检测到已授权设备");
-                    lastMapped = "";
-                    return;
-                }
-
-                String joined = mappingKey(online);
-                boolean previouslyMapped = joined.equals(lastMapped);
-                List<String> mappings = new ArrayList<>();
-                boolean allOk = true;
-                int fwd = forwardPort;
-
-                for (Device device : online) {
-                    if (!ensureMapping(device, "reverse", port, previouslyMapped, mappings)) {
-                        allOk = false;
+                    onlineForNotify = List.of();
+                } else {
+                    List<Device> details = parseDeviceDetails(devicesResult.output);
+                    List<Device> online = onlineDevices(details);
+                    if (!online.isEmpty()) {
+                        applyOnlineMappingsLocked(details, online);
                     }
-                    if (fwd > 0 && !ensureMapping(device, "forward", fwd, previouslyMapped, mappings)) {
-                        allOk = false;
+                    // 先为已接入的有线设备建立映射与就绪状态，再尝试无线调试连接，避免无线超时阻塞有线启动
+                    if (ensureWirelessIfConfiguredLocked(details)) {
+                        Result refreshed = run(net().adbExecutable, "devices", "-l");
+                        if (refreshed.ok()) {
+                            details = parseDeviceDetails(refreshed.output);
+                            online = onlineDevices(details);
+                        }
+                    }
+                    if (online.isEmpty()) {
+                        publishStatus(details, List.of(), true, "未检测到已授权设备");
+                        lastMapped = "";
+                        onlineForNotify = List.of();
+                    } else {
+                        applyOnlineMappingsLocked(details, online);
+                        onlineForNotify = List.copyOf(online);
                     }
                 }
-
-                lastMapped = allOk ? joined : "";
-                publishStatus(details, mappings, true, allOk ? "" : "端口映射存在失败，下个周期重试");
+            }
+            java.util.function.Consumer<List<Device>> observer = deviceObserver;
+            if (observer != null) {
+                observer.accept(onlineForNotify);
             }
         } catch (Throwable t) {
             log.debug("ADB 轮询异常：{}", t.getMessage());
         }
     }
 
+    private void applyOnlineMappingsLocked(List<Device> details, List<Device> online) {
+        String joined = mappingKey(online);
+        boolean previouslyMapped = joined.equals(lastMapped);
+        List<String> mappings = new ArrayList<>();
+        boolean allOk = true;
+        int fwd = forwardPort;
+        boolean hasWired = hasWiredDevice(online);
+
+        for (Device device : online) {
+            if (!ensureMapping(device, "reverse", port, previouslyMapped, mappings)) {
+                allOk = false;
+            }
+            if (fwd > 0 && (!hasWired || !device.wireless)) {
+                if (!ensureMapping(device, "forward", fwd, previouslyMapped, mappings)) {
+                    allOk = false;
+                }
+            }
+        }
+
+        lastMapped = allOk ? joined : "";
+        publishStatus(details, mappings, true, allOk ? "" : "端口映射存在失败，下个周期重试");
+    }
+
+    private boolean ensureWirelessIfConfiguredLocked(List<Device> details) {
+        AppConfig.AutoUnlock cfg = autoUnlockSupplier != null ? autoUnlockSupplier.get() : null;
+        if (cfg == null || !cfg.wirelessEnabled) {
+            return false;
+        }
+        String endpoint = cfg.wirelessEndpoint == null ? "" : cfg.wirelessEndpoint.trim();
+        if (!hasText(endpoint) && !cfg.wirelessMdnsAutoDiscover) {
+            return false;
+        }
+        for (Device d : details) {
+            if (d.wireless && "device".equals(d.state)) {
+                wirelessMessage = "无线已连接：" + d.serial;
+                return false;
+            }
+        }
+        long now = System.currentTimeMillis();
+        if (lastWirelessAttemptAt > 0 && now - lastWirelessAttemptAt < WIRELESS_RETRY_COOLDOWN_MS) {
+            return false;
+        }
+        lastWirelessAttemptAt = now;
+        String connected = tryConnectWirelessLocked(details, endpoint, cfg.wirelessMdnsAutoDiscover);
+        return hasText(connected);
+    }
+
+    private String tryConnectWirelessLocked(List<Device> details, String endpoint, boolean allowMdns) {
+        if (hasText(endpoint)) {
+            cleanupOfflineWirelessEntry(details, endpoint);
+            String reachError = customExecutor ? null : probeTcpUnreachableReason(endpoint, TCP_PROBE_TIMEOUT_MS);
+            if (reachError != null) {
+                wirelessMessage = "无法连接无线调试 [" + endpoint + "]：" + reachError;
+            } else {
+                Result conn = runWithTimeout(WIRELESS_CONNECT_TIMEOUT_SECONDS, net().adbExecutable, "connect", endpoint);
+                if (isConnectSuccess(conn)) {
+                    wirelessMessage = "无线已连接：" + endpoint;
+                    log.info("ADB 无线调试已连接：{}", endpoint);
+                    LogBuffer.get().info("ADB", "无线调试已连接：" + endpoint);
+                    return endpoint;
+                }
+                // 失败或超时后立即 disconnect，避免 adb devices 长期残留 offline 僵尸条目
+                run(net().adbExecutable, "disconnect", endpoint);
+                String errLine = firstLine(conn.output(), "连接失败");
+                wirelessMessage = "无线连接失败 [" + endpoint + "]：" + errLine
+                        + "（如首次使用或端口变化，请先配对或核对手机无线调试端口）";
+            }
+        }
+
+        if (allowMdns) {
+            Result mdns = run(net().adbExecutable, "mdns", "services");
+            if (mdns.ok()) {
+                String preferredHost = extractHost(endpoint);
+                String discovered = parseMdnsConnectEndpoint(mdns.output(), preferredHost);
+                if (hasText(discovered) && !discovered.equals(endpoint)) {
+                    cleanupOfflineWirelessEntry(details, discovered);
+                    String reachError = customExecutor ? null : probeTcpUnreachableReason(discovered, TCP_PROBE_TIMEOUT_MS);
+                    if (reachError == null) {
+                        Result connMdns = runWithTimeout(WIRELESS_CONNECT_TIMEOUT_SECONDS, net().adbExecutable, "connect", discovered);
+                        if (isConnectSuccess(connMdns)) {
+                            wirelessMessage = "通过 mDNS 发现并连接无线调试：" + discovered;
+                            log.info("ADB 通过 mDNS 连接无线调试：{}", discovered);
+                            LogBuffer.get().info("ADB", "通过 mDNS 连接无线调试：" + discovered);
+                            return discovered;
+                        }
+                        run(net().adbExecutable, "disconnect", discovered);
+                    }
+                }
+            }
+        }
+        return "";
+    }
+
+    private void cleanupOfflineWirelessEntry(List<Device> details, String endpoint) {
+        for (Device d : details) {
+            if (endpoint.equals(d.serial) && !"device".equals(d.state)) {
+                run(net().adbExecutable, "disconnect", endpoint);
+            }
+        }
+    }
+
+    /** 连接/配对前做轻量 TCP 预探：若直接超时即可快速判定网络隔离/不可达，避免卡死 adbLock 或残留 offline */
+    private static String probeTcpUnreachableReason(String endpoint, int timeoutMs) {
+        String host = extractHost(endpoint);
+        int idx = endpoint == null ? -1 : endpoint.lastIndexOf(':');
+        if (host.isEmpty() || idx < 0) {
+            return "地址格式无效";
+        }
+        int port;
+        try {
+            port = Integer.parseInt(endpoint.substring(idx + 1).trim());
+        } catch (NumberFormatException e) {
+            return "端口无效";
+        }
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(host, port), timeoutMs);
+            return null;
+        } catch (SocketTimeoutException e) {
+            return "网络 TCP 超时（可能处于校园网/公共Wi-Fi终端隔离或不在同一网段，可开电脑移动热点或普通路由器后再试）";
+        } catch (IOException e) {
+            // Connection refused 通常表示端口未开/已更换，放行后续 mDNS 自动发现或由 adb 给出精确提示
+            return null;
+        }
+    }
+
+    static String parseMdnsConnectEndpoint(String output, String preferredHost) {
+        if (output == null || output.isBlank()) {
+            return "";
+        }
+        String fallback = "";
+        for (String line : output.split("\\R")) {
+            if (!line.contains("_adb-tls-connect._tcp")) {
+                continue;
+            }
+            String[] parts = line.trim().split("\\s+");
+            for (int i = parts.length - 1; i >= 0; i--) {
+                String token = parts[i].trim();
+                if (com.phoneconsole.pc.config.ConfigStore.isValidHostPort(token)) {
+                    if (preferredHost != null && !preferredHost.isBlank()
+                            && preferredHost.equals(extractHost(token))) {
+                        return token;
+                    }
+                    if (fallback.isEmpty()) {
+                        fallback = token;
+                    }
+                }
+            }
+        }
+        return fallback;
+    }
+
+    private static String extractHost(String endpoint) {
+        if (endpoint == null) {
+            return "";
+        }
+        int idx = endpoint.lastIndexOf(':');
+        return idx > 0 ? endpoint.substring(0, idx).trim() : endpoint.trim();
+    }
+
+    private static boolean isConnectSuccess(Result res) {
+        if (res == null || !res.ok()) {
+            return false;
+        }
+        String out = res.output() == null ? "" : res.output().toLowerCase(java.util.Locale.ROOT);
+        return (out.contains("connected to ") || out.contains("already connected to "))
+                && !out.contains("cannot connect")
+                && !out.contains("failed to connect");
+    }
+
+    private static boolean hasWiredDevice(List<Device> online) {
+        for (Device d : online) {
+            if (!d.wireless) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean ensureMapping(Device device, String mode, int targetPort,
                                   boolean previouslyMapped, List<String> mappings) {
         boolean isForward = "forward".equals(mode);
-        String verbLabel = isForward ? "正向端口映射" : "有线端口映射";
+        String verbLabel = isForward ? "正向端口映射" : (device.wireless ? "无线反向映射" : "有线反向映射");
         Result list = runOn(device, mode, "--list");
         if (list.ok() && hasPortMapping(list.output(), targetPort, isForward ? device.serial : null)) {
             appendMappingLines(mappings, device.serial, mode, list.output());
@@ -267,6 +623,7 @@ public class AdbPortForwarder {
             snapshot.devices = List.copyOf(onlineSerials(details));
             List<String> mappingNotes = new ArrayList<>();
             snapshot.mappings = List.copyOf(readMappings(details, mappingNotes));
+            populateWirelessMeta(snapshot, details);
             if (snapshot.devices.isEmpty()) {
                 mappingNotes.add("未检测到已授权设备");
             }
@@ -289,6 +646,7 @@ public class AdbPortForwarder {
             if (!devices.ok()) {
                 adbMissing = devices.unavailable();
                 snapshot.message = firstLine(devices.output, "adb 不可用");
+                snapshot.wirelessMessage = wirelessMessage;
                 status = snapshot;
                 LogBuffer.get().warn("ADB", "手动重建失败：" + snapshot.message);
                 return snapshot;
@@ -300,8 +658,9 @@ public class AdbPortForwarder {
             snapshot.adbAvailable = true;
             snapshot.deviceDetails = List.copyOf(details);
             snapshot.devices = List.copyOf(onlineSerials(details));
+            populateWirelessMeta(snapshot, details);
             if (online.isEmpty()) {
-                snapshot.message = "未检测到已授权设备，请检查数据线与 USB 调试开关";
+                snapshot.message = "未检测到已授权设备，请检查数据线与 USB / 无线调试开关";
                 status = snapshot;
                 LogBuffer.get().warn("ADB", "手动重建跳过：" + snapshot.message);
                 return snapshot;
@@ -310,6 +669,7 @@ public class AdbPortForwarder {
             List<String> notes = new ArrayList<>();
             boolean allOk = true;
             int fwd = forwardPort;
+            boolean hasWired = hasWiredDevice(online);
             for (Device device : online) {
                 Result reverse = runOn(device, "reverse", "tcp:" + port, "tcp:" + port);
                 if (reverse.ok()) {
@@ -318,7 +678,7 @@ public class AdbPortForwarder {
                     allOk = false;
                     notes.add(device.serial + " 反向映射失败：" + firstLine(reverse.output, "未知错误"));
                 }
-                if (fwd > 0) {
+                if (fwd > 0 && (!hasWired || !device.wireless)) {
                     Result forward = runOn(device, "forward", "tcp:" + fwd, "tcp:" + fwd);
                     if (forward.ok()) {
                         notes.add(device.serial + " 摄像头端口转发成功（tcp:" + fwd + "）");
@@ -377,9 +737,30 @@ public class AdbPortForwarder {
         snapshot.devices = List.copyOf(onlineSerials(details));
         snapshot.mappings = snapshot.devices.isEmpty() ? List.of() : List.copyOf(mappings);
         snapshot.checkedAt = System.currentTimeMillis();
+        populateWirelessMeta(snapshot, details);
         snapshot.message = message != null ? message
                 : (available ? (snapshot.devices.isEmpty() ? "未检测到已授权设备" : "") : "未找到 adb 可执行文件");
         status = snapshot;
+    }
+
+    private void populateWirelessMeta(Status snapshot, List<Device> details) {
+        int wired = 0;
+        int wireless = 0;
+        if (details != null) {
+            for (Device d : details) {
+                if ("device".equals(d.state)) {
+                    if (d.wireless) {
+                        wireless++;
+                    } else {
+                        wired++;
+                    }
+                }
+            }
+        }
+        snapshot.wiredCount = wired;
+        snapshot.wirelessCount = wireless;
+        snapshot.wirelessConnected = wireless > 0;
+        snapshot.wirelessMessage = wirelessMessage;
     }
 
     /**
@@ -472,6 +853,7 @@ public class AdbPortForwarder {
             }
             Device device = new Device();
             device.serial = parts[0];
+            device.wireless = isWirelessSerial(device.serial);
             device.state = parts[1];
             for (int i = 2; i < parts.length; i++) {
                 String token = parts[i];
@@ -552,17 +934,46 @@ public class AdbPortForwarder {
         return value != null && !value.isBlank();
     }
 
-    /** 执行命令并返回退出码与输出，超时立即强杀；所有 adb 调用都走这里 */
+    /** 所有 adb 调用统一走 CommandExecutor，便于生产执行与单元测试替换 */
     private Result run(String... command) {
+        return commandExecutor.execute(command);
+    }
+
+    private Result runWithTimeout(long timeoutSeconds, String... command) {
+        if (customExecutor) {
+            return commandExecutor.execute(command);
+        }
+        return runProcessWithTimeout(timeoutSeconds, command);
+    }
+
+    private Result runProcess(String... command) {
+        return runProcessWithTimeout(COMMAND_TIMEOUT_SECONDS, command);
+    }
+
+    /** 执行命令并返回退出码与输出，边读边等避免 >4KB 管道死锁 */
+    private Result runProcessWithTimeout(long timeoutSeconds, String... command) {
         try {
             Process process = new ProcessBuilder(command)
                     .redirectErrorStream(true)
                     .start();
-            if (!process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            ByteArrayOutputStream buf = new ByteArrayOutputStream();
+            Thread drainer = new Thread(() -> {
+                try {
+                    process.getInputStream().transferTo(buf);
+                } catch (IOException ignored) {
+                    // 进程超时被销毁时管道关闭属正常现象
+                }
+            }, "adb-stdout");
+            drainer.setDaemon(true);
+            drainer.start();
+
+            if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                return new Result(-1, "命令超时（" + COMMAND_TIMEOUT_SECONDS + "s）", false);
+                drainer.join(200);
+                return new Result(-1, "命令超时（" + timeoutSeconds + "s）", false);
             }
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            drainer.join(500);
+            String output = buf.toString(StandardCharsets.UTF_8).trim();
             if (adbMissing) {
                 adbMissing = false;
                 log.info("ADB 已可用");
@@ -572,9 +983,9 @@ public class AdbPortForwarder {
         } catch (IOException e) {
             if (!adbMissing) {
                 adbMissing = true;
-                log.warn("未检测到 adb（{}），有线模式将不可用；仅影响 USB 直连，无线模式不受影响",
+                log.warn("未检测到 adb（{}），有线/无线 ADB 模式将不可用；仅影响 ADB 功能，局域网 WebSocket 不受影响",
                         net().adbExecutable);
-                LogBuffer.get().warn("ADB", "未检测到 adb（" + net().adbExecutable + "），有线模式不可用");
+                LogBuffer.get().warn("ADB", "未检测到 adb（" + net().adbExecutable + "），ADB 模式不可用");
             }
             return new Result(-1, "无法执行 " + command[0] + "：" + e.getMessage(), true);
         } catch (InterruptedException e) {
@@ -583,8 +994,8 @@ public class AdbPortForwarder {
         }
     }
 
-    private record Result(int exitCode, String output, boolean unavailable) {
-        boolean ok() {
+    public record Result(int exitCode, String output, boolean unavailable) {
+        public boolean ok() {
             return exitCode == 0;
         }
     }
